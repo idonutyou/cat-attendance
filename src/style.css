@@ -1,0 +1,971 @@
+:root {
+  font-family:
+    Pretendard,
+    "Noto Sans KR",
+    "Segoe UI",
+    sans-serif;
+
+  color: #172033;
+  background: #eef2f8;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+
+  --border: #dde4ef;
+  --muted: #778196;
+  --surface: #ffffff;
+  --background: #eef2f8;
+
+  --day: #3b82f6;
+  --night: #6366f1;
+  --day-overtime: #06b6d4;
+  --night-overtime: #8b5cf6;
+  --day-holiday: #f59e0b;
+  --night-holiday: #ec4899;
+  --day-holiday-overtime: #f97316;
+  --night-holiday-overtime: #db2777;
+  --annual-leave: #10b981;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(37, 99, 235, 0.12),
+      transparent 32%
+    ),
+    var(--background);
+}
+
+button {
+  font: inherit;
+}
+
+button,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 26px 24px;
+
+  color: white;
+  background:
+    linear-gradient(
+      135deg,
+      #1d4ed8,
+      #2563eb 55%,
+      #4f46e5
+    );
+}
+
+.app-header h1 {
+  margin: 2px 0 0;
+  font-size: clamp(25px, 4vw, 34px);
+  letter-spacing: -1px;
+}
+
+.header-caption {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.header-icon {
+  display: grid;
+  place-items: center;
+
+  width: 50px;
+  height: 50px;
+
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 16px;
+
+  font-size: 25px;
+  font-weight: 800;
+
+  background: rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(8px);
+}
+
+.main-content {
+  width: min(1100px, calc(100% - 28px));
+  margin: 24px auto 60px;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.calendar-card,
+.summary-card {
+  padding: 22px;
+
+  border: 1px solid rgba(221, 228, 239, 0.9);
+  border-radius: 22px;
+
+  background: var(--surface);
+  box-shadow:
+    0 16px 38px rgba(34, 56, 94, 0.08);
+}
+
+.calendar-toolbar {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 12px;
+}
+
+.calendar-toolbar h2 {
+  margin: 0;
+  text-align: center;
+
+  font-size: 23px;
+  letter-spacing: -0.6px;
+}
+
+.month-button {
+  width: 44px;
+  height: 44px;
+
+  border: 1px solid var(--border);
+  border-radius: 14px;
+
+  color: #2d3950;
+  background: #f8fafc;
+
+  font-size: 27px;
+  cursor: pointer;
+}
+
+.month-button:hover {
+  border-color: #a9bce2;
+  background: #eef4ff;
+}
+
+.today-button {
+  display: block;
+
+  margin: 12px auto 20px;
+  padding: 8px 15px;
+
+  border: 0;
+  border-radius: 999px;
+
+  color: var(--primary);
+  background: #edf4ff;
+
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.weekdays {
+  margin-bottom: 8px;
+}
+
+.weekdays div {
+  padding: 9px 2px;
+
+  text-align: center;
+  color: #7c879a;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.weekdays .saturday {
+  color: #2563eb;
+}
+
+.weekdays .sunday {
+  color: #ef4444;
+}
+
+.calendar-grid {
+  gap: 7px;
+}
+
+.day-cell {
+  position: relative;
+
+  min-width: 0;
+  min-height: 92px;
+  padding: 10px 8px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+
+  border: 1px solid var(--border);
+  border-radius: 15px;
+
+  color: #26334a;
+  background: #ffffff;
+
+  text-align: left;
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.day-cell:not(.empty):hover {
+  z-index: 2;
+
+  transform: translateY(-2px);
+
+  border-color: #a8bcec;
+  box-shadow:
+    0 9px 20px rgba(34, 70, 130, 0.12);
+}
+
+.day-cell.empty {
+  border-color: transparent;
+  background: #f8fafc;
+  cursor: default;
+}
+
+.day-cell.today {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.day-number {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.saturday-cell .day-number {
+  color: #2563eb;
+}
+
+.sunday-cell .day-number {
+  color: #ef4444;
+}
+
+.work-badge {
+  margin-top: auto;
+  padding: 6px 5px;
+
+  overflow: hidden;
+
+  border-radius: 8px;
+
+  color: white;
+
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.empty-record {
+  margin-top: auto;
+
+  overflow: hidden;
+
+  color: #a3adbe;
+
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 10px;
+}
+
+.type-day .work-badge,
+.type-day .work-type-color,
+.summary-dot.type-day {
+  background: var(--day);
+}
+
+.type-night .work-badge,
+.type-night .work-type-color,
+.summary-dot.type-night {
+  background: var(--night);
+}
+
+.type-dayOvertime .work-badge,
+.type-dayOvertime .work-type-color,
+.summary-dot.type-dayOvertime {
+  background: var(--day-overtime);
+}
+
+.type-nightOvertime .work-badge,
+.type-nightOvertime .work-type-color,
+.summary-dot.type-nightOvertime {
+  background: var(--night-overtime);
+}
+
+.type-dayHoliday .work-badge,
+.type-dayHoliday .work-type-color,
+.summary-dot.type-dayHoliday {
+  background: var(--day-holiday);
+}
+
+.type-nightHoliday .work-badge,
+.type-nightHoliday .work-type-color,
+.summary-dot.type-nightHoliday {
+  background: var(--night-holiday);
+}
+
+.type-dayHolidayOvertime .work-badge,
+.type-dayHolidayOvertime .work-type-color,
+.summary-dot.type-dayHolidayOvertime {
+  background: var(--day-holiday-overtime);
+}
+
+.type-nightHolidayOvertime .work-badge,
+.type-nightHolidayOvertime .work-type-color,
+.summary-dot.type-nightHolidayOvertime {
+  background: var(--night-holiday-overtime);
+}
+
+.type-annualLeave .work-badge,
+.type-annualLeave .work-type-color,
+.summary-dot.type-annualLeave {
+  background: var(--annual-leave);
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 18px;
+}
+
+.section-title-row h2 {
+  margin: 2px 0 0;
+  font-size: 19px;
+}
+
+.section-caption {
+  margin: 0;
+
+  color: var(--muted);
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recorded-days {
+  padding: 9px 13px;
+
+  border-radius: 12px;
+
+  color: var(--primary);
+  background: #edf4ff;
+
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.summary-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.summary-item {
+  display: grid;
+  grid-template-columns: 11px 1fr auto;
+  align-items: center;
+  gap: 10px;
+
+  padding: 12px 11px;
+
+  border: 1px solid #e7ecf4;
+  border-radius: 13px;
+
+  background: #fafbfd;
+}
+
+.summary-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.summary-label {
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  color: #536077;
+  font-size: 13px;
+}
+
+.summary-item strong {
+  color: #24324a;
+  font-size: 13px;
+}
+
+.modal {
+  position: fixed;
+  z-index: 100;
+
+  inset: 0;
+
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal.open {
+  display: flex;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+
+  background: rgba(14, 25, 45, 0.56);
+  backdrop-filter: blur(3px);
+}
+
+.modal-sheet {
+  position: relative;
+  z-index: 1;
+
+  width: min(560px, 100%);
+  max-height: min(760px, 88vh);
+  padding: 24px;
+
+  overflow-y: auto;
+
+  border-radius: 26px 26px 0 0;
+
+  background: white;
+  box-shadow:
+    0 -20px 60px rgba(0, 0, 0, 0.2);
+
+  animation: slideUp 0.2s ease-out;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  margin-bottom: 19px;
+}
+
+.modal-header h2 {
+  margin: 3px 0 0;
+  font-size: 21px;
+}
+
+.close-button {
+  width: 40px;
+  height: 40px;
+
+  border: 0;
+  border-radius: 12px;
+
+  color: #536077;
+  background: #f1f4f8;
+
+  font-size: 25px;
+  cursor: pointer;
+}
+
+.work-type-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.work-type-button {
+  min-height: 52px;
+  padding: 11px 13px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  border: 1px solid #e1e7f0;
+  border-radius: 14px;
+
+  color: #334158;
+  background: #ffffff;
+
+  font-size: 13px;
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.work-type-button:hover {
+  border-color: #afc2e9;
+  background: #f8faff;
+}
+
+.work-type-button.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.13);
+}
+
+.work-type-color {
+  flex: 0 0 auto;
+
+  width: 11px;
+  height: 11px;
+
+  border-radius: 999px;
+}
+
+.delete-record-button {
+  width: 100%;
+  margin-top: 15px;
+  padding: 13px;
+
+  border: 0;
+  border-radius: 13px;
+
+  color: #dc2626;
+  background: #fff1f1;
+
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.delete-record-button[hidden] {
+  display: none;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 850px) {
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-header {
+    padding: 21px 17px;
+  }
+
+  .main-content {
+    width: min(100% - 16px, 1100px);
+    margin-top: 10px;
+  }
+
+  .calendar-card,
+  .summary-card {
+    padding: 14px;
+
+    border-radius: 18px;
+  }
+
+  .calendar-grid {
+    gap: 4px;
+  }
+
+  .day-cell {
+    min-height: 72px;
+    padding: 7px 4px;
+
+    border-radius: 11px;
+  }
+
+  .day-number {
+    font-size: 12px;
+  }
+
+  .work-badge {
+    padding: 5px 2px;
+
+    border-radius: 6px;
+
+    font-size: 8.5px;
+  }
+
+  .empty-record {
+    display: none;
+  }
+
+  .work-type-list {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-sheet {
+    padding: 20px 17px;
+  }
+}
+.salary-card {
+  grid-column: 1 / -1;
+
+  padding: 22px;
+
+  border: 1px solid rgba(221, 228, 239, 0.9);
+  border-radius: 22px;
+
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(34, 56, 94, 0.08);
+}
+
+.salary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+
+  margin-bottom: 20px;
+}
+
+.salary-heading h2 {
+  margin: 3px 0 0;
+  font-size: 21px;
+}
+
+.ordinary-wage-box {
+  min-width: 150px;
+  padding: 11px 15px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+
+  border-radius: 14px;
+
+  color: #2563eb;
+  background: #edf4ff;
+}
+
+.ordinary-wage-box span {
+  color: #71809a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ordinary-wage-box strong {
+  font-size: 18px;
+}
+
+.salary-layout {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 0.9fr)
+    minmax(220px, 0.9fr)
+    minmax(280px, 1.2fr);
+
+  gap: 15px;
+}
+
+.salary-panel {
+  padding: 17px;
+
+  border: 1px solid #e3e9f2;
+  border-radius: 17px;
+
+  background: #fafbfd;
+}
+
+.salary-panel h3 {
+  margin: 0 0 15px;
+
+  color: #25334b;
+
+  font-size: 16px;
+}
+
+.salary-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  margin-bottom: 10px;
+}
+
+.salary-input-row > span {
+  color: #5b687e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.input-with-unit {
+  width: 145px;
+
+  display: flex;
+  align-items: center;
+
+  border: 1px solid #dce4ef;
+  border-radius: 11px;
+
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.input-with-unit:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.input-with-unit input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 5px 10px 11px;
+
+  border: 0;
+  outline: 0;
+
+  color: #27354c;
+  background: transparent;
+
+  text-align: right;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.input-with-unit span {
+  padding-right: 10px;
+
+  color: #8a96a9;
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.formula-note {
+  margin: 14px 0 0;
+  padding: 10px;
+
+  border-radius: 10px;
+
+  color: #758199;
+  background: #f0f4fa;
+
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.work-totals-grid,
+.pay-breakdown {
+  display: grid;
+  gap: 7px;
+}
+
+.work-total-row,
+.payment-row {
+  min-height: 35px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+
+  border-bottom: 1px solid #e7ecf3;
+
+  color: #647086;
+  font-size: 12.5px;
+}
+
+.work-total-row:last-child,
+.payment-row:last-child {
+  border-bottom: 0;
+}
+
+.work-total-row strong,
+.payment-row strong {
+  color: #27354c;
+  font-size: 13px;
+}
+
+.payment-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.total-pay-row {
+  margin-top: 15px;
+  padding: 15px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  border-radius: 13px;
+
+  color: #ffffff;
+  background:
+    linear-gradient(
+      135deg,
+      #1d4ed8,
+      #2563eb 60%,
+      #4f46e5
+    );
+}
+
+.total-pay-row span {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.total-pay-row strong {
+  font-size: 21px;
+  letter-spacing: -0.5px;
+}
+
+@media (max-width: 900px) {
+  .salary-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .payment-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .salary-card {
+    padding: 15px;
+    border-radius: 18px;
+  }
+
+  .salary-heading {
+    align-items: flex-start;
+  }
+
+  .ordinary-wage-box {
+    min-width: 120px;
+    padding: 9px 11px;
+  }
+
+  .ordinary-wage-box strong {
+    font-size: 15px;
+  }
+
+  .salary-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-panel {
+    grid-column: auto;
+  }
+
+  .salary-input-row {
+    gap: 8px;
+  }
+
+  .input-with-unit {
+    width: 135px;
+  }
+
+  .total-pay-row strong {
+    font-size: 18px;
+  }
+}
+.calendar-actions {
+  margin: 12px 0 20px;
+
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.calendar-actions .today-button {
+  margin: 0;
+}
+
+.reset-month-button {
+  padding: 8px 15px;
+
+  border: 0;
+  border-radius: 999px;
+
+  color: #dc2626;
+  background: #fff1f1;
+
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reset-month-button:hover {
+  background: #fee2e2;
+}
+
+.reset-month-button:active {
+  transform: scale(0.97);
+}
+.calendar-actions {
+  margin: 12px 0 20px;
+
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.calendar-actions .today-button {
+  margin: 0;
+}
+
+.reset-month-button {
+  padding: 8px 15px;
+
+  border: 0;
+  border-radius: 999px;
+
+  color: #dc2626;
+  background: #fff1f1;
+
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reset-month-button:hover {
+  background: #fee2e2;
+}
+
+.reset-month-button:active {
+  transform: scale(0.97);
+}

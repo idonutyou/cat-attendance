@@ -1,0 +1,2 @@
+ZIP을 풀면 public 폴더가 나옵니다.
+프로젝트 루트 CAT-ATTENDANCE 안에 public 폴더째 넣으세요.
