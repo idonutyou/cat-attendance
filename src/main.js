@@ -1,7 +1,8 @@
 import "./style.css";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
-const SETTINGS_KEY = "cat-attendance-settings-v1";
+const SETTINGS_KEY = "cat-attendance-settings-by-month-v2";
+const LEGACY_SETTINGS_KEY = "cat-attendance-settings-v1";
 
 const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
@@ -95,7 +96,7 @@ currentMonth = new Date(
 
 let selectedDateKey = null;
 let records = loadRecords();
-let settings = loadSettings();
+let settingsByMonth = loadSettingsByMonth();
 
 const app = document.querySelector("#app");
 
@@ -209,7 +210,7 @@ app.innerHTML = `
                   inputmode="numeric"
                   min="0"
                   placeholder="0"
-                  value="${settings.baseHourlyWage || ""}"
+                  value=""
                 />
                 <span>원</span>
               </div>
@@ -225,7 +226,7 @@ app.innerHTML = `
                   inputmode="numeric"
                   min="0"
                   placeholder="0"
-                  value="${settings.safetyAllowance || ""}"
+                  value=""
                 />
                 <span>원</span>
               </div>
@@ -241,7 +242,7 @@ app.innerHTML = `
                   inputmode="numeric"
                   min="0"
                   placeholder="0"
-                  value="${settings.longevityAllowance || ""}"
+                  value=""
                 />
                 <span>원</span>
               </div>
@@ -449,7 +450,9 @@ deleteRecordButton.addEventListener("click", () => {
   longevityAllowanceInput,
 ].forEach((input) => {
   input.addEventListener("input", () => {
-    settings = {
+    const monthKey = getMonthKey(currentMonth);
+
+    settingsByMonth[monthKey] = {
       baseHourlyWage: getInputNumber(baseHourlyWageInput),
       safetyAllowance: getInputNumber(safetyAllowanceInput),
       longevityAllowance: getInputNumber(
@@ -457,7 +460,7 @@ deleteRecordButton.addEventListener("click", () => {
       ),
     };
 
-    saveSettings();
+    saveSettingsByMonth();
     renderSalary();
   });
 });
@@ -471,6 +474,7 @@ document.addEventListener("keydown", (event) => {
 function render() {
   renderCalendar();
   renderSummary();
+  syncSalaryInputs();
   renderSalary();
 }
 
@@ -573,6 +577,7 @@ function renderSalary() {
   const month = currentMonth.getMonth();
 
   const stats = calculateMonthStats();
+  const settings = getCurrentMonthSettings();
 
   const baseHourlyWage = Number(settings.baseHourlyWage) || 0;
   const safetyAllowance = Number(settings.safetyAllowance) || 0;
@@ -917,32 +922,83 @@ function saveRecords() {
   );
 }
 
-function loadSettings() {
+function getMonthKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+
+  return `${year}-${month}`;
+}
+
+function getCurrentMonthSettings() {
+  const monthKey = getMonthKey(currentMonth);
+
+  return {
+    ...DEFAULT_SETTINGS,
+    ...(settingsByMonth[monthKey] || {}),
+  };
+}
+
+function syncSalaryInputs() {
+  const settings = getCurrentMonthSettings();
+
+  baseHourlyWageInput.value = settings.baseHourlyWage || "";
+  safetyAllowanceInput.value = settings.safetyAllowance || "";
+  longevityAllowanceInput.value = settings.longevityAllowance || "";
+}
+
+function loadSettingsByMonth() {
   try {
     const savedSettings = localStorage.getItem(SETTINGS_KEY);
 
-    if (!savedSettings) {
-      return { ...DEFAULT_SETTINGS };
+    if (savedSettings) {
+      const parsedSettings = JSON.parse(savedSettings);
+
+      if (
+        parsedSettings &&
+        typeof parsedSettings === "object" &&
+        !Array.isArray(parsedSettings)
+      ) {
+        return parsedSettings;
+      }
     }
 
-    return {
+    const legacySettings = localStorage.getItem(
+      LEGACY_SETTINGS_KEY,
+    );
+
+    if (!legacySettings) {
+      return {};
+    }
+
+    const parsedLegacySettings = {
       ...DEFAULT_SETTINGS,
-      ...JSON.parse(savedSettings),
+      ...JSON.parse(legacySettings),
     };
+
+    const migratedSettings = {
+      [getMonthKey(currentMonth)]: parsedLegacySettings,
+    };
+
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify(migratedSettings),
+    );
+
+    return migratedSettings;
   } catch (error) {
     console.error(
-      "급여 설정을 불러오지 못했습니다.",
+      "월별 급여 설정을 불러오지 못했습니다.",
       error,
     );
 
-    return { ...DEFAULT_SETTINGS };
+    return {};
   }
 }
 
-function saveSettings() {
+function saveSettingsByMonth() {
   localStorage.setItem(
     SETTINGS_KEY,
-    JSON.stringify(settings),
+    JSON.stringify(settingsByMonth),
   );
 }
 
