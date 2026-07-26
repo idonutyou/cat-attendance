@@ -2,6 +2,7 @@ import "./style.css";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
 const SETTINGS_KEY = "cat-attendance-settings-by-month-v2";
+const PREVIOUS_SETTINGS_KEY = "cat-attendance-settings-v2";
 const LEGACY_SETTINGS_KEY = "cat-attendance-settings-v1";
 
 const DEFAULT_SETTINGS = {
@@ -948,16 +949,35 @@ function syncSalaryInputs() {
 
 function loadSettingsByMonth() {
   try {
-    const savedSettings = localStorage.getItem(SETTINGS_KEY);
+    const settingsKeys = [
+      SETTINGS_KEY,
+      PREVIOUS_SETTINGS_KEY,
+    ];
 
-    if (savedSettings) {
-      const parsedSettings = JSON.parse(savedSettings);
+    for (const settingsKey of settingsKeys) {
+      const savedMonthlySettings =
+        localStorage.getItem(settingsKey);
+
+      if (!savedMonthlySettings) {
+        continue;
+      }
+
+      const parsedSettings = JSON.parse(
+        savedMonthlySettings,
+      );
 
       if (
         parsedSettings &&
         typeof parsedSettings === "object" &&
         !Array.isArray(parsedSettings)
       ) {
+        if (settingsKey !== SETTINGS_KEY) {
+          localStorage.setItem(
+            SETTINGS_KEY,
+            JSON.stringify(parsedSettings),
+          );
+        }
+
         return parsedSettings;
       }
     }
