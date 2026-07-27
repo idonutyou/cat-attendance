@@ -95,6 +95,18 @@ const CUSTOM_WORK_TYPE = {
   totals: {},
 };
 
+const WORK_TYPE_PICKER_ORDER = [
+  "day",
+  "dayOvertime",
+  "dayHoliday",
+  "dayHolidayOvertime",
+  "annualLeave",
+  "night",
+  "nightOvertime",
+  "nightHoliday",
+  "nightHolidayOvertime",
+];
+
 const SUMMARY_WORK_TYPES = [
   ...WORK_TYPES,
   CUSTOM_WORK_TYPE,
@@ -2295,7 +2307,9 @@ function openModal(dateKey, year, month, dayNumber) {
   const selectedWorkTypeId = selectedWorkType?.id || "";
 
   workTypeList.innerHTML = `
-    ${WORK_TYPES.map(
+    ${WORK_TYPE_PICKER_ORDER.map((workTypeId) =>
+      WORK_TYPES.find((workType) => workType.id === workTypeId),
+    ).map(
       (workType) => `
         <button
           type="button"

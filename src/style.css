@@ -1011,17 +1011,20 @@ input {
 
 .work-type-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .work-type-button {
-  min-height: 52px;
-  padding: 11px 13px;
+  min-width: 0;
+  min-height: 68px;
+  padding: 9px 5px;
 
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 6px;
 
   border: 1px solid #e1e7f0;
   border-radius: 14px;
@@ -1029,10 +1032,18 @@ input {
   color: #334158;
   background: #ffffff;
 
-  font-size: 13px;
+  text-align: center;
+  font-size: 11px;
   font-weight: 750;
+  line-height: 1.2;
+  word-break: keep-all;
 
   cursor: pointer;
+}
+
+.work-type-button > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .work-type-button:hover {
@@ -1230,7 +1241,20 @@ input {
   }
 
   .work-type-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .work-type-button {
+    min-height: 66px;
+    padding: 7px 2px;
+    gap: 5px;
+    font-size: 9.5px;
+  }
+
+  .work-type-color {
+    width: 8px;
+    height: 8px;
   }
 
   .modal-sheet {
