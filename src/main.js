@@ -116,6 +116,8 @@ let mobilePageAnimations = [];
 let exitBackReady = false;
 let exitToastTimer = null;
 let backExitGuardInitialized = false;
+let backExitPopstateAttached = false;
+let allowAppExitNavigation = false;
 let datePickerTargetInput = null;
 let datePickerVisibleMonth = new Date();
 let datePickerPreviousFocus = null;
@@ -1444,19 +1446,56 @@ function isMobilePageAtBottom(page) {
 }
 
 function initializeBackExitGuard() {
-  const isStandalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true;
-
-  if (
-    backExitGuardInitialized ||
-    (!isMobilePagerMode() && !isStandalone)
-  ) {
+  if (!shouldUseBackExitGuard()) {
     return;
   }
 
-  backExitGuardInitialized = true;
+  if (!backExitGuardInitialized) {
+    backExitGuardInitialized = true;
+    window.addEventListener("pageshow", resetBackExitState);
+    document.addEventListener(
+      "visibilitychange",
+      handleAppVisibilityChange,
+    );
+  }
+
+  ensureBackExitPopstateListener();
+  resetBackExitState();
+}
+
+function ensureBackExitPopstateListener() {
+  if (backExitPopstateAttached) {
+    return;
+  }
+
   window.addEventListener("popstate", handleAppBackNavigation);
+  backExitPopstateAttached = true;
+}
+
+function shouldUseBackExitGuard() {
+  return (
+    isMobilePagerMode() ||
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
+}
+
+function handleAppVisibilityChange() {
+  if (document.visibilityState === "visible") {
+    resetBackExitState();
+  }
+}
+
+function resetBackExitState() {
+  if (!shouldUseBackExitGuard()) {
+    return;
+  }
+
+  allowAppExitNavigation = false;
+  exitBackReady = false;
+  window.clearTimeout(exitToastTimer);
+  hideExitToast();
+  ensureBackExitPopstateListener();
 
   const currentState =
     window.history.state &&
@@ -1468,19 +1507,25 @@ function initializeBackExitGuard() {
     return;
   }
 
-  window.history.replaceState(
-    {
-      ...currentState,
-      catAttendanceAppBase: true,
-    },
-    "",
-    window.location.href,
-  );
+  if (!currentState.catAttendanceAppBase) {
+    window.history.replaceState(
+      {
+        ...currentState,
+        catAttendanceAppBase: true,
+      },
+      "",
+      window.location.href,
+    );
+  }
 
   restoreBackExitGuard();
 }
 
 function handleAppBackNavigation() {
+  if (allowAppExitNavigation) {
+    return;
+  }
+
   if (workModal.classList.contains("open")) {
     closeModal();
     restoreBackExitGuard();
@@ -1500,20 +1545,34 @@ function handleAppBackNavigation() {
   }
 
   exitBackReady = false;
+  allowAppExitNavigation = true;
   window.clearTimeout(exitToastTimer);
   hideExitToast();
   window.removeEventListener("popstate", handleAppBackNavigation);
+  backExitPopstateAttached = false;
 
   window.setTimeout(() => {
     window.history.back();
 
     window.setTimeout(() => {
       window.close();
+
+      window.setTimeout(() => {
+        if (document.visibilityState === "visible") {
+          resetBackExitState();
+        }
+      }, 250);
     }, 120);
   }, 0);
 }
 
 function restoreBackExitGuard() {
+  const currentState = window.history.state;
+
+  if (currentState?.catAttendanceExitGuard) {
+    return;
+  }
+
   window.history.pushState(
     { catAttendanceExitGuard: true },
     "",
