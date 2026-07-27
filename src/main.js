@@ -1456,6 +1456,7 @@ function initializeBackExitGuard() {
     backExitGuardInitialized = true;
     window.addEventListener("pageshow", resetBackExitState);
     window.addEventListener("focus", resetBackExitState);
+    window.addEventListener("pagehide", prepareBackExitForNextLaunch);
     document.addEventListener(
       "visibilitychange",
       handleAppVisibilityChange,
@@ -1472,7 +1473,7 @@ function ensureAppCloseWatcher() {
     return;
   }
 
-  if (typeof window.CloseWatcher !== "function") {
+  if (!supportsAppCloseWatcher()) {
     document.documentElement.dataset.backExitGuard = "history";
     return;
   }
@@ -1484,6 +1485,10 @@ function ensureAppCloseWatcher() {
     { once: true },
   );
   document.documentElement.dataset.backExitGuard = "close-watcher";
+}
+
+function supportsAppCloseWatcher() {
+  return typeof window.CloseWatcher === "function";
 }
 
 function installBackExitTestHook() {
@@ -1498,7 +1503,11 @@ function installBackExitTestHook() {
   testButton.style.cssText =
     "position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.001;z-index:9999;";
   testButton.addEventListener("click", () => {
-    appCloseWatcher?.requestClose();
+    if (appCloseWatcher) {
+      appCloseWatcher.requestClose();
+    } else {
+      handleAppBackNavigation();
+    }
   });
   document.body.appendChild(testButton);
 }
@@ -1520,10 +1529,9 @@ function handleAppCloseRequest() {
 
   if (!exitBackReady) {
     // 첫 번째 Android 뒤로가기는 CloseWatcher가 소비한다.
-    // 두 번째 요청과 다음 앱 실행까지 같은 방식으로 받을 수 있도록
-    // 다음 watcher를 즉시 준비한다.
+    // 안내가 보이는 동안에는 watcher를 만들지 않아 두 번째 요청을
+    // Android의 기본 종료 동작으로 그대로 전달한다.
     showExitToast();
-    ensureAppCloseWatcher();
     return;
   }
 
@@ -1548,9 +1556,25 @@ function shouldUseBackExitGuard() {
 }
 
 function handleAppVisibilityChange() {
-  if (document.visibilityState === "visible") {
-    resetBackExitState();
+  if (document.visibilityState === "hidden") {
+    prepareBackExitForNextLaunch();
+    return;
   }
+
+  resetBackExitState();
+}
+
+function prepareBackExitForNextLaunch() {
+  if (!shouldUseBackExitGuard()) {
+    return;
+  }
+
+  allowAppExitNavigation = false;
+  exitBackReady = false;
+  window.clearTimeout(exitToastTimer);
+  hideExitToast();
+  ensureBackExitPopstateListener();
+  ensureAppCloseWatcher();
 }
 
 function resetBackExitState() {
@@ -1564,6 +1588,23 @@ function resetBackExitState() {
   hideExitToast();
   ensureBackExitPopstateListener();
   ensureAppCloseWatcher();
+
+  if (supportsAppCloseWatcher()) {
+    const currentState =
+      window.history.state &&
+      typeof window.history.state === "object"
+        ? { ...window.history.state }
+        : {};
+
+    delete currentState.catAttendanceAppBase;
+    delete currentState.catAttendanceExitGuard;
+    window.history.replaceState(
+      currentState,
+      "",
+      window.location.href,
+    );
+    return;
+  }
 
   const currentState =
     window.history.state &&
@@ -1616,19 +1657,27 @@ function handleAppBackNavigation() {
 
   if (workModal.classList.contains("open")) {
     closeModal();
-    restoreBackExitGuard();
+    resetBackExitState();
     return;
   }
 
   if (datePickerModal.classList.contains("open")) {
     closeDatePicker();
-    restoreBackExitGuard();
+    resetBackExitState();
     return;
   }
 
   if (!exitBackReady) {
+    if (supportsAppCloseWatcher() && appCloseWatcher) {
+      appCloseWatcher.destroy();
+      appCloseWatcher = null;
+    }
+
     showExitToast();
-    restoreBackExitGuard();
+
+    if (!supportsAppCloseWatcher()) {
+      restoreBackExitGuard();
+    }
     return;
   }
 
@@ -1649,12 +1698,8 @@ function completeAppExit(fromCloseWatcher) {
   window.removeEventListener("popstate", handleAppBackNavigation);
   backExitPopstateAttached = false;
 
-  // Android는 앱 창을 없애지 않고 백그라운드에 그대로 보관할 수 있다.
-  // 종료 동작을 시작하기 전에 다음 실행용 watcher를 미리 생성한다.
-  ensureAppCloseWatcher();
-
   if (mobilePagerTestMode) {
-    allowAppExitNavigation = false;
+    resetBackExitState();
     return;
   }
 
@@ -1669,9 +1714,7 @@ function completeAppExit(fromCloseWatcher) {
       window.close();
 
       window.setTimeout(() => {
-        // Android PWA는 완전히 종료되지 않고 백그라운드에 남을 수 있다.
-        // 숨겨진 상태에서도 다음 실행을 위한 뒤로가기 보호를 다시 만든다.
-        resetBackExitState();
+        prepareBackExitForNextLaunch();
       }, 250);
     }, 120);
   }, 0);
