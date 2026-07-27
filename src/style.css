@@ -1537,6 +1537,67 @@ input {
   transform: scale(0.97);
 }
 
+/* 모바일 페이지 전환에서 달력이 한 화면 안에 정확히 들어오도록 조정 */
+html.mobile-pager-enabled .calendar-card {
+  padding: 10px;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+html.mobile-pager-enabled .calendar-toolbar {
+  grid-template-columns: 38px 1fr 38px;
+  gap: 8px;
+}
+
+html.mobile-pager-enabled .calendar-toolbar h2 {
+  font-size: 20px;
+}
+
+html.mobile-pager-enabled .calendar-toolbar .month-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 24px;
+}
+
+html.mobile-pager-enabled .calendar-actions {
+  margin: 7px 0 8px;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+html.mobile-pager-enabled .calendar-actions .today-button,
+html.mobile-pager-enabled .calendar-actions .reset-month-button {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+html.mobile-pager-enabled .weekdays {
+  margin-bottom: 4px;
+  flex: 0 0 auto;
+}
+
+html.mobile-pager-enabled .weekdays div {
+  padding: 4px 2px;
+  font-size: 11px;
+}
+
+html.mobile-pager-enabled .calendar-grid {
+  min-height: 0;
+  gap: 3px;
+
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  flex: 1 1 auto;
+}
+
+html.mobile-pager-enabled .calendar-grid .day-cell {
+  min-height: 0;
+  padding: 4px 3px;
+  overflow: hidden;
+}
+
 html.mobile-pager-enabled,
   html.mobile-pager-enabled body,
   html.mobile-pager-enabled #app,
