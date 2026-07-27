@@ -1,4 +1,4 @@
-const CACHE_NAME = "cat-attendance-v20";
+const CACHE_NAME = "cat-attendance-v21";
 
 const APP_SHELL = [
   "./",

@@ -117,6 +117,7 @@ let exitBackReady = false;
 let exitToastTimer = null;
 let backExitGuardInitialized = false;
 let backExitPopstateAttached = false;
+let backExitGuardArmedThisSession = false;
 let allowAppExitNavigation = false;
 let datePickerTargetInput = null;
 let datePickerVisibleMonth = new Date();
@@ -1502,6 +1503,26 @@ function resetBackExitState() {
     typeof window.history.state === "object"
       ? window.history.state
       : {};
+
+  // 설치형 앱을 다시 실행하면 이전 실행의 history.state만 복원되고
+  // 실제 이전 항목은 없는 경우가 있다. 새 실행에서는 현재 항목을
+  // 기준점으로 다시 만들고 보호 항목을 하나 추가해야 첫 뒤로가기를
+  // 항상 안내 문구로 받을 수 있다.
+  if (!backExitGuardArmedThisSession) {
+    window.history.replaceState(
+      {
+        ...currentState,
+        catAttendanceAppBase: true,
+        catAttendanceExitGuard: false,
+      },
+      "",
+      window.location.href,
+    );
+
+    backExitGuardArmedThisSession = true;
+    restoreBackExitGuard();
+    return;
+  }
 
   if (currentState.catAttendanceExitGuard) {
     return;
