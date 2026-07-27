@@ -1,4 +1,4 @@
-const CACHE_NAME = "cat-attendance-v12";
+const CACHE_NAME = "cat-attendance-v13";
 
 const APP_SHELL = [
   "./",
@@ -32,6 +32,35 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
+  // 앱 시작 화면은 항상 서버의 최신 버전을 먼저 확인한다.
+  // 예전 index.html과 새 자산 파일이 섞여 하얀 화면이 뜨는 것을 막는다.
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, copy);
+            });
+          }
+
+          return networkResponse;
+        })
+        .catch(async () =>
+          (await caches.match(event.request)) ||
+          (await caches.match("./")) ||
+          new Response("오프라인 상태입니다.", {
+            status: 503,
+            headers: {
+              "Content-Type": "text/plain; charset=utf-8"
+            }
+          })
+        )
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;
@@ -53,18 +82,15 @@ self.addEventListener("fetch", (event) => {
 
           return networkResponse;
         })
-        .catch(() => {
-          if (event.request.mode === "navigate") {
-            return caches.match("./");
-          }
-
-          return new Response("오프라인 상태입니다.", {
-            status: 503,
-            headers: {
-              "Content-Type": "text/plain; charset=utf-8"
-            }
-          });
-        });
+        .catch(
+          () =>
+            new Response("오프라인 상태입니다.", {
+              status: 503,
+              headers: {
+                "Content-Type": "text/plain; charset=utf-8"
+              }
+            })
+        );
     })
   );
 });
