@@ -110,6 +110,9 @@ currentMonth = new Date(
 
 let selectedDateKey = null;
 let summarySlideIndex = 0;
+let mobilePageIndex = 0;
+let mobilePageAnimating = false;
+let mobilePageAnimations = [];
 let datePickerTargetInput = null;
 let datePickerVisibleMonth = new Date();
 let datePickerPreviousFocus = null;
@@ -133,8 +136,13 @@ app.innerHTML = `
       </div>
     </header>
 
-    <main class="main-content">
-      <section class="calendar-card">
+    <main id="mobilePager" class="main-content">
+      <div id="mobilePageTrack" class="mobile-page-track">
+      <section
+        class="calendar-card mobile-page mobile-page-active"
+        data-mobile-page="0"
+        aria-label="달력"
+      >
         <div class="calendar-toolbar">
           <button
             id="previousMonth"
@@ -190,7 +198,8 @@ app.innerHTML = `
 
       <section
         id="summaryCard"
-        class="summary-card"
+        class="summary-card mobile-page"
+        data-mobile-page="1"
         tabindex="0"
         aria-label="월간 근무 현황"
         aria-roledescription="carousel"
@@ -343,7 +352,11 @@ app.innerHTML = `
         <p class="summary-swipe-hint">옆으로 넘겨 확인</p>
       </section>
 
-      <section class="salary-card">
+      <section
+        class="salary-card mobile-page"
+        data-mobile-page="2"
+        aria-label="자동 급여 계산"
+      >
         <div class="salary-heading">
           <div>
             <p class="section-caption">자동 급여 계산</p>
@@ -441,6 +454,34 @@ app.innerHTML = `
           </section>
         </div>
       </section>
+      </div>
+
+      <nav
+        class="mobile-page-pagination"
+        aria-label="주요 화면 선택"
+      >
+        <button
+          class="mobile-page-dot active"
+          type="button"
+          data-mobile-page-button="0"
+          aria-label="달력 화면 보기"
+          aria-current="true"
+        ></button>
+        <button
+          class="mobile-page-dot"
+          type="button"
+          data-mobile-page-button="1"
+          aria-label="근무 기록 요약 화면 보기"
+          aria-current="false"
+        ></button>
+        <button
+          class="mobile-page-dot"
+          type="button"
+          data-mobile-page-button="2"
+          aria-label="자동 급여 계산 화면 보기"
+          aria-current="false"
+        ></button>
+      </nav>
     </main>
   </div>
 
@@ -598,6 +639,19 @@ app.innerHTML = `
 
 const monthTitle = document.querySelector("#monthTitle");
 const calendarGrid = document.querySelector("#calendarGrid");
+const mobilePager = document.querySelector("#mobilePager");
+const mobilePages = [
+  ...document.querySelectorAll("[data-mobile-page]"),
+];
+const mobilePageButtons = [
+  ...document.querySelectorAll("[data-mobile-page-button]"),
+];
+const mobilePagerMedia = window.matchMedia("(max-width: 620px)");
+const mobilePagerTestMode =
+  ["localhost", "127.0.0.1"].includes(window.location.hostname) &&
+  new URLSearchParams(window.location.search).get(
+    "mobilePagerTest",
+  ) === "1";
 const summaryCard = document.querySelector("#summaryCard");
 const summaryCarousel = document.querySelector("#summaryCarousel");
 const summaryTrack = document.querySelector("#summaryTrack");
@@ -676,6 +730,124 @@ const saveCustomWorkTypeButton = document.querySelector(
 const deleteRecordButton = document.querySelector(
   "#deleteRecordButton",
 );
+
+let mobileTouchStartX = 0;
+let mobileTouchStartY = 0;
+let mobileTouchCanMoveNext = false;
+let mobileTouchCanMovePrevious = false;
+let mobileWheelLocked = false;
+
+mobilePageButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setMobilePage(Number(button.dataset.mobilePageButton));
+  });
+});
+
+mobilePager.addEventListener(
+  "touchstart",
+  (event) => {
+    if (!isMobilePagerMode() || mobilePageAnimating) {
+      return;
+    }
+
+    const [touch] = event.changedTouches;
+    const activePage = mobilePages[mobilePageIndex];
+
+    mobileTouchStartX = touch.clientX;
+    mobileTouchStartY = touch.clientY;
+    mobileTouchCanMovePrevious = isMobilePageAtTop(activePage);
+    mobileTouchCanMoveNext = isMobilePageAtBottom(activePage);
+  },
+  { passive: true },
+);
+
+mobilePager.addEventListener(
+  "touchend",
+  (event) => {
+    if (!isMobilePagerMode() || mobilePageAnimating) {
+      return;
+    }
+
+    const [touch] = event.changedTouches;
+    const deltaX = touch.clientX - mobileTouchStartX;
+    const deltaY = touch.clientY - mobileTouchStartY;
+
+    if (
+      Math.abs(deltaY) < 55 ||
+      Math.abs(deltaY) <= Math.abs(deltaX)
+    ) {
+      return;
+    }
+
+    if (deltaY < 0 && mobileTouchCanMoveNext) {
+      changeMobilePage(1);
+    }
+
+    if (deltaY > 0 && mobileTouchCanMovePrevious) {
+      changeMobilePage(-1);
+    }
+  },
+  { passive: true },
+);
+
+mobilePager.addEventListener(
+  "wheel",
+  (event) => {
+    if (
+      !isMobilePagerMode() ||
+      mobilePageAnimating ||
+      mobileWheelLocked ||
+      Math.abs(event.deltaY) <= Math.abs(event.deltaX)
+    ) {
+      return;
+    }
+
+    const activePage = mobilePages[mobilePageIndex];
+    const direction = event.deltaY > 0 ? 1 : -1;
+    const canMove =
+      direction > 0
+        ? isMobilePageAtBottom(activePage)
+        : isMobilePageAtTop(activePage);
+
+    if (!canMove) {
+      return;
+    }
+
+    event.preventDefault();
+    mobileWheelLocked = true;
+    changeMobilePage(direction);
+
+    window.setTimeout(() => {
+      mobileWheelLocked = false;
+    }, 520);
+  },
+  { passive: false },
+);
+
+mobilePager.addEventListener("keydown", (event) => {
+  if (
+    !isMobilePagerMode() ||
+    event.target.matches("input, textarea, select")
+  ) {
+    return;
+  }
+
+  if (event.key === "PageDown") {
+    event.preventDefault();
+    changeMobilePage(1);
+  }
+
+  if (event.key === "PageUp") {
+    event.preventDefault();
+    changeMobilePage(-1);
+  }
+});
+
+if (typeof mobilePagerMedia.addEventListener === "function") {
+  mobilePagerMedia.addEventListener("change", syncMobilePagerMode);
+} else {
+  mobilePagerMedia.addListener(syncMobilePagerMode);
+}
 
 document
   .querySelector("#previousMonth")
@@ -1094,6 +1266,163 @@ function selectDatePickerDate(dateKey) {
   saveWeeklyDateRangeFromInputs();
   render52HourCalculator();
   closeDatePicker();
+}
+
+function isMobilePagerMode() {
+  return mobilePagerMedia.matches || mobilePagerTestMode;
+}
+
+function syncMobilePagerMode() {
+  const isMobile = isMobilePagerMode();
+
+  mobilePageAnimations.forEach((animation) => {
+    animation.cancel();
+  });
+
+  mobilePageAnimations = [];
+  mobilePageAnimating = false;
+
+  document.documentElement.classList.toggle(
+    "mobile-pager-enabled",
+    isMobile,
+  );
+
+  mobilePages.forEach((page, index) => {
+    const isActive = index === mobilePageIndex;
+
+    page.classList.remove("mobile-page-transitioning");
+    page.classList.toggle(
+      "mobile-page-active",
+      isMobile && isActive,
+    );
+
+    if (isMobile) {
+      page.inert = !isActive;
+      page.setAttribute("aria-hidden", String(!isActive));
+    } else {
+      page.inert = false;
+      page.removeAttribute("aria-hidden");
+    }
+  });
+
+  updateMobilePageButtons();
+}
+
+function setMobilePage(nextIndex, requestedDirection = 0) {
+  if (!isMobilePagerMode() || mobilePageAnimating) {
+    return;
+  }
+
+  const pageCount = mobilePages.length;
+  const normalizedIndex =
+    ((nextIndex % pageCount) + pageCount) % pageCount;
+
+  if (normalizedIndex === mobilePageIndex) {
+    return;
+  }
+
+  const forwardDistance =
+    (normalizedIndex - mobilePageIndex + pageCount) % pageCount;
+  const backwardDistance =
+    (mobilePageIndex - normalizedIndex + pageCount) % pageCount;
+  const direction =
+    requestedDirection ||
+    (forwardDistance <= backwardDistance ? 1 : -1);
+
+  const currentPage = mobilePages[mobilePageIndex];
+  const nextPage = mobilePages[normalizedIndex];
+  const outgoingOffset = direction > 0 ? "-100%" : "100%";
+  const incomingOffset = direction > 0 ? "100%" : "-100%";
+
+  mobilePageAnimating = true;
+  mobilePageIndex = normalizedIndex;
+
+  nextPage.scrollTop = 0;
+  nextPage.inert = false;
+  nextPage.setAttribute("aria-hidden", "false");
+  nextPage.classList.add("mobile-page-transitioning");
+
+  currentPage.classList.add("mobile-page-transitioning");
+  updateMobilePageButtons();
+
+  if (typeof nextPage.animate !== "function") {
+    finishMobilePageTransition(currentPage, nextPage);
+    return;
+  }
+
+  const animationOptions = {
+    duration: 330,
+    easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    fill: "both",
+  };
+
+  mobilePageAnimations = [
+    currentPage.animate(
+      [
+        { transform: "translateY(0)" },
+        { transform: `translateY(${outgoingOffset})` },
+      ],
+      animationOptions,
+    ),
+    nextPage.animate(
+      [
+        { transform: `translateY(${incomingOffset})` },
+        { transform: "translateY(0)" },
+      ],
+      animationOptions,
+    ),
+  ];
+
+  Promise.allSettled(
+    mobilePageAnimations.map((animation) => animation.finished),
+  ).then(() => {
+    if (
+      !isMobilePagerMode() ||
+      mobilePageIndex !== normalizedIndex
+    ) {
+      return;
+    }
+
+    finishMobilePageTransition(currentPage, nextPage);
+  });
+}
+
+function finishMobilePageTransition(currentPage, nextPage) {
+  currentPage.classList.remove(
+    "mobile-page-active",
+    "mobile-page-transitioning",
+  );
+  currentPage.inert = true;
+  currentPage.setAttribute("aria-hidden", "true");
+
+  nextPage.classList.remove("mobile-page-transitioning");
+  nextPage.classList.add("mobile-page-active");
+  nextPage.inert = false;
+  nextPage.setAttribute("aria-hidden", "false");
+
+  mobilePageAnimations = [];
+  mobilePageAnimating = false;
+}
+
+function changeMobilePage(direction) {
+  setMobilePage(mobilePageIndex + direction, direction);
+}
+
+function updateMobilePageButtons() {
+  mobilePageButtons.forEach((button, index) => {
+    const isActive = index === mobilePageIndex;
+
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-current", String(isActive));
+  });
+}
+
+function isMobilePageAtTop(page) {
+  return page.scrollTop <= 2;
+}
+
+function isMobilePageAtBottom(page) {
+  return page.scrollTop + page.clientHeight >= page.scrollHeight - 2;
 }
 
 function setSummarySlide(nextIndex) {
@@ -2070,5 +2399,6 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+syncMobilePagerMode();
 render();
 loadHolidays();
