@@ -4,6 +4,7 @@ const STORAGE_KEY = "cat-attendance-records-v1";
 const SETTINGS_KEY = "cat-attendance-settings-by-month-v2";
 const PREVIOUS_SETTINGS_KEY = "cat-attendance-settings-v2";
 const LEGACY_SETTINGS_KEY = "cat-attendance-settings-v1";
+const WEEKLY_RANGE_KEY = "cat-attendance-52-hour-range-v1";
 
 const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
@@ -88,6 +89,17 @@ const WORK_TYPES = [
   },
 ];
 
+const CUSTOM_WORK_TYPE = {
+  id: "custom",
+  label: "직접 입력",
+  totals: {},
+};
+
+const SUMMARY_WORK_TYPES = [
+  ...WORK_TYPES,
+  CUSTOM_WORK_TYPE,
+];
+
 let currentMonth = new Date();
 
 currentMonth = new Date(
@@ -103,6 +115,7 @@ let datePickerVisibleMonth = new Date();
 let datePickerPreviousFocus = null;
 let records = loadRecords();
 let settingsByMonth = loadSettingsByMonth();
+let weeklyDateRange = loadWeeklyDateRange();
 let holidays = {};
 
 const app = document.querySelector("#app");
@@ -462,6 +475,40 @@ app.innerHTML = `
 
       <div id="workTypeList" class="work-type-list"></div>
 
+      <div
+        id="customWorkTypeEditor"
+        class="custom-work-type-editor"
+        hidden
+      >
+        <label for="customWorkTypeInput">근무 내용 직접 입력</label>
+
+        <div class="custom-work-type-control">
+          <input
+            id="customWorkTypeInput"
+            type="text"
+            inputmode="text"
+            maxlength="20"
+            autocomplete="off"
+            placeholder="예: 교육, 출장, 휴무"
+          />
+
+          <button
+            id="saveCustomWorkTypeButton"
+            type="button"
+          >
+            저장
+          </button>
+        </div>
+
+        <p
+          id="customWorkTypeMessage"
+          class="custom-work-type-message"
+          aria-live="polite"
+        >
+          직접 입력한 기록은 근무시간 0시간으로 계산됩니다.
+        </p>
+      </div>
+
       <button
         id="deleteRecordButton"
         class="delete-record-button"
@@ -613,6 +660,18 @@ const otherAllowanceInput = document.querySelector(
 const workModal = document.querySelector("#workModal");
 const modalTitle = document.querySelector("#modalTitle");
 const workTypeList = document.querySelector("#workTypeList");
+const customWorkTypeEditor = document.querySelector(
+  "#customWorkTypeEditor",
+);
+const customWorkTypeInput = document.querySelector(
+  "#customWorkTypeInput",
+);
+const customWorkTypeMessage = document.querySelector(
+  "#customWorkTypeMessage",
+);
+const saveCustomWorkTypeButton = document.querySelector(
+  "#saveCustomWorkTypeButton",
+);
 
 const deleteRecordButton = document.querySelector(
   "#deleteRecordButton",
@@ -710,6 +769,26 @@ deleteRecordButton.addEventListener("click", () => {
   saveRecords();
   closeModal();
   render();
+});
+
+saveCustomWorkTypeButton.addEventListener(
+  "click",
+  saveCustomWorkType,
+);
+
+customWorkTypeInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") {
+    return;
+  }
+
+  event.preventDefault();
+  saveCustomWorkType();
+});
+
+customWorkTypeInput.addEventListener("input", () => {
+  customWorkTypeMessage.textContent =
+    "직접 입력한 기록은 근무시간 0시간으로 계산됩니다.";
+  customWorkTypeMessage.classList.remove("error");
 });
 
 summaryPageButtons.forEach((button) => {
@@ -1012,6 +1091,7 @@ function selectDatePickerDate(dateKey) {
   }
 
   datePickerTargetInput.value = dateKey;
+  saveWeeklyDateRangeFromInputs();
   render52HourCalculator();
   closeDatePicker();
 }
@@ -1046,6 +1126,7 @@ function changeSummarySlide(direction) {
 
 function render() {
   renderCalendar();
+  syncWeeklyDateRangeInputs();
   renderSummary();
   syncSalaryInputs();
   renderSalary();
@@ -1080,8 +1161,8 @@ function renderCalendar() {
     const dateKey = createDateKey(year, month, dayNumber);
     const holidayName = getHolidayName(dateKey);
 
-    const workTypeId = records[dateKey];
-    const workType = getWorkType(workTypeId);
+    const workRecord = records[dateKey];
+    const workType = getWorkType(workRecord);
 
     const dayButton = document.createElement("button");
 
@@ -1128,7 +1209,7 @@ function renderCalendar() {
 
       ${
         workType
-          ? `<span class="work-badge">${workType.label}</span>`
+          ? `<span class="work-badge">${escapeHtml(workType.label)}</span>`
           : `<span class="empty-record">근무 선택</span>`
       }
     `;
@@ -1148,7 +1229,7 @@ function renderSummary() {
 
   recordedDays.textContent = `${stats.recordedDays}일`;
 
-  summaryGrid.innerHTML = WORK_TYPES.map(
+  summaryGrid.innerHTML = SUMMARY_WORK_TYPES.map(
     (workType) => `
       <div class="summary-item">
         <span class="summary-dot type-${workType.id}"></span>
@@ -1263,10 +1344,14 @@ function calculate52HourAverage(startDate, endDate) {
   };
 }
 
-function get52HourWorkHours(workTypeId) {
-  const workType = getWorkType(workTypeId);
+function get52HourWorkHours(workRecord) {
+  const workType = getWorkType(workRecord);
 
-  if (!workType || workType.id === "annualLeave") {
+  if (
+    !workType ||
+    workType.id === "annualLeave" ||
+    workType.id === CUSTOM_WORK_TYPE.id
+  ) {
     return 0;
   }
 
@@ -1489,11 +1574,11 @@ function calculateMonthStats() {
     counts: {},
   };
 
-  WORK_TYPES.forEach((workType) => {
+  SUMMARY_WORK_TYPES.forEach((workType) => {
     stats.counts[workType.id] = 0;
   });
 
-  for (const [dateKey, workTypeId] of Object.entries(records)) {
+  for (const [dateKey, workRecord] of Object.entries(records)) {
     const recordDate = parseDateKey(dateKey);
 
     if (
@@ -1503,7 +1588,7 @@ function calculateMonthStats() {
       continue;
     }
 
-    const workType = getWorkType(workTypeId);
+    const workType = getWorkType(workRecord);
 
     if (!workType) {
       continue;
@@ -1548,21 +1633,35 @@ function openModal(dateKey, year, month, dayNumber) {
   modalTitle.textContent =
     `${year}년 ${month + 1}월 ${dayNumber}일`;
 
-  const selectedWorkTypeId = records[dateKey];
+  const selectedWorkRecord = records[dateKey];
+  const selectedWorkType = getWorkType(selectedWorkRecord);
+  const selectedWorkTypeId = selectedWorkType?.id || "";
 
-  workTypeList.innerHTML = WORK_TYPES.map(
-    (workType) => `
-      <button
-        type="button"
-        class="work-type-button type-${workType.id}
-          ${selectedWorkTypeId === workType.id ? "selected" : ""}"
-        data-work-type="${workType.id}"
-      >
-        <span class="work-type-color"></span>
-        <span>${workType.label}</span>
-      </button>
-    `,
-  ).join("");
+  workTypeList.innerHTML = `
+    ${WORK_TYPES.map(
+      (workType) => `
+        <button
+          type="button"
+          class="work-type-button type-${workType.id}
+            ${selectedWorkTypeId === workType.id ? "selected" : ""}"
+          data-work-type="${workType.id}"
+        >
+          <span class="work-type-color"></span>
+          <span>${workType.label}</span>
+        </button>
+      `,
+    ).join("")}
+
+    <button
+      type="button"
+      class="work-type-button type-custom
+        ${selectedWorkTypeId === CUSTOM_WORK_TYPE.id ? "selected" : ""}"
+      data-custom-work-type
+    >
+      <span class="work-type-color"></span>
+      <span>직접 입력</span>
+    </button>
+  `;
 
   workTypeList
     .querySelectorAll("[data-work-type]")
@@ -1578,16 +1677,84 @@ function openModal(dateKey, year, month, dayNumber) {
       });
     });
 
-  deleteRecordButton.hidden = !selectedWorkTypeId;
+  const customWorkTypeButton = workTypeList.querySelector(
+    "[data-custom-work-type]",
+  );
+
+  customWorkTypeButton.addEventListener("click", () => {
+    const initialValue =
+      selectedWorkTypeId === CUSTOM_WORK_TYPE.id
+        ? selectedWorkType.label
+        : "";
+
+    showCustomWorkTypeEditor(initialValue);
+  });
+
+  if (selectedWorkTypeId === CUSTOM_WORK_TYPE.id) {
+    showCustomWorkTypeEditor(selectedWorkType.label);
+  } else {
+    hideCustomWorkTypeEditor();
+  }
+
+  deleteRecordButton.hidden = !selectedWorkRecord;
 
   workModal.classList.add("open");
   workModal.setAttribute("aria-hidden", "false");
+}
+
+function showCustomWorkTypeEditor(initialValue = "") {
+  customWorkTypeEditor.hidden = false;
+  customWorkTypeInput.value = initialValue;
+  customWorkTypeMessage.textContent =
+    "직접 입력한 기록은 근무시간 0시간으로 계산됩니다.";
+  customWorkTypeMessage.classList.remove("error");
+
+  customWorkTypeInput.focus();
+  customWorkTypeInput.select();
+
+  window.requestAnimationFrame(() => {
+    customWorkTypeInput.focus();
+    customWorkTypeInput.select();
+  });
+}
+
+function hideCustomWorkTypeEditor() {
+  customWorkTypeEditor.hidden = true;
+  customWorkTypeInput.value = "";
+  customWorkTypeMessage.textContent =
+    "직접 입력한 기록은 근무시간 0시간으로 계산됩니다.";
+  customWorkTypeMessage.classList.remove("error");
+}
+
+function saveCustomWorkType() {
+  if (!selectedDateKey) {
+    return;
+  }
+
+  const label = normalizeCustomLabel(customWorkTypeInput.value);
+
+  if (!label) {
+    customWorkTypeMessage.textContent = "내용을 입력해 주세요.";
+    customWorkTypeMessage.classList.add("error");
+    customWorkTypeInput.focus();
+    return;
+  }
+
+  records[selectedDateKey] = {
+    type: CUSTOM_WORK_TYPE.id,
+    label,
+  };
+
+  saveRecords();
+  closeModal();
+  render();
 }
 
 function closeModal() {
   workModal.classList.remove("open");
   workModal.setAttribute("aria-hidden", "true");
 
+  hideCustomWorkTypeEditor();
   selectedDateKey = null;
 }
 
@@ -1610,10 +1777,52 @@ function parseDateKey(dateKey) {
   };
 }
 
-function getWorkType(workTypeId) {
+function getWorkType(workRecord) {
+  if (isCustomWorkRecord(workRecord)) {
+    const label = normalizeCustomLabel(workRecord.label);
+
+    if (!label) {
+      return null;
+    }
+
+    return {
+      ...CUSTOM_WORK_TYPE,
+      label,
+    };
+  }
+
+  if (typeof workRecord !== "string") {
+    return null;
+  }
+
   return WORK_TYPES.find(
-    (workType) => workType.id === workTypeId,
+    (workType) => workType.id === workRecord,
   );
+}
+
+function isCustomWorkRecord(workRecord) {
+  return Boolean(
+    workRecord &&
+      typeof workRecord === "object" &&
+      workRecord.type === CUSTOM_WORK_TYPE.id &&
+      typeof workRecord.label === "string",
+  );
+}
+
+function normalizeCustomLabel(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 20);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function getHolidayName(dateKey) {
@@ -1691,6 +1900,61 @@ function saveRecords() {
     STORAGE_KEY,
     JSON.stringify(records),
   );
+}
+
+function loadWeeklyDateRange() {
+  try {
+    const savedRange = localStorage.getItem(WEEKLY_RANGE_KEY);
+
+    if (!savedRange) {
+      return {
+        startDate: "",
+        endDate: "",
+      };
+    }
+
+    const parsedRange = JSON.parse(savedRange);
+    const startDate = parseDateInputValue(
+      parsedRange?.startDate,
+    )
+      ? parsedRange.startDate
+      : "";
+    const endDate = parseDateInputValue(parsedRange?.endDate)
+      ? parsedRange.endDate
+      : "";
+
+    return {
+      startDate,
+      endDate,
+    };
+  } catch (error) {
+    console.error(
+      "52시간 계산기 날짜를 불러오지 못했습니다.",
+      error,
+    );
+
+    return {
+      startDate: "",
+      endDate: "",
+    };
+  }
+}
+
+function saveWeeklyDateRangeFromInputs() {
+  weeklyDateRange = {
+    startDate: weeklyStartDateInput.value,
+    endDate: weeklyEndDateInput.value,
+  };
+
+  localStorage.setItem(
+    WEEKLY_RANGE_KEY,
+    JSON.stringify(weeklyDateRange),
+  );
+}
+
+function syncWeeklyDateRangeInputs() {
+  weeklyStartDateInput.value = weeklyDateRange.startDate || "";
+  weeklyEndDateInput.value = weeklyDateRange.endDate || "";
 }
 
 function getMonthKey(date) {
