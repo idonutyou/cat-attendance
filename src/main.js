@@ -98,8 +98,12 @@ currentMonth = new Date(
 
 let selectedDateKey = null;
 let summarySlideIndex = 0;
+let datePickerTargetInput = null;
+let datePickerVisibleMonth = new Date();
+let datePickerPreviousFocus = null;
 let records = loadRecords();
 let settingsByMonth = loadSettingsByMonth();
+let holidays = {};
 
 const app = document.querySelector("#app");
 
@@ -228,23 +232,63 @@ app.innerHTML = `
 
               <div class="weekly-calculator">
                 <div class="weekly-date-range">
-                  <label class="weekly-date-field">
-                    <span>언제부터</span>
-                    <input
-                      id="weeklyStartDate"
-                      type="date"
-                      aria-label="52시간 계산 시작 날짜"
-                    />
-                  </label>
+                  <div class="weekly-date-field">
+                    <label for="weeklyStartDate">언제부터</label>
 
-                  <label class="weekly-date-field">
-                    <span>언제까지</span>
-                    <input
-                      id="weeklyEndDate"
-                      type="date"
-                      aria-label="52시간 계산 종료 날짜"
-                    />
-                  </label>
+                    <div class="weekly-date-control">
+                      <input
+                        id="weeklyStartDate"
+                        type="text"
+                        placeholder="날짜 선택"
+                        aria-label="52시간 계산 시작 날짜"
+                        aria-haspopup="dialog"
+                        readonly
+                      />
+
+                      <button
+                        class="weekly-date-open-button"
+                        type="button"
+                        data-date-picker-target="weeklyStartDate"
+                        aria-label="시작 날짜 달력 열기"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path d="M7 2v3M17 2v3M3.5 9h17M5.5 4h13a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="weekly-date-field">
+                    <label for="weeklyEndDate">언제까지</label>
+
+                    <div class="weekly-date-control">
+                      <input
+                        id="weeklyEndDate"
+                        type="text"
+                        placeholder="날짜 선택"
+                        aria-label="52시간 계산 종료 날짜"
+                        aria-haspopup="dialog"
+                        readonly
+                      />
+
+                      <button
+                        class="weekly-date-open-button"
+                        type="button"
+                        data-date-picker-target="weeklyEndDate"
+                        aria-label="종료 날짜 달력 열기"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path d="M7 2v3M17 2v3M3.5 9h17M5.5 4h13a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div
@@ -254,10 +298,6 @@ app.innerHTML = `
                 >
                   시작일과 종료일을 선택해 주세요.
                 </div>
-
-                <p class="weekly-calculator-note">
-                  주말을 포함한 선택 기간 전체 일수를 기준으로 계산합니다.
-                </p>
               </div>
             </article>
           </div>
@@ -431,6 +471,82 @@ app.innerHTML = `
       </button>
     </section>
   </div>
+
+  <div
+    id="datePickerModal"
+    class="modal date-picker-modal"
+    aria-hidden="true"
+  >
+    <div
+      class="modal-backdrop"
+      data-close-date-picker
+    ></div>
+
+    <section
+      class="modal-sheet date-picker-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="datePickerTitle"
+    >
+      <div class="date-picker-header">
+        <button
+          id="datePickerPreviousMonth"
+          class="date-picker-month-button"
+          type="button"
+          aria-label="달력 이전 달"
+        >
+          ‹
+        </button>
+
+        <h2 id="datePickerTitle"></h2>
+
+        <button
+          id="datePickerNextMonth"
+          class="date-picker-month-button"
+          type="button"
+          aria-label="달력 다음 달"
+        >
+          ›
+        </button>
+      </div>
+
+      <div
+        class="date-picker-weekdays"
+        aria-hidden="true"
+      >
+        <span>월</span>
+        <span>화</span>
+        <span>수</span>
+        <span>목</span>
+        <span>금</span>
+        <span class="saturday">토</span>
+        <span class="sunday">일</span>
+      </div>
+
+      <div
+        id="datePickerGrid"
+        class="date-picker-grid"
+      ></div>
+
+      <div class="date-picker-actions">
+        <button
+          id="datePickerTodayButton"
+          class="date-picker-today-button"
+          type="button"
+        >
+          오늘 선택
+        </button>
+
+        <button
+          id="closeDatePickerButton"
+          class="date-picker-close-button"
+          type="button"
+        >
+          닫기
+        </button>
+      </div>
+    </section>
+  </div>
 `;
 
 const monthTitle = document.querySelector("#monthTitle");
@@ -454,6 +570,18 @@ const weeklyEndDateInput = document.querySelector(
 );
 const weeklyAverageResult = document.querySelector(
   "#weeklyAverageResult",
+);
+const datePickerModal = document.querySelector(
+  "#datePickerModal",
+);
+const datePickerTitle = document.querySelector(
+  "#datePickerTitle",
+);
+const datePickerGrid = document.querySelector(
+  "#datePickerGrid",
+);
+const closeDatePickerButton = document.querySelector(
+  "#closeDatePickerButton",
 );
 
 const salaryMonthTitle = document.querySelector("#salaryMonthTitle");
@@ -639,9 +767,78 @@ summaryCard.addEventListener("keydown", (event) => {
   weeklyStartDateInput,
   weeklyEndDateInput,
 ].forEach((input) => {
-  input.addEventListener("change", render52HourCalculator);
-  input.addEventListener("input", render52HourCalculator);
+  input.addEventListener("click", () => {
+    openDatePicker(input);
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openDatePicker(input);
+    }
+  });
 });
+
+document
+  .querySelectorAll("[data-date-picker-target]")
+  .forEach((button) => {
+    button.addEventListener("click", () => {
+      const input = document.querySelector(
+        `#${button.dataset.datePickerTarget}`,
+      );
+
+      if (input) {
+        openDatePicker(input);
+      }
+    });
+  });
+
+document
+  .querySelector("#datePickerPreviousMonth")
+  .addEventListener("click", () => {
+    datePickerVisibleMonth = new Date(
+      datePickerVisibleMonth.getFullYear(),
+      datePickerVisibleMonth.getMonth() - 1,
+      1,
+    );
+
+    renderDatePicker();
+  });
+
+document
+  .querySelector("#datePickerNextMonth")
+  .addEventListener("click", () => {
+    datePickerVisibleMonth = new Date(
+      datePickerVisibleMonth.getFullYear(),
+      datePickerVisibleMonth.getMonth() + 1,
+      1,
+    );
+
+    renderDatePicker();
+  });
+
+document
+  .querySelector("#datePickerTodayButton")
+  .addEventListener("click", () => {
+    const today = new Date();
+
+    selectDatePickerDate(
+      createDateKey(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+      ),
+    );
+  });
+
+closeDatePickerButton.addEventListener(
+  "click",
+  closeDatePicker,
+);
+
+document
+  .querySelector("[data-close-date-picker]")
+  .addEventListener("click", closeDatePicker);
 
 [
   baseHourlyWageInput,
@@ -667,10 +864,140 @@ summaryCard.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closeModal();
+  if (event.key !== "Escape") {
+    return;
   }
+
+  if (datePickerModal.classList.contains("open")) {
+    closeDatePicker();
+    return;
+  }
+
+  closeModal();
 });
+
+function openDatePicker(input) {
+  const selectedDate = parseDateInputValue(input.value);
+  const today = new Date();
+
+  datePickerTargetInput = input;
+  datePickerPreviousFocus = document.activeElement;
+  datePickerVisibleMonth = selectedDate
+    ? new Date(
+        selectedDate.getUTCFullYear(),
+        selectedDate.getUTCMonth(),
+        1,
+      )
+    : new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        1,
+      );
+
+  renderDatePicker();
+  datePickerModal.classList.add("open");
+  datePickerModal.setAttribute("aria-hidden", "false");
+
+  window.requestAnimationFrame(() => {
+    const focusTarget =
+      datePickerGrid.querySelector(".selected") ||
+      datePickerGrid.querySelector(".today") ||
+      datePickerGrid.querySelector("button");
+
+    focusTarget?.focus();
+  });
+}
+
+function closeDatePicker() {
+  if (!datePickerModal.classList.contains("open")) {
+    return;
+  }
+
+  datePickerModal.classList.remove("open");
+  datePickerModal.setAttribute("aria-hidden", "true");
+
+  const focusTarget = datePickerPreviousFocus;
+
+  datePickerTargetInput = null;
+  datePickerPreviousFocus = null;
+  focusTarget?.focus();
+}
+
+function renderDatePicker() {
+  const year = datePickerVisibleMonth.getFullYear();
+  const month = datePickerVisibleMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayPosition =
+    (new Date(year, month, 1).getDay() + 6) % 7;
+  const selectedDateKey = datePickerTargetInput?.value || "";
+  const today = new Date();
+  const todayDateKey = createDateKey(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+
+  datePickerTitle.textContent = `${year}년 ${month + 1}월`;
+  datePickerGrid.innerHTML = "";
+
+  for (let cellIndex = 0; cellIndex < 42; cellIndex += 1) {
+    const dayNumber = cellIndex - firstDayPosition + 1;
+
+    if (dayNumber < 1 || dayNumber > daysInMonth) {
+      const emptyCell = document.createElement("span");
+
+      emptyCell.className = "date-picker-day empty";
+      emptyCell.setAttribute("aria-hidden", "true");
+      datePickerGrid.appendChild(emptyCell);
+      continue;
+    }
+
+    const date = new Date(year, month, dayNumber);
+    const dateKey = createDateKey(year, month, dayNumber);
+    const dayButton = document.createElement("button");
+
+    dayButton.type = "button";
+    dayButton.className = "date-picker-day";
+    dayButton.textContent = String(dayNumber);
+    dayButton.setAttribute(
+      "aria-label",
+      `${year}년 ${month + 1}월 ${dayNumber}일 선택`,
+    );
+
+    if (date.getDay() === 6) {
+      dayButton.classList.add("saturday");
+    }
+
+    if (date.getDay() === 0) {
+      dayButton.classList.add("sunday");
+    }
+
+    if (dateKey === todayDateKey) {
+      dayButton.classList.add("today");
+    }
+
+    if (dateKey === selectedDateKey) {
+      dayButton.classList.add("selected");
+      dayButton.setAttribute("aria-current", "date");
+    }
+
+    dayButton.addEventListener("click", () => {
+      selectDatePickerDate(dateKey);
+    });
+
+    datePickerGrid.appendChild(dayButton);
+  }
+}
+
+function selectDatePickerDate(dateKey) {
+  if (!datePickerTargetInput) {
+    return;
+  }
+
+  datePickerTargetInput.value = dateKey;
+  render52HourCalculator();
+  closeDatePicker();
+}
 
 function setSummarySlide(nextIndex) {
   const slideCount = summarySlides.length;
@@ -734,6 +1061,7 @@ function renderCalendar() {
 
     const date = new Date(year, month, dayNumber);
     const dateKey = createDateKey(year, month, dayNumber);
+    const holidayName = getHolidayName(dateKey);
 
     const workTypeId = records[dateKey];
     const workType = getWorkType(workTypeId);
@@ -759,12 +1087,26 @@ function renderCalendar() {
       dayButton.classList.add("saturday-cell");
     }
 
+    if (holidayName) {
+      dayButton.classList.add("holiday-cell");
+      dayButton.setAttribute(
+        "aria-label",
+        `${year}년 ${month + 1}월 ${dayNumber}일 ${holidayName}`,
+      );
+    }
+
     if (workType) {
       dayButton.classList.add(`type-${workType.id}`);
     }
 
     dayButton.innerHTML = `
       <span class="day-number">${dayNumber}</span>
+
+      ${
+        holidayName
+          ? `<span class="holiday-name">${holidayName}</span>`
+          : ""
+      }
 
       ${
         workType
@@ -850,11 +1192,6 @@ function render52HourCalculator() {
   const remainingDays = dayCount % 7;
 
   weeklyAverageResult.innerHTML = `
-    <div class="weekly-date-summary">
-      ${formatKoreanDate(startDate)}부터
-      ${formatKoreanDate(endDate)}까지
-    </div>
-
     <div class="weekly-result-summary">
       <div class="weekly-duration">
         <strong>${fullWeeks}주 ${remainingDays}일</strong> 동안
@@ -945,11 +1282,6 @@ function createDateKeyFromUtcDate(date) {
   return `${year}-${month}-${day}`;
 }
 
-function formatKoreanDate(date) {
-  return `${date.getUTCFullYear()}년 ${
-    date.getUTCMonth() + 1
-  }월 ${date.getUTCDate()}일`;
-}
 
 function formatTotalWorkHours(value) {
   return new Intl.NumberFormat("ko-KR", {
@@ -1266,6 +1598,29 @@ function getWorkType(workTypeId) {
   );
 }
 
+function getHolidayName(dateKey) {
+  return holidays[dateKey] || "";
+}
+
+async function loadHolidays() {
+  try {
+    const response = await fetch(
+      `${import.meta.env.BASE_URL}holidays.json`,
+      { cache: "no-cache" },
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    holidays = await response.json();
+    render();
+
+  } catch (error) {
+    console.error("공휴일 정보를 불러오지 못했습니다.", error);
+  }
+}
+
 function getInputNumber(input) {
   const value = Number(input.value);
 
@@ -1434,3 +1789,4 @@ if ("serviceWorker" in navigator) {
 }
 
 render();
+loadHolidays();
