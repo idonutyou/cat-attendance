@@ -118,6 +118,7 @@ let exitToastTimer = null;
 let backExitGuardInitialized = false;
 let backExitPopstateAttached = false;
 let backExitGuardArmedThisSession = false;
+let appCloseWatcher = null;
 let allowAppExitNavigation = false;
 let datePickerTargetInput = null;
 let datePickerVisibleMonth = new Date();
@@ -1461,7 +1462,53 @@ function initializeBackExitGuard() {
   }
 
   ensureBackExitPopstateListener();
+  ensureAppCloseWatcher();
   resetBackExitState();
+}
+
+function ensureAppCloseWatcher() {
+  if (!shouldUseBackExitGuard() || appCloseWatcher) {
+    return;
+  }
+
+  if (typeof window.CloseWatcher !== "function") {
+    document.documentElement.dataset.backExitGuard = "history";
+    return;
+  }
+
+  appCloseWatcher = new window.CloseWatcher();
+  appCloseWatcher.addEventListener(
+    "close",
+    handleAppCloseRequest,
+    { once: true },
+  );
+  document.documentElement.dataset.backExitGuard = "close-watcher";
+}
+
+function handleAppCloseRequest() {
+  appCloseWatcher = null;
+
+  if (workModal.classList.contains("open")) {
+    closeModal();
+    resetBackExitState();
+    return;
+  }
+
+  if (datePickerModal.classList.contains("open")) {
+    closeDatePicker();
+    resetBackExitState();
+    return;
+  }
+
+  if (!exitBackReady) {
+    // 첫 번째 Android 뒤로가기는 CloseWatcher가 소비한다.
+    // 안내가 보이는 동안에는 새 watcher를 만들지 않아 두 번째
+    // 뒤로가기가 기존 history 보호 단계로 전달되게 한다.
+    showExitToast();
+    return;
+  }
+
+  completeAppExit(true);
 }
 
 function ensureBackExitPopstateListener() {
@@ -1497,6 +1544,7 @@ function resetBackExitState() {
   window.clearTimeout(exitToastTimer);
   hideExitToast();
   ensureBackExitPopstateListener();
+  ensureAppCloseWatcher();
 
   const currentState =
     window.history.state &&
@@ -1565,15 +1613,29 @@ function handleAppBackNavigation() {
     return;
   }
 
+  completeAppExit(false);
+}
+
+function completeAppExit(fromCloseWatcher) {
   exitBackReady = false;
   allowAppExitNavigation = true;
   window.clearTimeout(exitToastTimer);
   hideExitToast();
+
+  if (appCloseWatcher) {
+    appCloseWatcher.destroy();
+    appCloseWatcher = null;
+  }
+
   window.removeEventListener("popstate", handleAppBackNavigation);
   backExitPopstateAttached = false;
 
   window.setTimeout(() => {
-    window.history.back();
+    if (fromCloseWatcher) {
+      window.history.go(-2);
+    } else {
+      window.history.back();
+    }
 
     window.setTimeout(() => {
       window.close();
@@ -1611,6 +1673,7 @@ function showExitToast() {
   exitToastTimer = window.setTimeout(() => {
     exitBackReady = false;
     hideExitToast();
+    ensureAppCloseWatcher();
   }, 2200);
 }
 
