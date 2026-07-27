@@ -113,6 +113,9 @@ let summarySlideIndex = 0;
 let mobilePageIndex = 0;
 let mobilePageAnimating = false;
 let mobilePageAnimations = [];
+let exitBackReady = false;
+let exitToastTimer = null;
+let backExitGuardInitialized = false;
 let datePickerTargetInput = null;
 let datePickerVisibleMonth = new Date();
 let datePickerPreviousFocus = null;
@@ -486,6 +489,16 @@ app.innerHTML = `
   </div>
 
   <div
+    id="exitToast"
+    class="exit-toast"
+    role="status"
+    aria-live="polite"
+    aria-hidden="true"
+  >
+    한 번 더 뒤로가기를 누르면 앱이 종료됩니다.
+  </div>
+
+  <div
     id="workModal"
     class="modal"
     aria-hidden="true"
@@ -652,6 +665,7 @@ const mobilePagerTestMode =
   new URLSearchParams(window.location.search).get(
     "mobilePagerTest",
   ) === "1";
+const exitToast = document.querySelector("#exitToast");
 const summaryCard = document.querySelector("#summaryCard");
 const summaryCarousel = document.querySelector("#summaryCarousel");
 const summaryTrack = document.querySelector("#summaryTrack");
@@ -1306,6 +1320,10 @@ function syncMobilePagerMode() {
   });
 
   updateMobilePageButtons();
+
+  if (isMobile) {
+    initializeBackExitGuard();
+  }
 }
 
 function setMobilePage(nextIndex, requestedDirection = 0) {
@@ -1423,6 +1441,102 @@ function isMobilePageAtTop(page) {
 
 function isMobilePageAtBottom(page) {
   return page.scrollTop + page.clientHeight >= page.scrollHeight - 2;
+}
+
+function initializeBackExitGuard() {
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+
+  if (
+    backExitGuardInitialized ||
+    (!isMobilePagerMode() && !isStandalone)
+  ) {
+    return;
+  }
+
+  backExitGuardInitialized = true;
+  window.addEventListener("popstate", handleAppBackNavigation);
+
+  const currentState =
+    window.history.state &&
+    typeof window.history.state === "object"
+      ? window.history.state
+      : {};
+
+  if (currentState.catAttendanceExitGuard) {
+    return;
+  }
+
+  window.history.replaceState(
+    {
+      ...currentState,
+      catAttendanceAppBase: true,
+    },
+    "",
+    window.location.href,
+  );
+
+  restoreBackExitGuard();
+}
+
+function handleAppBackNavigation() {
+  if (workModal.classList.contains("open")) {
+    closeModal();
+    restoreBackExitGuard();
+    return;
+  }
+
+  if (datePickerModal.classList.contains("open")) {
+    closeDatePicker();
+    restoreBackExitGuard();
+    return;
+  }
+
+  if (!exitBackReady) {
+    showExitToast();
+    restoreBackExitGuard();
+    return;
+  }
+
+  exitBackReady = false;
+  window.clearTimeout(exitToastTimer);
+  hideExitToast();
+  window.removeEventListener("popstate", handleAppBackNavigation);
+
+  window.setTimeout(() => {
+    window.history.back();
+
+    window.setTimeout(() => {
+      window.close();
+    }, 120);
+  }, 0);
+}
+
+function restoreBackExitGuard() {
+  window.history.pushState(
+    { catAttendanceExitGuard: true },
+    "",
+    window.location.href,
+  );
+}
+
+function showExitToast() {
+  exitBackReady = true;
+  window.clearTimeout(exitToastTimer);
+
+  exitToast.classList.add("show");
+  exitToast.setAttribute("aria-hidden", "false");
+
+  exitToastTimer = window.setTimeout(() => {
+    exitBackReady = false;
+    hideExitToast();
+  }, 2200);
+}
+
+function hideExitToast() {
+  exitToast.classList.remove("show");
+  exitToast.setAttribute("aria-hidden", "true");
 }
 
 function setSummarySlide(nextIndex) {
@@ -2400,5 +2514,6 @@ if ("serviceWorker" in navigator) {
 }
 
 syncMobilePagerMode();
+initializeBackExitGuard();
 render();
 loadHolidays();

@@ -1648,6 +1648,89 @@ html.mobile-pager-enabled .mobile-page-dot.active {
   height: 20px;
   background: var(--primary);
 }
+
+html.mobile-pager-enabled .summary-card {
+  padding: 10px 12px;
+}
+
+html.mobile-pager-enabled .summary-card .section-title-row {
+  margin-bottom: 9px;
+}
+
+html.mobile-pager-enabled .summary-card .section-title-row h2 {
+  font-size: 17px;
+}
+
+html.mobile-pager-enabled .summary-card .section-caption {
+  font-size: 10.5px;
+}
+
+html.mobile-pager-enabled .summary-card .recorded-days {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+html.mobile-pager-enabled .summary-card .summary-grid {
+  gap: 4px;
+}
+
+html.mobile-pager-enabled .summary-card .summary-item {
+  min-height: 34px;
+  padding: 7px 9px;
+  gap: 8px;
+}
+
+html.mobile-pager-enabled .summary-card .summary-pagination {
+  margin-top: 8px;
+}
+
+html.mobile-pager-enabled .summary-card .summary-swipe-hint {
+  margin-top: 3px;
+}
+
+html.mobile-pager-enabled .summary-card .work-total-row {
+  min-height: 36px;
+}
+
+.exit-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 300;
+
+  width: max-content;
+  max-width: calc(100% - 48px);
+  padding: 13px 18px;
+
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 15px;
+
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.78);
+  box-shadow: 0 14px 38px rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(10px);
+
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+
+  text-align: center;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.45;
+
+  transform: translate(-50%, -44%) scale(0.96);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    visibility 0.18s ease;
+}
+
+.exit-toast.show {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
 .calendar-actions {
   margin: 12px 0 20px;
 
