@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
   safetyAllowance: 0,
   longevityAllowance: 0,
+  otherAllowance: 0,
 };
 
 const WORK_TYPES = [
@@ -96,6 +97,7 @@ currentMonth = new Date(
 );
 
 let selectedDateKey = null;
+let summarySlideIndex = 0;
 let records = loadRecords();
 let settingsByMonth = loadSettingsByMonth();
 
@@ -109,8 +111,8 @@ app.innerHTML = `
         <h1>CAT 근태관리</h1>
       </div>
 
-      <div class="header-icon" aria-hidden="true">
-        ₩
+      <div class="made-by" aria-label="Made by 제민">
+        Made by 제민
       </div>
     </header>
 
@@ -169,19 +171,123 @@ app.innerHTML = `
         <div id="calendarGrid" class="calendar-grid"></div>
       </section>
 
-      <section class="summary-card">
-        <div class="section-title-row">
-          <div>
-            <p class="section-caption">월간 현황</p>
-            <h2>근무 기록 요약</h2>
-          </div>
+      <section
+        id="summaryCard"
+        class="summary-card"
+        tabindex="0"
+        aria-label="월간 근무 현황"
+        aria-roledescription="carousel"
+      >
+        <div id="summaryCarousel" class="summary-carousel">
+          <div id="summaryTrack" class="summary-track">
+            <article
+              class="summary-slide"
+              data-summary-slide="0"
+              aria-label="근무 기록 요약"
+            >
+              <div class="section-title-row">
+                <div>
+                  <p class="section-caption">월간 현황</p>
+                  <h2>근무 기록 요약</h2>
+                </div>
 
-          <div id="recordedDays" class="recorded-days">
-            0일
+                <div id="recordedDays" class="recorded-days">
+                  0일
+                </div>
+              </div>
+
+              <div id="summaryGrid" class="summary-grid"></div>
+            </article>
+
+            <article
+              class="summary-slide"
+              data-summary-slide="1"
+              aria-label="근무시간 집계"
+            >
+              <div class="section-title-row">
+                <div>
+                  <p class="section-caption">월간 현황</p>
+                  <h2>근무시간 집계</h2>
+                </div>
+              </div>
+
+              <div id="workTotalsGrid" class="work-totals-grid"></div>
+            </article>
+
+            <article
+              class="summary-slide"
+              data-summary-slide="2"
+              aria-label="52시간 계산기"
+            >
+              <div class="section-title-row">
+                <div>
+                  <p class="section-caption">기간별 현황</p>
+                  <h2>52시간 계산기</h2>
+                </div>
+              </div>
+
+              <div class="weekly-calculator">
+                <div class="weekly-date-range">
+                  <label class="weekly-date-field">
+                    <span>언제부터</span>
+                    <input
+                      id="weeklyStartDate"
+                      type="date"
+                      aria-label="52시간 계산 시작 날짜"
+                    />
+                  </label>
+
+                  <label class="weekly-date-field">
+                    <span>언제까지</span>
+                    <input
+                      id="weeklyEndDate"
+                      type="date"
+                      aria-label="52시간 계산 종료 날짜"
+                    />
+                  </label>
+                </div>
+
+                <div
+                  id="weeklyAverageResult"
+                  class="weekly-average-result"
+                  aria-live="polite"
+                >
+                  시작일과 종료일을 선택해 주세요.
+                </div>
+
+                <p class="weekly-calculator-note">
+                  주말을 포함한 선택 기간 전체 일수를 기준으로 계산합니다.
+                </p>
+              </div>
+            </article>
           </div>
         </div>
 
-        <div id="summaryGrid" class="summary-grid"></div>
+        <div class="summary-pagination" aria-label="요약 페이지 선택">
+          <button
+            class="carousel-dot active"
+            type="button"
+            data-summary-page="0"
+            aria-label="근무 기록 요약 보기"
+            aria-current="true"
+          ></button>
+          <button
+            class="carousel-dot"
+            type="button"
+            data-summary-page="1"
+            aria-label="근무시간 집계 보기"
+            aria-current="false"
+          ></button>
+          <button
+            class="carousel-dot"
+            type="button"
+            data-summary-page="2"
+            aria-label="52시간 계산기 보기"
+            aria-current="false"
+          ></button>
+        </div>
+
+        <p class="summary-swipe-hint">옆으로 넘겨 확인</p>
       </section>
 
       <section class="salary-card">
@@ -249,14 +355,25 @@ app.innerHTML = `
               </div>
             </label>
 
+            <label class="salary-input-row">
+              <span>기타수당</span>
+
+              <div class="input-with-unit">
+                <input
+                  id="otherAllowance"
+                  type="number"
+                  inputmode="numeric"
+                  min="0"
+                  placeholder="0"
+                  value=""
+                />
+                <span>원</span>
+              </div>
+            </label>
+
             <p class="formula-note">
               통상시급 = 기본시급 + (안전수당 + 근속수당) ÷ 243
             </p>
-          </section>
-
-          <section class="salary-panel">
-            <h3>근무시간 집계</h3>
-            <div id="workTotalsGrid" class="work-totals-grid"></div>
           </section>
 
           <section class="salary-panel payment-panel">
@@ -318,8 +435,26 @@ app.innerHTML = `
 
 const monthTitle = document.querySelector("#monthTitle");
 const calendarGrid = document.querySelector("#calendarGrid");
+const summaryCard = document.querySelector("#summaryCard");
+const summaryCarousel = document.querySelector("#summaryCarousel");
+const summaryTrack = document.querySelector("#summaryTrack");
+const summarySlides = [
+  ...document.querySelectorAll("[data-summary-slide]"),
+];
+const summaryPageButtons = [
+  ...document.querySelectorAll("[data-summary-page]"),
+];
 const summaryGrid = document.querySelector("#summaryGrid");
 const recordedDays = document.querySelector("#recordedDays");
+const weeklyStartDateInput = document.querySelector(
+  "#weeklyStartDate",
+);
+const weeklyEndDateInput = document.querySelector(
+  "#weeklyEndDate",
+);
+const weeklyAverageResult = document.querySelector(
+  "#weeklyAverageResult",
+);
 
 const salaryMonthTitle = document.querySelector("#salaryMonthTitle");
 const workTotalsGrid = document.querySelector("#workTotalsGrid");
@@ -341,6 +476,10 @@ const safetyAllowanceInput = document.querySelector(
 
 const longevityAllowanceInput = document.querySelector(
   "#longevityAllowance",
+);
+
+const otherAllowanceInput = document.querySelector(
+  "#otherAllowance",
 );
 
 const workModal = document.querySelector("#workModal");
@@ -445,10 +584,70 @@ deleteRecordButton.addEventListener("click", () => {
   render();
 });
 
+summaryPageButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setSummarySlide(Number(button.dataset.summaryPage));
+  });
+});
+
+let summaryTouchStartX = 0;
+let summaryTouchStartY = 0;
+
+summaryCarousel.addEventListener(
+  "touchstart",
+  (event) => {
+    const [touch] = event.changedTouches;
+
+    summaryTouchStartX = touch.clientX;
+    summaryTouchStartY = touch.clientY;
+  },
+  { passive: true },
+);
+
+summaryCarousel.addEventListener(
+  "touchend",
+  (event) => {
+    const [touch] = event.changedTouches;
+    const deltaX = touch.clientX - summaryTouchStartX;
+    const deltaY = touch.clientY - summaryTouchStartY;
+
+    if (
+      Math.abs(deltaX) < 45 ||
+      Math.abs(deltaX) <= Math.abs(deltaY)
+    ) {
+      return;
+    }
+
+    changeSummarySlide(deltaX < 0 ? 1 : -1);
+  },
+  { passive: true },
+);
+
+summaryCard.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    changeSummarySlide(-1);
+  }
+
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    changeSummarySlide(1);
+  }
+});
+
+[
+  weeklyStartDateInput,
+  weeklyEndDateInput,
+].forEach((input) => {
+  input.addEventListener("change", render52HourCalculator);
+  input.addEventListener("input", render52HourCalculator);
+});
+
 [
   baseHourlyWageInput,
   safetyAllowanceInput,
   longevityAllowanceInput,
+  otherAllowanceInput,
 ].forEach((input) => {
   input.addEventListener("input", () => {
     const monthKey = getMonthKey(currentMonth);
@@ -459,6 +658,7 @@ deleteRecordButton.addEventListener("click", () => {
       longevityAllowance: getInputNumber(
         longevityAllowanceInput,
       ),
+      otherAllowance: getInputNumber(otherAllowanceInput),
     };
 
     saveSettingsByMonth();
@@ -471,6 +671,34 @@ document.addEventListener("keydown", (event) => {
     closeModal();
   }
 });
+
+function setSummarySlide(nextIndex) {
+  const slideCount = summarySlides.length;
+
+  summarySlideIndex =
+    ((nextIndex % slideCount) + slideCount) % slideCount;
+
+  summaryTrack.style.transform =
+    `translateX(-${summarySlideIndex * 100}%)`;
+
+  summarySlides.forEach((slide, index) => {
+    slide.setAttribute(
+      "aria-hidden",
+      String(index !== summarySlideIndex),
+    );
+  });
+
+  summaryPageButtons.forEach((button, index) => {
+    const isActive = index === summarySlideIndex;
+
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-current", String(isActive));
+  });
+}
+
+function changeSummarySlide(direction) {
+  setSummarySlide(summarySlideIndex + direction);
+}
 
 function render() {
   renderCalendar();
@@ -554,6 +782,8 @@ function renderCalendar() {
 }
 
 function renderSummary() {
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
   const stats = calculateMonthStats();
 
   recordedDays.textContent = `${stats.recordedDays}일`;
@@ -571,6 +801,168 @@ function renderSummary() {
       </div>
     `,
   ).join("");
+
+  const daysInMonth = new Date(
+    year,
+    month + 1,
+    0,
+  ).getDate();
+
+  const sundayCount = countSundaysInMonth(year, month);
+  const basePayDays = daysInMonth - sundayCount;
+  const basePayHours = basePayDays * 8;
+
+  render52HourCalculator();
+  setSummarySlide(summarySlideIndex);
+}
+
+function render52HourCalculator() {
+  const startDate = parseDateInputValue(
+    weeklyStartDateInput.value,
+  );
+  const endDate = parseDateInputValue(
+    weeklyEndDateInput.value,
+  );
+
+  if (!startDate || !endDate) {
+    weeklyAverageResult.textContent =
+      "시작일과 종료일을 선택해 주세요.";
+    weeklyAverageResult.classList.remove("error");
+    weeklyAverageResult.classList.remove("has-result");
+    return;
+  }
+
+  if (startDate.getTime() > endDate.getTime()) {
+    weeklyAverageResult.textContent =
+      "종료일은 시작일보다 빠를 수 없습니다.";
+    weeklyAverageResult.classList.add("error");
+    weeklyAverageResult.classList.remove("has-result");
+    return;
+  }
+
+  const {
+    averageHours,
+    dayCount,
+    totalWorkHours,
+  } = calculate52HourAverage(startDate, endDate);
+
+  const fullWeeks = Math.floor(dayCount / 7);
+  const remainingDays = dayCount % 7;
+
+  weeklyAverageResult.innerHTML = `
+    <div class="weekly-date-summary">
+      ${formatKoreanDate(startDate)}부터
+      ${formatKoreanDate(endDate)}까지
+    </div>
+
+    <div class="weekly-result-summary">
+      <div class="weekly-duration">
+        <strong>${fullWeeks}주 ${remainingDays}일</strong> 동안
+      </div>
+
+      <div class="weekly-result-grid">
+        <div class="weekly-result-item">
+          <span>총 근무시간</span>
+          <strong>${formatTotalWorkHours(totalWorkHours)} 시간</strong>
+        </div>
+
+        <div class="weekly-result-item">
+          <span>평균 근무시간</span>
+          <strong>${formatAverageHours(averageHours)} 시간</strong>
+        </div>
+      </div>
+    </div>
+  `;
+  weeklyAverageResult.classList.remove("error");
+  weeklyAverageResult.classList.add("has-result");
+}
+
+function calculate52HourAverage(startDate, endDate) {
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  const dayCount =
+    Math.floor(
+      (endDate.getTime() - startDate.getTime()) /
+        millisecondsPerDay,
+    ) + 1;
+
+  let totalWorkHours = 0;
+
+  for (
+    let dateValue = startDate.getTime();
+    dateValue <= endDate.getTime();
+    dateValue += millisecondsPerDay
+  ) {
+    const date = new Date(dateValue);
+    const dateKey = createDateKeyFromUtcDate(date);
+
+    totalWorkHours += get52HourWorkHours(records[dateKey]);
+  }
+
+  const averageHours =
+    totalWorkHours / (dayCount * 0.14285714285714);
+
+  return {
+    averageHours,
+    dayCount,
+    totalWorkHours,
+  };
+}
+
+function get52HourWorkHours(workTypeId) {
+  const workType = getWorkType(workTypeId);
+
+  if (!workType || workType.id === "annualLeave") {
+    return 0;
+  }
+
+  return workType.label.endsWith("잔업") ? 10.5 : 8;
+}
+
+function parseDateInputValue(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function createDateKeyFromUtcDate(date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatKoreanDate(date) {
+  return `${date.getUTCFullYear()}년 ${
+    date.getUTCMonth() + 1
+  }월 ${date.getUTCDate()}일`;
+}
+
+function formatTotalWorkHours(value) {
+  return new Intl.NumberFormat("ko-KR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function formatAverageHours(value) {
+  return new Intl.NumberFormat("ko-KR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 function renderSalary() {
@@ -585,6 +977,9 @@ function renderSalary() {
 
   const longevityAllowance =
     Number(settings.longevityAllowance) || 0;
+
+  const otherAllowance =
+    Number(settings.otherAllowance) || 0;
 
   const ordinaryHourlyWage =
     baseHourlyWage +
@@ -643,7 +1038,8 @@ function renderSalary() {
     payments.holidayPay +
     payments.holidayOvertimePay +
     safetyAllowance +
-    longevityAllowance;
+    longevityAllowance +
+    otherAllowance;
 
   salaryMonthTitle.textContent =
     `${year}년 ${month + 1}월 예상 급여`;
@@ -713,6 +1109,7 @@ function renderSalary() {
     ["휴연수당", payments.holidayOvertimePay],
     ["안전수당", safetyAllowance],
     ["근속수당", longevityAllowance],
+    ["기타수당", otherAllowance],
   ];
 
   payBreakdown.innerHTML = paymentRows
@@ -945,6 +1342,7 @@ function syncSalaryInputs() {
   baseHourlyWageInput.value = settings.baseHourlyWage || "";
   safetyAllowanceInput.value = settings.safetyAllowance || "";
   longevityAllowanceInput.value = settings.longevityAllowance || "";
+  otherAllowanceInput.value = settings.otherAllowance || "";
 }
 
 function loadSettingsByMonth() {
