@@ -1455,6 +1455,7 @@ function initializeBackExitGuard() {
   if (!backExitGuardInitialized) {
     backExitGuardInitialized = true;
     window.addEventListener("pageshow", resetBackExitState);
+    window.addEventListener("focus", resetBackExitState);
     document.addEventListener(
       "visibilitychange",
       handleAppVisibilityChange,
@@ -1485,6 +1486,23 @@ function ensureAppCloseWatcher() {
   document.documentElement.dataset.backExitGuard = "close-watcher";
 }
 
+function installBackExitTestHook() {
+  if (!mobilePagerTestMode || document.querySelector("#backExitTestButton")) {
+    return;
+  }
+
+  const testButton = document.createElement("button");
+  testButton.id = "backExitTestButton";
+  testButton.type = "button";
+  testButton.textContent = "back exit test";
+  testButton.style.cssText =
+    "position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.001;z-index:9999;";
+  testButton.addEventListener("click", () => {
+    appCloseWatcher?.requestClose();
+  });
+  document.body.appendChild(testButton);
+}
+
 function handleAppCloseRequest() {
   appCloseWatcher = null;
 
@@ -1502,9 +1520,10 @@ function handleAppCloseRequest() {
 
   if (!exitBackReady) {
     // 첫 번째 Android 뒤로가기는 CloseWatcher가 소비한다.
-    // 안내가 보이는 동안에는 새 watcher를 만들지 않아 두 번째
-    // 뒤로가기가 기존 history 보호 단계로 전달되게 한다.
+    // 두 번째 요청과 다음 앱 실행까지 같은 방식으로 받을 수 있도록
+    // 다음 watcher를 즉시 준비한다.
     showExitToast();
+    ensureAppCloseWatcher();
     return;
   }
 
@@ -1630,6 +1649,15 @@ function completeAppExit(fromCloseWatcher) {
   window.removeEventListener("popstate", handleAppBackNavigation);
   backExitPopstateAttached = false;
 
+  // Android는 앱 창을 없애지 않고 백그라운드에 그대로 보관할 수 있다.
+  // 종료 동작을 시작하기 전에 다음 실행용 watcher를 미리 생성한다.
+  ensureAppCloseWatcher();
+
+  if (mobilePagerTestMode) {
+    allowAppExitNavigation = false;
+    return;
+  }
+
   window.setTimeout(() => {
     if (fromCloseWatcher) {
       window.history.go(-2);
@@ -1641,9 +1669,9 @@ function completeAppExit(fromCloseWatcher) {
       window.close();
 
       window.setTimeout(() => {
-        if (document.visibilityState === "visible") {
-          resetBackExitState();
-        }
+        // Android PWA는 완전히 종료되지 않고 백그라운드에 남을 수 있다.
+        // 숨겨진 상태에서도 다음 실행을 위한 뒤로가기 보호를 다시 만든다.
+        resetBackExitState();
       }, 250);
     }, 120);
   }, 0);
@@ -2658,5 +2686,6 @@ if ("serviceWorker" in navigator) {
 
 syncMobilePagerMode();
 initializeBackExitGuard();
+installBackExitTestHook();
 render();
 loadHolidays();
