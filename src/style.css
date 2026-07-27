@@ -558,10 +558,13 @@ input {
 .holiday-name {
   margin-top: 3px;
 
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-height: 2.4em;
 
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+
+  text-align: center;
   font-size: 9px;
   font-weight: 800;
   line-height: 1.2;
@@ -882,10 +885,20 @@ input {
   color: #ef4444;
 }
 
+.date-picker-day.holiday {
+  color: #dc2626;
+}
+
 .date-picker-day {
-  aspect-ratio: 1;
+  min-height: 58px;
   min-width: 0;
-  padding: 0;
+  padding: 4px 2px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
 
   border: 1px solid transparent;
   border-radius: 11px;
@@ -896,6 +909,26 @@ input {
   font-size: 13px;
   font-weight: 750;
   cursor: pointer;
+}
+
+.date-picker-day-number {
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.date-picker-holiday-name {
+  width: 100%;
+  min-height: 2.2em;
+
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+
+  color: #dc2626;
+  text-align: center;
+  font-size: 7px;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 .date-picker-day:hover {
@@ -914,6 +947,11 @@ input {
 
   color: white;
   background: var(--primary);
+}
+
+.date-picker-day.selected.holiday,
+.date-picker-day.selected.holiday .date-picker-holiday-name {
+  color: white;
 }
 
 

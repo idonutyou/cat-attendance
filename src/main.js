@@ -954,11 +954,19 @@ function renderDatePicker() {
 
     const date = new Date(year, month, dayNumber);
     const dateKey = createDateKey(year, month, dayNumber);
+    const holidayName = getHolidayName(dateKey);
     const dayButton = document.createElement("button");
 
     dayButton.type = "button";
     dayButton.className = "date-picker-day";
-    dayButton.textContent = String(dayNumber);
+    dayButton.innerHTML = `
+      <span class="date-picker-day-number">${dayNumber}</span>
+      ${
+        holidayName
+          ? `<span class="date-picker-holiday-name">${holidayName}</span>`
+          : ""
+      }
+    `;
     dayButton.setAttribute(
       "aria-label",
       `${year}년 ${month + 1}월 ${dayNumber}일 선택`,
@@ -970,6 +978,15 @@ function renderDatePicker() {
 
     if (date.getDay() === 0) {
       dayButton.classList.add("sunday");
+    }
+
+    if (holidayName) {
+      dayButton.classList.add("holiday");
+      dayButton.title = holidayName;
+      dayButton.setAttribute(
+        "aria-label",
+        `${year}년 ${month + 1}월 ${dayNumber}일 ${holidayName} 선택`,
+      );
     }
 
     if (dateKey === todayDateKey) {
@@ -1089,6 +1106,7 @@ function renderCalendar() {
 
     if (holidayName) {
       dayButton.classList.add("holiday-cell");
+      dayButton.title = holidayName;
       dayButton.setAttribute(
         "aria-label",
         `${year}년 ${month + 1}월 ${dayNumber}일 ${holidayName}`,
