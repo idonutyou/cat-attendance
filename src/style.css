@@ -1744,6 +1744,7 @@ input {
 
   display: flex;
   align-items: center;
+  gap: 2px;
 
   border: 1px solid #dce4ef;
   border-radius: 11px;
@@ -1773,27 +1774,31 @@ input {
   font-weight: 750;
 }
 
-.input-with-unit output {
-  height: 100%;
-  min-width: 0;
-  padding: 0 5px 0 11px;
+.salary-inline-output {
+  width: 145px;
+  height: 38px;
+
+  padding-right: 10px;
 
   display: flex;
-  flex: 1;
   align-items: center;
   justify-content: flex-end;
+  gap: 2px;
+}
 
+.salary-inline-output output {
   color: #27354c;
 
-  text-align: right;
   font-size: 14px;
   font-weight: 750;
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-.salary-output-with-unit {
-  height: 38px;
-  background: #ffffff;
+.salary-inline-output span {
+  color: #8a96a9;
+
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .input-with-unit span {
@@ -1919,6 +1924,10 @@ input {
   }
 
   .input-with-unit {
+    width: 135px;
+  }
+
+  .salary-inline-output {
     width: 135px;
   }
 

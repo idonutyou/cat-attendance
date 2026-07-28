@@ -248,7 +248,7 @@ app.innerHTML = `
                 </div>
 
                 <div id="recordedDays" class="recorded-days">
-                  0일
+                  0&thinsp;일
                 </div>
               </div>
 
@@ -381,12 +381,12 @@ app.innerHTML = `
 
                     <div class="annual-leave-item">
                       <span>사용 연차</span>
-                      <strong id="usedAnnualLeave">0일</strong>
+                      <strong id="usedAnnualLeave">0&thinsp;일</strong>
                     </div>
 
                     <div class="annual-leave-item">
                       <span>잔여 연차</span>
-                      <strong id="remainingAnnualLeave">0일</strong>
+                      <strong id="remainingAnnualLeave">0&thinsp;일</strong>
                     </div>
                   </div>
                 </div>
@@ -502,7 +502,10 @@ app.innerHTML = `
             <div class="salary-input-row salary-output-row">
               <span>통상시급</span>
 
-              <div class="input-with-unit salary-output-with-unit">
+              <div
+                class="salary-inline-output"
+                aria-label="자동 계산된 통상시급"
+              >
                 <output id="ordinaryHourlyWageOutput">0</output>
                 <span>원</span>
               </div>
@@ -520,7 +523,7 @@ app.innerHTML = `
 
             <div class="total-pay-row">
               <span>예상 총급여</span>
-              <strong id="totalPayOutput">0원</strong>
+              <strong id="totalPayOutput">0&thinsp;원</strong>
             </div>
           </section>
         </div>
@@ -627,7 +630,7 @@ app.innerHTML = `
           class="custom-work-type-message"
           aria-live="polite"
         >
-          직접 입력한 기록은 근무시간 0시간으로 계산됩니다.
+          직접 입력한 기록은 근무시간 0&thinsp;시간으로 계산됩니다.
         </p>
       </div>
 
@@ -1147,7 +1150,7 @@ customWorkTypeInput.addEventListener("keydown", (event) => {
 
 customWorkTypeInput.addEventListener("input", () => {
   customWorkTypeMessage.textContent =
-    "직접 입력한 기록은 근무시간 0시간으로 계산됩니다.";
+    "직접 입력한 기록은 근무시간 0\u2009시간으로 계산됩니다.";
   customWorkTypeMessage.classList.remove("error");
 });
 
@@ -2416,7 +2419,7 @@ function renderSummary() {
   const month = currentMonth.getMonth();
   const stats = calculateMonthStats();
 
-  recordedDays.textContent = `${stats.recordedDays}일`;
+  recordedDays.textContent = formatUnit(stats.recordedDays, "일");
 
   summaryGrid.innerHTML = SUMMARY_WORK_TYPES.map(
     (workType) => `
@@ -2427,7 +2430,7 @@ function renderSummary() {
           ${workType.label}
         </span>
 
-        <strong>${stats.counts[workType.id]}일</strong>
+        <strong>${formatUnit(stats.counts[workType.id], "일")}</strong>
       </div>
     `,
   ).join("");
@@ -2484,18 +2487,18 @@ function render52HourCalculator() {
     <div class="weekly-result-summary">
       <div class="weekly-result-grid">
         <div class="weekly-result-item weekly-duration">
-          <strong>${fullWeeks}주 ${remainingDays}일</strong>
+          <strong>${formatUnit(fullWeeks, "주")} ${formatUnit(remainingDays, "일")}</strong>
           <span>동안</span>
         </div>
 
         <div class="weekly-result-item">
           <span>총 근무시간</span>
-          <strong>${formatTotalWorkHours(totalWorkHours)} 시간</strong>
+          <strong>${formatUnit(formatTotalWorkHours(totalWorkHours), "시간")}</strong>
         </div>
 
         <div class="weekly-result-item">
           <span>평균 근무시간</span>
-          <strong>${formatAverageHours(averageHours)} 시간</strong>
+          <strong>${formatUnit(formatAverageHours(averageHours), "시간")}</strong>
         </div>
       </div>
     </div>
@@ -2518,9 +2521,9 @@ function renderAnnualLeaveSummary(syncInput = true) {
   }
 
   usedAnnualLeaveOutput.textContent =
-    `${formatAnnualLeaveDays(usedLeave)}일`;
+    formatUnit(formatAnnualLeaveDays(usedLeave), "일");
   remainingAnnualLeaveOutput.textContent =
-    `${formatAnnualLeaveDays(remainingLeave)}일`;
+    formatUnit(formatAnnualLeaveDays(remainingLeave), "일");
   remainingAnnualLeaveOutput.classList.toggle(
     "negative",
     remainingLeave < 0,
@@ -2748,39 +2751,39 @@ function renderSalary() {
   const workTotals = [
     [
       "근무기록 일수",
-      `${formatNumber(stats.regularDays)}일`,
+      formatUnit(formatNumber(stats.regularDays), "일"),
     ],
     [
       "기본급 적용일수",
-      `${basePayDays}일`,
+      formatUnit(basePayDays, "일"),
     ],
     [
       "일요일 수",
-      `${sundayCount}일`,
+      formatUnit(sundayCount, "일"),
     ],
     [
       "기본급 시간",
-      `${basePayHours}시간`,
+      formatUnit(basePayHours, "시간"),
     ],
     [
       "연장시간",
-      `${formatNumber(stats.overtimeHours)}시간`,
+      formatUnit(formatNumber(stats.overtimeHours), "시간"),
     ],
     [
       "심야시간",
-      `${formatNumber(stats.nightHours)}시간`,
+      formatUnit(formatNumber(stats.nightHours), "시간"),
     ],
     [
       "철야시간",
-      `${formatNumber(stats.overnightHours)}시간`,
+      formatUnit(formatNumber(stats.overnightHours), "시간"),
     ],
     [
       "휴일시간",
-      `${formatNumber(stats.holidayHours)}시간`,
+      formatUnit(formatNumber(stats.holidayHours), "시간"),
     ],
     [
       "휴연시간",
-      `${formatNumber(stats.holidayOvertimeHours)}시간`,
+      formatUnit(formatNumber(stats.holidayOvertimeHours), "시간"),
     ],
   ];
 
@@ -2969,7 +2972,7 @@ function showCustomWorkTypeEditor(initialValue = "") {
   customWorkTypeEditor.hidden = false;
   customWorkTypeInput.value = initialValue;
   customWorkTypeMessage.textContent =
-    "직접 입력한 기록은 근무시간 0시간으로 계산됩니다.";
+    "직접 입력한 기록은 근무시간 0\u2009시간으로 계산됩니다.";
   customWorkTypeMessage.classList.remove("error");
 
   customWorkTypeInput.focus();
@@ -2985,7 +2988,7 @@ function hideCustomWorkTypeEditor() {
   customWorkTypeEditor.hidden = true;
   customWorkTypeInput.value = "";
   customWorkTypeMessage.textContent =
-    "직접 입력한 기록은 근무시간 0시간으로 계산됩니다.";
+    "직접 입력한 기록은 근무시간 0\u2009시간으로 계산됩니다.";
   customWorkTypeMessage.classList.remove("error");
 }
 
@@ -3122,7 +3125,11 @@ function getInputNumber(input) {
 }
 
 function formatMoney(value) {
-  return `${formatMoneyValue(value)}원`;
+  return formatUnit(formatMoneyValue(value), "원");
+}
+
+function formatUnit(value, unit) {
+  return `${value}\u2009${unit}`;
 }
 
 function formatMoneyValue(value) {
