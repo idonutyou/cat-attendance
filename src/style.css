@@ -234,6 +234,33 @@ input {
   gap: 14px;
 }
 
+.summary-part-heading {
+  margin-bottom: 14px;
+}
+
+.annual-leave-section {
+  margin-top: 18px;
+  padding-top: 16px;
+
+  border-top: 1px solid #e4eaf3;
+}
+
+.annual-leave-section-heading {
+  margin-bottom: 11px;
+}
+
+.annual-leave-section-heading > span {
+  padding: 4px 9px;
+
+  border-radius: 999px;
+
+  color: #64748b;
+  background: #f1f5f9;
+
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
 .weekly-date-range {
   display: grid;
   gap: 10px;
@@ -437,50 +464,6 @@ input {
   background:
     linear-gradient(145deg, #ffffff, #f8fafc);
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
-}
-
-.annual-leave-heading {
-  margin: 0 5px 8px;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.annual-leave-heading h3 {
-  margin: 0;
-
-  color: #172033;
-  font-size: 14px;
-  letter-spacing: -0.02em;
-}
-
-.annual-leave-heading h3::before {
-  width: 6px;
-  height: 6px;
-  margin-right: 7px;
-
-  display: inline-block;
-
-  border-radius: 999px;
-
-  background: var(--primary);
-
-  content: "";
-  vertical-align: 2px;
-}
-
-.annual-leave-heading > span {
-  padding: 3px 8px;
-
-  border-radius: 999px;
-
-  color: #64748b;
-  background: #f1f5f9;
-
-  font-size: 10.5px;
-  font-weight: 800;
 }
 
 .annual-leave-grid {
@@ -1715,31 +1698,6 @@ input {
   font-size: 21px;
 }
 
-.ordinary-wage-box {
-  min-width: 150px;
-  padding: 11px 15px;
-
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-
-  border-radius: 14px;
-
-  color: #2563eb;
-  background: #edf4ff;
-}
-
-.ordinary-wage-box span {
-  color: #71809a;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.ordinary-wage-box strong {
-  font-size: 18px;
-}
-
 .salary-layout {
   display: grid;
   grid-template-columns:
@@ -1813,6 +1771,29 @@ input {
   text-align: right;
   font-size: 14px;
   font-weight: 750;
+}
+
+.input-with-unit output {
+  height: 100%;
+  min-width: 0;
+  padding: 0 5px 0 11px;
+
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+
+  color: #27354c;
+
+  text-align: right;
+  font-size: 14px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.salary-output-with-unit {
+  height: 38px;
+  background: #ffffff;
 }
 
 .input-with-unit span {
@@ -1923,15 +1904,6 @@ input {
 
   .salary-heading {
     align-items: flex-start;
-  }
-
-  .ordinary-wage-box {
-    min-width: 120px;
-    padding: 9px 11px;
-  }
-
-  .ordinary-wage-box strong {
-    font-size: 15px;
   }
 
   .salary-layout {
@@ -2173,6 +2145,15 @@ html.mobile-pager-enabled .summary-card .section-title-row {
 
 html.mobile-pager-enabled .summary-card .section-title-row h2 {
   font-size: 17px;
+}
+
+html.mobile-pager-enabled .summary-card .annual-leave-section {
+  margin-top: 14px;
+  padding-top: 13px;
+}
+
+html.mobile-pager-enabled .summary-card .annual-leave-section-heading {
+  margin-bottom: 8px;
 }
 
 html.mobile-pager-enabled .summary-card .section-caption {

@@ -275,14 +275,14 @@ app.innerHTML = `
               data-summary-slide="2"
               aria-label="52시간 계산기"
             >
-              <div class="section-title-row">
-                <div>
-                  <p class="section-caption">기간별 현황</p>
-                  <h2>52시간 계산기</h2>
-                </div>
+              <div class="section-title-row summary-part-heading">
+                <h2 id="weeklyCalculatorTitle">52시간 계산기</h2>
               </div>
 
-              <div class="weekly-calculator">
+              <section
+                class="weekly-calculator"
+                aria-labelledby="weeklyCalculatorTitle"
+              >
                 <div class="weekly-date-range">
                   <div class="weekly-date-field">
                     <label for="weeklyStartDate">언제부터</label>
@@ -350,16 +350,18 @@ app.innerHTML = `
                 >
                   시작일과 종료일을 선택해 주세요.
                 </div>
+              </section>
 
-                <section
-                  class="annual-leave-card"
-                  aria-labelledby="annualLeaveTitle"
-                >
-                  <div class="annual-leave-heading">
-                    <h3 id="annualLeaveTitle">잔여 연차</h3>
-                    <span id="annualLeaveYearLabel"></span>
-                  </div>
+              <section
+                class="annual-leave-section"
+                aria-labelledby="annualLeaveTitle"
+              >
+                <div class="section-title-row annual-leave-section-heading">
+                  <h2 id="annualLeaveTitle">잔여 연차</h2>
+                  <span id="annualLeaveYearLabel"></span>
+                </div>
 
+                <div class="annual-leave-card">
                   <div class="annual-leave-grid">
                     <label class="annual-leave-item annual-leave-input-item">
                       <span>발생 연차</span>
@@ -387,8 +389,8 @@ app.innerHTML = `
                       <strong id="remainingAnnualLeave">0일</strong>
                     </div>
                   </div>
-                </section>
-              </div>
+                </div>
+              </section>
             </article>
           </div>
         </div>
@@ -426,15 +428,7 @@ app.innerHTML = `
         aria-label="자동 급여 계산"
       >
         <div class="salary-heading">
-          <div>
-            <p class="section-caption">자동 급여 계산</p>
-            <h2 id="salaryMonthTitle">이번 달 예상 급여</h2>
-          </div>
-
-          <div class="ordinary-wage-box">
-            <span>통상시급</span>
-            <strong id="ordinaryHourlyWageOutput">0원</strong>
-          </div>
+          <h2 id="salaryMonthTitle">이번 달 예상 급여</h2>
         </div>
 
         <div class="salary-layout">
@@ -504,6 +498,15 @@ app.innerHTML = `
                 <span>원</span>
               </div>
             </label>
+
+            <div class="salary-input-row salary-output-row">
+              <span>통상시급</span>
+
+              <div class="input-with-unit salary-output-with-unit">
+                <output id="ordinaryHourlyWageOutput">0</output>
+                <span>원</span>
+              </div>
+            </div>
 
             <p class="formula-note">
               통상시급 = 기본시급 + (안전수당 + 근속수당) ÷ 243
@@ -2738,7 +2741,7 @@ function renderSalary() {
     `${year}년 ${month + 1}월 예상 급여`;
 
   ordinaryHourlyWageOutput.textContent =
-    formatMoney(ordinaryHourlyWage);
+    formatMoneyValue(ordinaryHourlyWage);
 
   totalPayOutput.textContent = formatMoney(totalPay);
 
@@ -3119,13 +3122,17 @@ function getInputNumber(input) {
 }
 
 function formatMoney(value) {
+  return `${formatMoneyValue(value)}원`;
+}
+
+function formatMoneyValue(value) {
   const safeValue = Number.isFinite(value)
     ? value
     : 0;
 
-  return `${new Intl.NumberFormat("ko-KR", {
+  return new Intl.NumberFormat("ko-KR", {
     maximumFractionDigits: 0,
-  }).format(Math.round(safeValue))}원`;
+  }).format(Math.round(safeValue));
 }
 
 function formatNumber(value) {
