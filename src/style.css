@@ -443,9 +443,15 @@ input {
 }
 
 .calendar-month-title::after {
-  content: " ▾";
+  content: "▾";
+  margin-left: 5px;
+
+  display: inline-block;
+
   color: #8793a6;
-  font-size: 12px;
+  font-size: 15px;
+  line-height: 1;
+  vertical-align: 0.06em;
 }
 
 .calendar-month-title:hover {
@@ -460,6 +466,10 @@ input {
 .month-button {
   width: 44px;
   height: 44px;
+  padding: 0;
+
+  display: grid;
+  place-items: center;
 
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -468,6 +478,7 @@ input {
   background: #f8fafc;
 
   font-size: 27px;
+  line-height: 1;
   cursor: pointer;
 }
 
