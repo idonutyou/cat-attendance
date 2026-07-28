@@ -355,7 +355,7 @@ input {
 
 
 .weekly-result-summary {
-  padding: 15px 13px;
+  padding: 10px;
 
   border: 1px solid #dbeafe;
   border-radius: 16px;
@@ -364,34 +364,29 @@ input {
 }
 
 .weekly-duration {
-  color: #374151;
-
-  text-align: center;
-  font-size: 13px;
-  font-weight: 800;
+  color: #596579;
 }
 
 .weekly-duration strong {
   color: var(--primary-dark);
-  font-size: 18px;
-  white-space: nowrap;
 }
 
 .weekly-result-grid {
-  margin-top: 12px;
-
   display: grid;
-  gap: 9px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .weekly-result-item {
-  min-height: 46px;
-  padding: 10px 12px;
+  min-width: 0;
+  min-height: 62px;
+  padding: 8px 4px;
 
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: center;
+  gap: 3px;
 
   border: 1px solid rgba(191, 219, 254, 0.8);
   border-radius: 13px;
@@ -399,14 +394,130 @@ input {
   color: #596579;
   background: rgba(255, 255, 255, 0.78);
 
-  font-size: 12px;
+  text-align: center;
+  font-size: 10.5px;
   font-weight: 800;
 }
 
 .weekly-result-item strong {
   color: var(--primary-dark);
-  font-size: 16px;
+  font-size: 14px;
+  line-height: 1.2;
   white-space: nowrap;
+}
+
+.annual-leave-card {
+  padding: 12px;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+
+  background: #ffffff;
+}
+
+.annual-leave-heading {
+  margin-bottom: 9px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.annual-leave-heading h3 {
+  margin: 0;
+
+  color: #172033;
+  font-size: 14px;
+}
+
+.annual-leave-heading > span {
+  padding: 3px 8px;
+
+  border-radius: 999px;
+
+  color: #64748b;
+  background: #f1f5f9;
+
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.annual-leave-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.annual-leave-item {
+  min-width: 0;
+  min-height: 62px;
+  padding: 8px 4px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+
+  border: 1px solid #e7ecf4;
+  border-radius: 12px;
+
+  color: #64748b;
+  background: #f8fafc;
+
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.annual-leave-item strong {
+  color: var(--primary-dark);
+  font-size: 15px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.annual-leave-item strong.negative {
+  color: #dc2626;
+}
+
+.annual-leave-input-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+
+  color: var(--primary-dark);
+  font-size: 14px;
+}
+
+.annual-leave-input-control input {
+  width: 44px;
+  height: 28px;
+  padding: 0 4px;
+
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  outline: none;
+
+  color: var(--primary-dark);
+  background: #ffffff;
+
+  text-align: center;
+  font: inherit;
+  font-weight: 850;
+}
+
+.annual-leave-input-control input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.annual-leave-input-control input::-webkit-inner-spin-button,
+.annual-leave-input-control input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .weekly-average-result.error {

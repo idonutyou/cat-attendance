@@ -5,6 +5,7 @@ const SETTINGS_KEY = "cat-attendance-settings-by-month-v2";
 const PREVIOUS_SETTINGS_KEY = "cat-attendance-settings-v2";
 const LEGACY_SETTINGS_KEY = "cat-attendance-settings-v1";
 const WEEKLY_RANGE_KEY = "cat-attendance-52-hour-range-v1";
+const ANNUAL_LEAVE_KEY = "cat-attendance-annual-leave-by-year-v1";
 
 const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
@@ -142,6 +143,7 @@ let datePickerMonthAnimating = false;
 let records = loadRecords();
 let settingsByMonth = loadSettingsByMonth();
 let weeklyDateRange = loadWeeklyDateRange();
+let annualLeaveByYear = loadAnnualLeaveByYear();
 let holidays = {};
 
 const app = document.querySelector("#app");
@@ -348,6 +350,44 @@ app.innerHTML = `
                 >
                   시작일과 종료일을 선택해 주세요.
                 </div>
+
+                <section
+                  class="annual-leave-card"
+                  aria-labelledby="annualLeaveTitle"
+                >
+                  <div class="annual-leave-heading">
+                    <h3 id="annualLeaveTitle">잔여 연차</h3>
+                    <span id="annualLeaveYearLabel"></span>
+                  </div>
+
+                  <div class="annual-leave-grid">
+                    <label class="annual-leave-item annual-leave-input-item">
+                      <span>발생 연차</span>
+
+                      <span class="annual-leave-input-control">
+                        <input
+                          id="accruedAnnualLeave"
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          inputmode="decimal"
+                          aria-label="발생 연차"
+                        />
+                        <span>일</span>
+                      </span>
+                    </label>
+
+                    <div class="annual-leave-item">
+                      <span>사용 연차</span>
+                      <strong id="usedAnnualLeave">0일</strong>
+                    </div>
+
+                    <div class="annual-leave-item">
+                      <span>잔여 연차</span>
+                      <strong id="remainingAnnualLeave">0일</strong>
+                    </div>
+                  </div>
+                </section>
               </div>
             </article>
           </div>
@@ -801,6 +841,18 @@ const weeklyEndDateInput = document.querySelector(
 const weeklyAverageResult = document.querySelector(
   "#weeklyAverageResult",
 );
+const annualLeaveYearLabel = document.querySelector(
+  "#annualLeaveYearLabel",
+);
+const accruedAnnualLeaveInput = document.querySelector(
+  "#accruedAnnualLeave",
+);
+const usedAnnualLeaveOutput = document.querySelector(
+  "#usedAnnualLeave",
+);
+const remainingAnnualLeaveOutput = document.querySelector(
+  "#remainingAnnualLeave",
+);
 const datePickerModal = document.querySelector(
   "#datePickerModal",
 );
@@ -1176,6 +1228,17 @@ document
       }
     });
   });
+
+accruedAnnualLeaveInput.addEventListener("input", () => {
+  const yearKey = String(currentMonth.getFullYear());
+
+  annualLeaveByYear[yearKey] = getInputNumber(
+    accruedAnnualLeaveInput,
+  );
+
+  saveAnnualLeaveByYear();
+  renderAnnualLeaveSummary(false);
+});
 
 document
   .querySelector("#datePickerPreviousMonth")
@@ -2362,6 +2425,7 @@ function renderSummary() {
   const basePayHours = basePayDays * 8;
 
   render52HourCalculator();
+  renderAnnualLeaveSummary();
   setSummarySlide(summarySlideIndex);
 }
 
@@ -2400,11 +2464,12 @@ function render52HourCalculator() {
 
   weeklyAverageResult.innerHTML = `
     <div class="weekly-result-summary">
-      <div class="weekly-duration">
-        <strong>${fullWeeks}주 ${remainingDays}일</strong> 동안
-      </div>
-
       <div class="weekly-result-grid">
+        <div class="weekly-result-item weekly-duration">
+          <strong>${fullWeeks}주 ${remainingDays}일</strong>
+          <span>동안</span>
+        </div>
+
         <div class="weekly-result-item">
           <span>총 근무시간</span>
           <strong>${formatTotalWorkHours(totalWorkHours)} 시간</strong>
@@ -2419,6 +2484,59 @@ function render52HourCalculator() {
   `;
   weeklyAverageResult.classList.remove("error");
   weeklyAverageResult.classList.add("has-result");
+}
+
+function renderAnnualLeaveSummary(syncInput = true) {
+  const year = currentMonth.getFullYear();
+  const accruedLeave = getAnnualLeaveForYear(year);
+  const usedLeave = countUsedAnnualLeave(year);
+  const remainingLeave = accruedLeave - usedLeave;
+
+  annualLeaveYearLabel.textContent = `${year}년`;
+
+  if (syncInput) {
+    accruedAnnualLeaveInput.value =
+      accruedLeave === 0 ? "" : String(accruedLeave);
+  }
+
+  usedAnnualLeaveOutput.textContent =
+    `${formatAnnualLeaveDays(usedLeave)}일`;
+  remainingAnnualLeaveOutput.textContent =
+    `${formatAnnualLeaveDays(remainingLeave)}일`;
+  remainingAnnualLeaveOutput.classList.toggle(
+    "negative",
+    remainingLeave < 0,
+  );
+}
+
+function getAnnualLeaveForYear(year) {
+  const value = Number(annualLeaveByYear[String(year)]);
+
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function countUsedAnnualLeave(year) {
+  const yearPrefix = `${year}-`;
+
+  return Object.entries(records).reduce(
+    (count, [dateKey, workRecord]) => {
+      if (!dateKey.startsWith(yearPrefix)) {
+        return count;
+      }
+
+      return getWorkType(workRecord)?.id === "annualLeave"
+        ? count + 1
+        : count;
+    },
+    0,
+  );
+}
+
+function formatAnnualLeaveDays(value) {
+  return new Intl.NumberFormat("ko-KR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function calculate52HourAverage(startDate, endDate) {
@@ -3065,6 +3183,44 @@ function saveWeeklyDateRangeFromInputs() {
 function syncWeeklyDateRangeInputs() {
   weeklyStartDateInput.value = weeklyDateRange.startDate || "";
   weeklyEndDateInput.value = weeklyDateRange.endDate || "";
+}
+
+function loadAnnualLeaveByYear() {
+  try {
+    const savedAnnualLeave = localStorage.getItem(
+      ANNUAL_LEAVE_KEY,
+    );
+
+    if (!savedAnnualLeave) {
+      return {};
+    }
+
+    const parsedAnnualLeave = JSON.parse(savedAnnualLeave);
+
+    if (
+      !parsedAnnualLeave ||
+      typeof parsedAnnualLeave !== "object" ||
+      Array.isArray(parsedAnnualLeave)
+    ) {
+      return {};
+    }
+
+    return parsedAnnualLeave;
+  } catch (error) {
+    console.error(
+      "연도별 발생 연차를 불러오지 못했습니다.",
+      error,
+    );
+
+    return {};
+  }
+}
+
+function saveAnnualLeaveByYear() {
+  localStorage.setItem(
+    ANNUAL_LEAVE_KEY,
+    JSON.stringify(annualLeaveByYear),
+  );
 }
 
 function getMonthKey(date) {
