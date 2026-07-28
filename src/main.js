@@ -367,10 +367,10 @@ app.innerHTML = `
                       <span class="annual-leave-input-control">
                         <input
                           id="accruedAnnualLeave"
-                          type="number"
-                          min="0"
-                          step="0.5"
+                          type="text"
                           inputmode="decimal"
+                          pattern="[0-9]*[.]?[0-9]?"
+                          autocomplete="off"
                           aria-label="발생 연차"
                         />
                         <span>일</span>
@@ -1230,6 +1230,14 @@ document
   });
 
 accruedAnnualLeaveInput.addEventListener("input", () => {
+  const sanitizedValue = sanitizeAnnualLeaveInput(
+    accruedAnnualLeaveInput.value,
+  );
+
+  if (sanitizedValue !== accruedAnnualLeaveInput.value) {
+    accruedAnnualLeaveInput.value = sanitizedValue;
+  }
+
   const yearKey = String(currentMonth.getFullYear());
 
   annualLeaveByYear[yearKey] = getInputNumber(
@@ -1238,6 +1246,13 @@ accruedAnnualLeaveInput.addEventListener("input", () => {
 
   saveAnnualLeaveByYear();
   renderAnnualLeaveSummary(false);
+});
+
+accruedAnnualLeaveInput.addEventListener("blur", () => {
+  const value = getInputNumber(accruedAnnualLeaveInput);
+
+  accruedAnnualLeaveInput.value =
+    value === 0 ? "" : formatAnnualLeaveDays(value);
 });
 
 document
@@ -2537,6 +2552,23 @@ function formatAnnualLeaveDays(value) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
   }).format(value);
+}
+
+function sanitizeAnnualLeaveInput(value) {
+  const normalizedValue = String(value)
+    .replace(/,/g, ".")
+    .replace(/[^0-9.]/g, "");
+  const [integerPart = "", ...fractionParts] =
+    normalizedValue.split(".");
+
+  if (fractionParts.length === 0) {
+    return integerPart;
+  }
+
+  const fractionPart = fractionParts.join("").slice(0, 1);
+  const safeIntegerPart = integerPart || "0";
+
+  return `${safeIntegerPart}.${fractionPart}`;
 }
 
 function calculate52HourAverage(startDate, endDate) {

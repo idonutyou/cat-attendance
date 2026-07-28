@@ -355,12 +355,16 @@ input {
 
 
 .weekly-result-summary {
-  padding: 10px;
+  padding: 12px 8px;
 
-  border: 1px solid #dbeafe;
-  border-radius: 16px;
+  border: 1px solid #d7e6fb;
+  border-radius: 18px;
 
-  background: #eff6ff;
+  background:
+    linear-gradient(145deg, #f8fbff, #edf5ff);
+  box-shadow:
+    0 8px 22px rgba(37, 99, 235, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .weekly-duration {
@@ -374,13 +378,15 @@ input {
 .weekly-result-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 0;
 }
 
 .weekly-result-item {
+  position: relative;
+
   min-width: 0;
-  min-height: 62px;
-  padding: 8px 4px;
+  min-height: 58px;
+  padding: 6px 5px;
 
   display: flex;
   flex-direction: column;
@@ -388,35 +394,53 @@ input {
   justify-content: center;
   gap: 3px;
 
-  border: 1px solid rgba(191, 219, 254, 0.8);
-  border-radius: 13px;
-
   color: #596579;
-  background: rgba(255, 255, 255, 0.78);
 
   text-align: center;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 800;
+}
+
+.weekly-result-item + .weekly-result-item::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+
+  width: 1px;
+
+  background: rgba(148, 163, 184, 0.25);
+
+  content: "";
 }
 
 .weekly-result-item strong {
   color: var(--primary-dark);
-  font-size: 14px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: -0.025em;
   line-height: 1.2;
   white-space: nowrap;
 }
 
+.weekly-duration strong {
+  font-size: 16px;
+}
+
 .annual-leave-card {
-  padding: 12px;
+  padding: 13px 8px 10px;
 
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
+  border: 1px solid #e1e8f2;
+  border-radius: 18px;
 
-  background: #ffffff;
+  background:
+    linear-gradient(145deg, #ffffff, #f8fafc);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
 }
 
 .annual-leave-heading {
-  margin-bottom: 9px;
+  margin: 0 5px 8px;
 
   display: flex;
   align-items: center;
@@ -429,6 +453,22 @@ input {
 
   color: #172033;
   font-size: 14px;
+  letter-spacing: -0.02em;
+}
+
+.annual-leave-heading h3::before {
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+
+  display: inline-block;
+
+  border-radius: 999px;
+
+  background: var(--primary);
+
+  content: "";
+  vertical-align: 2px;
 }
 
 .annual-leave-heading > span {
@@ -446,13 +486,15 @@ input {
 .annual-leave-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 0;
 }
 
 .annual-leave-item {
+  position: relative;
+
   min-width: 0;
-  min-height: 62px;
-  padding: 8px 4px;
+  min-height: 58px;
+  padding: 6px 5px;
 
   display: flex;
   flex-direction: column;
@@ -460,20 +502,32 @@ input {
   justify-content: center;
   gap: 5px;
 
-  border: 1px solid #e7ecf4;
-  border-radius: 12px;
-
   color: #64748b;
-  background: #f8fafc;
 
   text-align: center;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 800;
+}
+
+.annual-leave-item + .annual-leave-item::before {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+
+  width: 1px;
+
+  background: rgba(148, 163, 184, 0.25);
+
+  content: "";
 }
 
 .annual-leave-item strong {
   color: var(--primary-dark);
-  font-size: 15px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: -0.025em;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -486,38 +540,50 @@ input {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
 
   color: var(--primary-dark);
-  font-size: 14px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  line-height: 1;
 }
 
 .annual-leave-input-control input {
-  width: 44px;
-  height: 28px;
-  padding: 0 4px;
+  width: 49px;
+  height: 27px;
+  padding: 0 2px 1px;
 
-  border: 1px solid #bfdbfe;
-  border-radius: 8px;
+  border: 0;
+  border-bottom: 1.5px solid #93c5fd;
+  border-radius: 0;
   outline: none;
 
   color: var(--primary-dark);
-  background: #ffffff;
+  background: transparent;
 
   text-align: center;
-  font: inherit;
-  font-weight: 850;
+  font-family:
+    Pretendard,
+    "Noto Sans KR",
+    "Segoe UI",
+    sans-serif;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: -0.025em;
+  line-height: 1;
+
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-text-fill-color: var(--primary-dark);
 }
 
 .annual-leave-input-control input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
-}
-
-.annual-leave-input-control input::-webkit-inner-spin-button,
-.annual-leave-input-control input::-webkit-outer-spin-button {
-  margin: 0;
-  appearance: none;
+  border-bottom-color: var(--primary);
+  box-shadow: 0 3px 0 -1px rgba(37, 99, 235, 0.15);
 }
 
 .weekly-average-result.error {
