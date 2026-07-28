@@ -135,6 +135,10 @@ let allowAppExitNavigation = false;
 let datePickerTargetInput = null;
 let datePickerVisibleMonth = new Date();
 let datePickerPreviousFocus = null;
+let monthPickerTarget = null;
+let monthPickerPreviousFocus = null;
+let mainCalendarMonthAnimating = false;
+let datePickerMonthAnimating = false;
 let records = loadRecords();
 let settingsByMonth = loadSettingsByMonth();
 let weeklyDateRange = loadWeeklyDateRange();
@@ -172,7 +176,12 @@ app.innerHTML = `
             ‹
           </button>
 
-          <h2 id="monthTitle"></h2>
+          <button
+            id="monthTitle"
+            class="calendar-month-title"
+            type="button"
+            aria-label="연도와 월 선택"
+          ></button>
 
           <button
             id="nextMonth"
@@ -615,7 +624,12 @@ app.innerHTML = `
           ‹
         </button>
 
-        <h2 id="datePickerTitle"></h2>
+        <button
+          id="datePickerTitle"
+          class="date-picker-title-button"
+          type="button"
+          aria-label="연도와 월 선택"
+        ></button>
 
         <button
           id="datePickerNextMonth"
@@ -661,6 +675,91 @@ app.innerHTML = `
         >
           닫기
         </button>
+      </div>
+    </section>
+  </div>
+
+  <div
+    id="monthPickerModal"
+    class="modal month-picker-modal"
+    aria-hidden="true"
+  >
+    <div
+      class="modal-backdrop"
+      data-close-month-picker
+    ></div>
+
+    <section
+      class="modal-sheet month-picker-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="monthPickerHeading"
+    >
+      <div class="month-picker-heading-row">
+        <div>
+          <p class="section-caption">빠른 이동</p>
+          <h2 id="monthPickerHeading">연도·월 선택</h2>
+        </div>
+
+        <button
+          id="closeMonthPickerButton"
+          class="close-button"
+          type="button"
+          aria-label="연도와 월 선택 닫기"
+        >
+          ×
+        </button>
+      </div>
+
+      <div class="month-picker-year-row">
+        <button
+          id="monthPickerPreviousYear"
+          class="month-picker-year-button"
+          type="button"
+          aria-label="이전 연도"
+        >
+          ‹
+        </button>
+
+        <label class="month-picker-year-field">
+          <span>연도</span>
+          <input
+            id="monthPickerYearInput"
+            type="number"
+            min="2000"
+            max="2100"
+            inputmode="numeric"
+            aria-label="이동할 연도"
+          />
+        </label>
+
+        <button
+          id="monthPickerNextYear"
+          class="month-picker-year-button"
+          type="button"
+          aria-label="다음 연도"
+        >
+          ›
+        </button>
+      </div>
+
+      <div
+        id="monthPickerMonths"
+        class="month-picker-months"
+        aria-label="이동할 월"
+      >
+        ${Array.from(
+          { length: 12 },
+          (_, monthIndex) => `
+            <button
+              class="month-picker-month"
+              type="button"
+              data-month-picker-month="${monthIndex}"
+            >
+              ${monthIndex + 1}월
+            </button>
+          `,
+        ).join("")}
       </div>
     </section>
   </div>
@@ -713,6 +812,18 @@ const datePickerGrid = document.querySelector(
 );
 const closeDatePickerButton = document.querySelector(
   "#closeDatePickerButton",
+);
+const monthPickerModal = document.querySelector(
+  "#monthPickerModal",
+);
+const monthPickerYearInput = document.querySelector(
+  "#monthPickerYearInput",
+);
+const monthPickerMonths = [
+  ...document.querySelectorAll("[data-month-picker-month]"),
+];
+const closeMonthPickerButton = document.querySelector(
+  "#closeMonthPickerButton",
 );
 
 const salaryMonthTitle = document.querySelector("#salaryMonthTitle");
@@ -882,26 +993,18 @@ if (typeof mobilePagerMedia.addEventListener === "function") {
 document
   .querySelector("#previousMonth")
   .addEventListener("click", () => {
-    currentMonth = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth() - 1,
-      1,
-    );
-
-    render();
+    changeMainCalendarMonth(-1);
   });
 
 document
   .querySelector("#nextMonth")
   .addEventListener("click", () => {
-    currentMonth = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth() + 1,
-      1,
-    );
-
-    render();
+    changeMainCalendarMonth(1);
   });
+
+monthTitle.addEventListener("click", () => {
+  openMonthPicker("main");
+});
 
 document
   .querySelector("#todayButton")
@@ -1077,26 +1180,26 @@ document
 document
   .querySelector("#datePickerPreviousMonth")
   .addEventListener("click", () => {
-    datePickerVisibleMonth = new Date(
-      datePickerVisibleMonth.getFullYear(),
-      datePickerVisibleMonth.getMonth() - 1,
-      1,
-    );
-
-    renderDatePicker();
+    changeDatePickerMonth(-1);
   });
 
 document
   .querySelector("#datePickerNextMonth")
   .addEventListener("click", () => {
-    datePickerVisibleMonth = new Date(
-      datePickerVisibleMonth.getFullYear(),
-      datePickerVisibleMonth.getMonth() + 1,
-      1,
-    );
-
-    renderDatePicker();
+    changeDatePickerMonth(1);
   });
+
+datePickerTitle.addEventListener("click", () => {
+  openMonthPicker("datePicker");
+});
+
+attachHorizontalMonthSwipe(calendarGrid, (direction) => {
+  changeMainCalendarMonth(direction);
+});
+
+attachHorizontalMonthSwipe(datePickerGrid, (direction) => {
+  changeDatePickerMonth(direction);
+});
 
 document
   .querySelector("#datePickerTodayButton")
@@ -1120,6 +1223,48 @@ closeDatePickerButton.addEventListener(
 document
   .querySelector("[data-close-date-picker]")
   .addEventListener("click", closeDatePicker);
+
+closeMonthPickerButton.addEventListener(
+  "click",
+  closeMonthPicker,
+);
+
+document
+  .querySelector("[data-close-month-picker]")
+  .addEventListener("click", closeMonthPicker);
+
+document
+  .querySelector("#monthPickerPreviousYear")
+  .addEventListener("click", () => {
+    setMonthPickerYear(getMonthPickerYear() - 1);
+  });
+
+document
+  .querySelector("#monthPickerNextYear")
+  .addEventListener("click", () => {
+    setMonthPickerYear(getMonthPickerYear() + 1);
+  });
+
+monthPickerYearInput.addEventListener("input", () => {
+  renderMonthPickerMonths();
+});
+
+monthPickerYearInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    monthPickerMonths.find((button) =>
+      button.classList.contains("active"),
+    )?.focus();
+  }
+});
+
+monthPickerMonths.forEach((button) => {
+  button.addEventListener("click", () => {
+    applyMonthPickerSelection(
+      Number(button.dataset.monthPickerMonth),
+    );
+  });
+});
 
 [
   baseHourlyWageInput,
@@ -1146,6 +1291,11 @@ document
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") {
+    return;
+  }
+
+  if (monthPickerModal.classList.contains("open")) {
+    closeMonthPicker();
     return;
   }
 
@@ -1204,6 +1354,265 @@ function closeDatePicker() {
   focusTarget?.focus();
 }
 
+function openMonthPicker(target) {
+  monthPickerTarget = target;
+  monthPickerPreviousFocus = document.activeElement;
+
+  const sourceMonth =
+    target === "datePicker"
+      ? datePickerVisibleMonth
+      : currentMonth;
+
+  monthPickerYearInput.value = String(
+    sourceMonth.getFullYear(),
+  );
+  renderMonthPickerMonths();
+
+  monthPickerModal.classList.add("open");
+  monthPickerModal.setAttribute("aria-hidden", "false");
+
+  window.requestAnimationFrame(() => {
+    monthPickerYearInput.focus();
+    monthPickerYearInput.select();
+  });
+}
+
+function closeMonthPicker() {
+  if (!monthPickerModal.classList.contains("open")) {
+    return;
+  }
+
+  monthPickerModal.classList.remove("open");
+  monthPickerModal.setAttribute("aria-hidden", "true");
+
+  const focusTarget = monthPickerPreviousFocus;
+
+  monthPickerTarget = null;
+  monthPickerPreviousFocus = null;
+  focusTarget?.focus();
+}
+
+function getMonthPickerYear() {
+  const sourceMonth =
+    monthPickerTarget === "datePicker"
+      ? datePickerVisibleMonth
+      : currentMonth;
+  const value = Number(monthPickerYearInput.value);
+
+  if (!Number.isInteger(value)) {
+    return sourceMonth.getFullYear();
+  }
+
+  return Math.min(2100, Math.max(2000, value));
+}
+
+function setMonthPickerYear(year) {
+  monthPickerYearInput.value = String(
+    Math.min(2100, Math.max(2000, year)),
+  );
+  renderMonthPickerMonths();
+}
+
+function renderMonthPickerMonths() {
+  const sourceMonth =
+    monthPickerTarget === "datePicker"
+      ? datePickerVisibleMonth
+      : currentMonth;
+  const selectedYear = getMonthPickerYear();
+
+  monthPickerMonths.forEach((button, monthIndex) => {
+    const isActive =
+      selectedYear === sourceMonth.getFullYear() &&
+      monthIndex === sourceMonth.getMonth();
+
+    button.classList.toggle("active", isActive);
+
+    if (isActive) {
+      button.setAttribute("aria-current", "date");
+    } else {
+      button.removeAttribute("aria-current");
+    }
+  });
+}
+
+function applyMonthPickerSelection(monthIndex) {
+  const selectedYear = getMonthPickerYear();
+
+  if (monthPickerTarget === "datePicker") {
+    datePickerVisibleMonth = new Date(
+      selectedYear,
+      monthIndex,
+      1,
+    );
+    renderDatePicker();
+  } else {
+    currentMonth = new Date(selectedYear, monthIndex, 1);
+    render();
+  }
+
+  closeMonthPicker();
+}
+
+async function changeMainCalendarMonth(direction) {
+  if (mainCalendarMonthAnimating) {
+    return;
+  }
+
+  mainCalendarMonthAnimating = true;
+
+  try {
+    await animateMonthTransition(
+      calendarGrid,
+      direction,
+      () => {
+        currentMonth = new Date(
+          currentMonth.getFullYear(),
+          currentMonth.getMonth() + direction,
+          1,
+        );
+        render();
+      },
+    );
+  } finally {
+    mainCalendarMonthAnimating = false;
+  }
+}
+
+async function changeDatePickerMonth(direction) {
+  if (datePickerMonthAnimating) {
+    return;
+  }
+
+  datePickerMonthAnimating = true;
+
+  try {
+    await animateMonthTransition(
+      datePickerGrid,
+      direction,
+      () => {
+        datePickerVisibleMonth = new Date(
+          datePickerVisibleMonth.getFullYear(),
+          datePickerVisibleMonth.getMonth() + direction,
+          1,
+        );
+        renderDatePicker();
+      },
+    );
+  } finally {
+    datePickerMonthAnimating = false;
+  }
+}
+
+async function animateMonthTransition(
+  grid,
+  direction,
+  updateMonth,
+) {
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+
+  if (reduceMotion || typeof grid.animate !== "function") {
+    updateMonth();
+    return;
+  }
+
+  const exitDistance = direction > 0 ? "-32%" : "32%";
+  const enterDistance = direction > 0 ? "32%" : "-32%";
+
+  const exitAnimation = grid.animate(
+    [
+      { transform: "translateX(0)", opacity: 1 },
+      { transform: `translateX(${exitDistance})`, opacity: 0 },
+    ],
+    {
+      duration: 130,
+      easing: "ease-in",
+      fill: "forwards",
+    },
+  );
+
+  await exitAnimation.finished.catch(() => {});
+  exitAnimation.cancel();
+
+  updateMonth();
+
+  const enterAnimation = grid.animate(
+    [
+      { transform: `translateX(${enterDistance})`, opacity: 0 },
+      { transform: "translateX(0)", opacity: 1 },
+    ],
+    {
+      duration: 190,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    },
+  );
+
+  await enterAnimation.finished.catch(() => {});
+}
+
+function attachHorizontalMonthSwipe(element, onSwipe) {
+  let activePointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let suppressClick = false;
+
+  element.addEventListener("pointerdown", (event) => {
+    if (
+      !event.isPrimary ||
+      (event.pointerType === "mouse" && event.button !== 0)
+    ) {
+      return;
+    }
+
+    activePointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+  });
+
+  element.addEventListener("pointerup", (event) => {
+    if (event.pointerId !== activePointerId) {
+      return;
+    }
+
+    activePointerId = null;
+
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+
+    if (
+      Math.abs(deltaX) < 48 ||
+      Math.abs(deltaX) <= Math.abs(deltaY)
+    ) {
+      return;
+    }
+
+    suppressClick = true;
+    onSwipe(deltaX < 0 ? 1 : -1);
+
+    window.setTimeout(() => {
+      suppressClick = false;
+    }, 420);
+  });
+
+  element.addEventListener("pointercancel", () => {
+    activePointerId = null;
+  });
+
+  element.addEventListener(
+    "click",
+    (event) => {
+      if (!suppressClick) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    true,
+  );
+}
+
 function renderDatePicker() {
   const year = datePickerVisibleMonth.getFullYear();
   const month = datePickerVisibleMonth.getMonth();
@@ -1236,6 +1645,8 @@ function renderDatePicker() {
     const date = new Date(year, month, dayNumber);
     const dateKey = createDateKey(year, month, dayNumber);
     const holidayName = getHolidayName(dateKey);
+    const workType = getWorkType(records[dateKey]);
+    const workTypeLabel = workType?.label || "";
     const dayButton = document.createElement("button");
 
     dayButton.type = "button";
@@ -1244,13 +1655,18 @@ function renderDatePicker() {
       <span class="date-picker-day-number">${dayNumber}</span>
       ${
         holidayName
-          ? `<span class="date-picker-holiday-name">${holidayName}</span>`
+          ? `<span class="date-picker-holiday-name">${escapeHtml(holidayName)}</span>`
+          : ""
+      }
+      ${
+        workType
+          ? `<span class="date-picker-work-name type-${workType.id}">${escapeHtml(workTypeLabel)}</span>`
           : ""
       }
     `;
     dayButton.setAttribute(
       "aria-label",
-      `${year}년 ${month + 1}월 ${dayNumber}일 선택`,
+      `${year}년 ${month + 1}월 ${dayNumber}일${holidayName ? ` ${holidayName}` : ""}${workTypeLabel ? ` ${workTypeLabel}` : ""} 선택`,
     );
 
     if (date.getDay() === 6) {
@@ -1264,10 +1680,10 @@ function renderDatePicker() {
     if (holidayName) {
       dayButton.classList.add("holiday");
       dayButton.title = holidayName;
-      dayButton.setAttribute(
-        "aria-label",
-        `${year}년 ${month + 1}월 ${dayNumber}일 ${holidayName} 선택`,
-      );
+    }
+
+    if (workType) {
+      dayButton.classList.add("has-work-record");
     }
 
     if (dateKey === todayDateKey) {
@@ -1533,6 +1949,12 @@ function handleAppCloseRequest() {
     return;
   }
 
+  if (monthPickerModal.classList.contains("open")) {
+    closeMonthPicker();
+    resetBackExitState();
+    return;
+  }
+
   if (datePickerModal.classList.contains("open")) {
     closeDatePicker();
     resetBackExitState();
@@ -1669,6 +2091,12 @@ function handleAppBackNavigation() {
 
   if (workModal.classList.contains("open")) {
     closeModal();
+    resetBackExitState();
+    return;
+  }
+
+  if (monthPickerModal.classList.contains("open")) {
+    closeMonthPicker();
     resetBackExitState();
     return;
   }
