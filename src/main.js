@@ -1249,6 +1249,14 @@ monthPickerYearInput.addEventListener("input", () => {
   renderMonthPickerMonths();
 });
 
+monthPickerYearInput.addEventListener("pointerdown", () => {
+  monthPickerYearInput.inputMode = "numeric";
+});
+
+monthPickerYearInput.addEventListener("focus", () => {
+  monthPickerYearInput.inputMode = "numeric";
+});
+
 monthPickerYearInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
@@ -1366,14 +1374,15 @@ function openMonthPicker(target) {
   monthPickerYearInput.value = String(
     sourceMonth.getFullYear(),
   );
+  monthPickerYearInput.inputMode = "none";
+  monthPickerYearInput.blur();
   renderMonthPickerMonths();
 
   monthPickerModal.classList.add("open");
   monthPickerModal.setAttribute("aria-hidden", "false");
 
   window.requestAnimationFrame(() => {
-    monthPickerYearInput.focus();
-    monthPickerYearInput.select();
+    closeMonthPickerButton.focus({ preventScroll: true });
   });
 }
 
@@ -1384,6 +1393,8 @@ function closeMonthPicker() {
 
   monthPickerModal.classList.remove("open");
   monthPickerModal.setAttribute("aria-hidden", "true");
+  monthPickerYearInput.inputMode = "none";
+  monthPickerYearInput.blur();
 
   const focusTarget = monthPickerPreviousFocus;
 

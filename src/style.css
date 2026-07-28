@@ -964,13 +964,13 @@ input {
 .date-picker-day {
   min-height: 68px;
   min-width: 0;
-  padding: 4px 2px;
+  padding: 4px 1px;
 
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
 
   border: 1px solid transparent;
   border-radius: 11px;
@@ -978,7 +978,7 @@ input {
   color: #334158;
   background: transparent;
 
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 750;
   cursor: pointer;
 }
@@ -986,6 +986,7 @@ input {
 .date-picker-day-number {
   flex: 0 0 auto;
   line-height: 1;
+  font-weight: 850;
 }
 
 .date-picker-holiday-name {
@@ -998,18 +999,20 @@ input {
 
   color: #dc2626;
   text-align: center;
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 800;
   line-height: 1.1;
 }
 
 .date-picker-work-name {
-  max-width: 100%;
-  padding: 2px 3px;
+  width: 100%;
+  min-height: 2.2em;
+  padding: 2px 1px;
 
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 
   border-radius: 999px;
 
@@ -1017,9 +1020,9 @@ input {
   background: #eef2f7;
 
   text-align: center;
-  font-size: 6.5px;
+  font-size: 9px;
   font-weight: 850;
-  line-height: 1.15;
+  line-height: 1.08;
 }
 
 .date-picker-work-name.type-day,
