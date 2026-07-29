@@ -1586,6 +1586,16 @@ annualLeaveHistoryBody.addEventListener("input", (event) => {
   saveAnnualLeaveReasons();
 });
 
+annualLeaveHistoryBody.addEventListener("click", (event) => {
+  const dateButton = event.target.closest("[data-annual-leave-date]");
+
+  if (!dateButton) {
+    return;
+  }
+
+  navigateToAnnualLeaveDate(dateButton.dataset.annualLeaveDate);
+});
+
 document
   .querySelector("#datePickerPreviousMonth")
   .addEventListener("click", () => {
@@ -3170,17 +3180,18 @@ function renderAnnualLeaveHistory(year) {
 
   annualLeaveHistoryBody.innerHTML = ranges
     .map((range) => {
-      const endText = range.days === 1
-        ? ""
-        : formatAnnualLeaveHistoryDate(range.end);
       const rangeKey = getAnnualLeaveReasonKey(year, range.start);
       const reason = annualLeaveReasons[rangeKey] || "";
 
       return `
         <div class="annual-leave-history-row" role="row">
-          <span role="cell">${formatAnnualLeaveHistoryDate(range.start)}</span>
-          <span role="cell">${endText}</span>
-          <span role="cell">${range.days}일</span>
+          <span class="annual-leave-date-cell" role="cell">
+            ${formatAnnualLeaveHistoryDateButton(range.start)}
+          </span>
+          <span class="annual-leave-date-cell" role="cell">
+            ${range.days === 1 ? "" : formatAnnualLeaveHistoryDateButton(range.end)}
+          </span>
+          <span class="annual-leave-days-cell" role="cell">${range.days}일</span>
           <label class="annual-leave-reason-cell" role="cell">
             <span class="sr-only">${formatAnnualLeaveHistoryDate(range.start)} 연차 사유</span>
             <input
@@ -3234,6 +3245,42 @@ function getAnnualLeaveRanges(year) {
 
 function formatAnnualLeaveHistoryDate(date) {
   return `${date.month}월 ${date.day}일`;
+}
+
+function formatAnnualLeaveHistoryDateMarkup(date) {
+  return `
+    <span class="annual-leave-date-value">
+      <span class="annual-leave-date-number">${date.month}</span><span>월</span>
+      <span class="annual-leave-date-number">${date.day}</span><span>일</span>
+    </span>
+  `;
+}
+
+function formatAnnualLeaveHistoryDateButton(date) {
+  return `
+    <button
+      class="annual-leave-date-button"
+      type="button"
+      data-annual-leave-date="${date.dateKey}"
+      aria-label="${formatAnnualLeaveHistoryDate(date)} 근태관리 달력으로 이동"
+    >
+      ${formatAnnualLeaveHistoryDateMarkup(date)}
+    </button>
+  `;
+}
+
+function navigateToAnnualLeaveDate(dateKey) {
+  const [year, month] = dateKey.split("-").map(Number);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month)) {
+    return;
+  }
+
+  currentMonth = new Date(year, month - 1, 1);
+  mobilePageIndex = 0;
+  setAppPage("attendance");
+  render();
+  syncMobilePagerMode();
 }
 
 function getAnnualLeaveReasonKey(year, startDate) {
