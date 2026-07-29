@@ -6,8 +6,15 @@ const PREVIOUS_SETTINGS_KEY = "cat-attendance-settings-v2";
 const LEGACY_SETTINGS_KEY = "cat-attendance-settings-v1";
 const WEEKLY_RANGE_KEY = "cat-attendance-52-hour-range-v1";
 const ANNUAL_LEAVE_KEY = "cat-attendance-annual-leave-by-year-v1";
+const ANNUAL_LEAVE_REASON_KEY = "cat-attendance-annual-leave-reasons-v1";
 const YEAR_MIN = 2000;
 const YEAR_MAX = 2100;
+
+const APP_PAGE_TITLES = {
+  attendance: "근태관리",
+  salary: "급여내역",
+  "hours-leave": "52h / 연차",
+};
 
 const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
@@ -152,6 +159,7 @@ let records = loadRecords();
 let settingsByMonth = loadSettingsByMonth();
 let weeklyDateRange = loadWeeklyDateRange();
 let annualLeaveByYear = loadAnnualLeaveByYear();
+let annualLeaveReasons = loadAnnualLeaveReasons();
 let holidays = {};
 
 const app = document.querySelector("#app");
@@ -172,7 +180,7 @@ app.innerHTML = `
         <span></span>
       </button>
 
-      <h1>CAT 근태관리</h1>
+      <h1 id="appPageTitle">근태관리</h1>
 
       <div class="made-by" aria-label="Made by 제민">
         Made by 제민
@@ -714,6 +722,7 @@ app.innerHTML = `
                   <span role="columnheader">시작</span>
                   <span role="columnheader">종료</span>
                   <span role="columnheader">사용 연차</span>
+                  <span role="columnheader">사유</span>
                 </div>
                 <div id="annualLeaveHistoryBody"></div>
               </div>
@@ -1001,6 +1010,7 @@ const appPages = [
 const appNavigationButtons = [
   ...document.querySelectorAll("[data-app-navigation]"),
 ];
+const appPageTitle = document.querySelector("#appPageTitle");
 const menuButton = document.querySelector("#menuButton");
 const navigationDrawer = document.querySelector(
   "#navigationDrawer",
@@ -1557,6 +1567,25 @@ accruedAnnualLeaveInput.addEventListener("blur", () => {
     value === 0 ? "" : formatAnnualLeaveDays(value);
 });
 
+annualLeaveHistoryBody.addEventListener("input", (event) => {
+  const reasonInput = event.target.closest("[data-annual-leave-reason]");
+
+  if (!reasonInput) {
+    return;
+  }
+
+  const rangeKey = reasonInput.dataset.annualLeaveReason;
+  const reason = reasonInput.value.slice(0, 120);
+
+  if (reason) {
+    annualLeaveReasons[rangeKey] = reason;
+  } else {
+    delete annualLeaveReasons[rangeKey];
+  }
+
+  saveAnnualLeaveReasons();
+});
+
 document
   .querySelector("#datePickerPreviousMonth")
   .addEventListener("click", () => {
@@ -1749,6 +1778,7 @@ function setAppPage(pageId) {
   }
 
   currentAppPage = pageId;
+  appPageTitle.textContent = APP_PAGE_TITLES[pageId] || "근태관리";
 
   appPages.forEach((page) => {
     const isActive = page === targetPage;
@@ -3143,12 +3173,25 @@ function renderAnnualLeaveHistory(year) {
       const endText = range.days === 1
         ? ""
         : formatAnnualLeaveHistoryDate(range.end);
+      const rangeKey = getAnnualLeaveReasonKey(year, range.start);
+      const reason = annualLeaveReasons[rangeKey] || "";
 
       return `
         <div class="annual-leave-history-row" role="row">
           <span role="cell">${formatAnnualLeaveHistoryDate(range.start)}</span>
           <span role="cell">${endText}</span>
-          <strong role="cell">${range.days}일</strong>
+          <span role="cell">${range.days}일</span>
+          <label class="annual-leave-reason-cell" role="cell">
+            <span class="sr-only">${formatAnnualLeaveHistoryDate(range.start)} 연차 사유</span>
+            <input
+              type="text"
+              maxlength="120"
+              autocomplete="off"
+              placeholder="사유 입력"
+              data-annual-leave-reason="${rangeKey}"
+              value="${escapeHtml(reason)}"
+            />
+          </label>
         </div>
       `;
     })
@@ -3191,6 +3234,10 @@ function getAnnualLeaveRanges(year) {
 
 function formatAnnualLeaveHistoryDate(date) {
   return `${date.month}월 ${date.day}일`;
+}
+
+function getAnnualLeaveReasonKey(year, startDate) {
+  return `${year}:${startDate.dateKey}`;
 }
 
 function getAnnualLeaveForYear(year) {
@@ -3904,6 +3951,34 @@ function saveAnnualLeaveByYear() {
   localStorage.setItem(
     ANNUAL_LEAVE_KEY,
     JSON.stringify(annualLeaveByYear),
+  );
+}
+
+function loadAnnualLeaveReasons() {
+  try {
+    const savedReasons = localStorage.getItem(ANNUAL_LEAVE_REASON_KEY);
+
+    if (!savedReasons) {
+      return {};
+    }
+
+    const parsedReasons = JSON.parse(savedReasons);
+
+    return parsedReasons &&
+      typeof parsedReasons === "object" &&
+      !Array.isArray(parsedReasons)
+      ? parsedReasons
+      : {};
+  } catch (error) {
+    console.error("연차 사용 사유를 불러오지 못했습니다.", error);
+    return {};
+  }
+}
+
+function saveAnnualLeaveReasons() {
+  localStorage.setItem(
+    ANNUAL_LEAVE_REASON_KEY,
+    JSON.stringify(annualLeaveReasons),
   );
 }
 
