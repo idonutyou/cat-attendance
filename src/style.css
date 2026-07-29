@@ -2269,3 +2269,685 @@ html.mobile-pager-enabled .summary-card .work-total-row {
 .reset-month-button:active {
   transform: scale(0.97);
 }
+
+/* ===== 다중 페이지 레이아웃 v36 ===== */
+[hidden] {
+  display: none !important;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 120;
+
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr) 94px;
+  align-items: center;
+  gap: 12px;
+
+  padding: 18px 24px;
+}
+
+.app-header h1 {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(23px, 4vw, 31px);
+  line-height: 1.15;
+}
+
+.menu-button {
+  width: 50px;
+  height: 50px;
+  padding: 0;
+
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 16px;
+
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.menu-button span {
+  width: 21px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.menu-button:hover,
+.menu-button:focus-visible,
+.made-by:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.made-by {
+  justify-self: end;
+}
+
+.navigation-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.navigation-drawer.open {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.navigation-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: rgba(15, 23, 42, 0.42);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.navigation-drawer.open .navigation-backdrop {
+  opacity: 1;
+}
+
+.navigation-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(310px, 84vw);
+  padding: 24px 18px;
+
+  color: #172033;
+  background: #ffffff;
+  box-shadow: 18px 0 42px rgba(15, 23, 42, 0.22);
+
+  transform: translateX(-104%);
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.navigation-drawer.open .navigation-panel {
+  transform: translateX(0);
+}
+
+body.navigation-open {
+  overflow: hidden;
+}
+
+.navigation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 2px 22px;
+  border-bottom: 1px solid #e8edf5;
+}
+
+.navigation-heading p {
+  margin: 0 0 3px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.navigation-heading strong {
+  font-size: 20px;
+}
+
+.navigation-close-button {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  color: #64748b;
+  background: #f1f5f9;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.navigation-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.navigation-item {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 16px;
+
+  display: flex;
+  align-items: center;
+  gap: 13px;
+
+  border: 0;
+  border-radius: 15px;
+
+  color: #526079;
+  background: transparent;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.navigation-item:hover {
+  background: #f4f7fb;
+}
+
+.navigation-item.active {
+  color: #1d4ed8;
+  background: #eaf1ff;
+}
+
+.navigation-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #ffffff;
+  background: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.navigation-item.active .navigation-icon {
+  background: var(--primary);
+}
+
+.app-main {
+  width: min(1180px, calc(100% - 28px));
+  margin: 24px auto 60px;
+  display: block;
+}
+
+.app-page {
+  width: 100%;
+  animation: app-page-enter 0.2s ease;
+}
+
+@keyframes app-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.attendance-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+.salary-page-layout {
+  display: grid;
+  gap: 20px;
+}
+
+.salary-overview-card {
+  position: relative;
+  padding: 22px;
+  border: 1px solid rgba(221, 228, 239, 0.9);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(34, 56, 94, 0.08);
+}
+
+.salary-year-toolbar {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+  margin: 0 auto 20px;
+}
+
+.salary-year-button,
+.salary-year-arrow {
+  border: 0;
+  border-radius: 13px;
+  color: #23324a;
+  background: #f1f5f9;
+  cursor: pointer;
+}
+
+.salary-year-button {
+  min-height: 48px;
+  padding: 0 18px;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.salary-year-arrow {
+  width: 44px;
+  height: 44px;
+  font-size: 27px;
+}
+
+.salary-year-button:hover,
+.salary-year-arrow:hover {
+  color: #1d4ed8;
+  background: #eaf1ff;
+}
+
+.salary-year-picker {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  z-index: 20;
+  width: min(330px, calc(100% - 32px));
+  padding: 14px;
+  border: 1px solid #dce4ef;
+  border-radius: 15px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+  transform: translateX(-50%);
+}
+
+.salary-year-picker > label {
+  display: block;
+  margin-bottom: 8px;
+  color: #5b687e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.salary-year-picker-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 68px;
+  gap: 8px;
+}
+
+.salary-year-picker-control input {
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d9e2ef;
+  border-radius: 11px;
+  outline: none;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.salary-year-picker-control input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.salary-year-picker-control button {
+  border: 0;
+  border-radius: 11px;
+  color: #ffffff;
+  background: var(--primary);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.salary-year-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.salary-month-card {
+  min-width: 0;
+  min-height: 102px;
+  padding: 15px 10px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  border: 1px solid #e0e7f1;
+  border-radius: 16px;
+
+  color: #596579;
+  background: #fafbfd;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.salary-month-card:hover {
+  transform: translateY(-2px);
+  border-color: #b9cbef;
+  background: #f4f7ff;
+}
+
+.salary-month-card.selected {
+  border-color: #2563eb;
+  color: #1d4ed8;
+  background: #eaf1ff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.salary-month-card span {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.salary-month-card strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #25334b;
+  font-size: clamp(14px, 2.6vw, 19px);
+  font-variant-numeric: tabular-nums lining-nums;
+  white-space: nowrap;
+}
+
+.annual-salary-row {
+  margin-top: 18px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-radius: 16px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb 60%, #4f46e5);
+}
+
+.annual-salary-row span {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.annual-salary-row strong {
+  font-size: clamp(20px, 4vw, 28px);
+  letter-spacing: -0.6px;
+}
+
+.salary-page-layout .salary-card {
+  grid-column: auto;
+}
+
+.hours-leave-card {
+  width: min(760px, 100%);
+  margin: 0 auto;
+}
+
+.hours-leave-card .weekly-date-range {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+}
+
+@media (max-width: 850px) {
+  .attendance-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-card {
+    width: 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-header {
+    grid-template-columns: 50px minmax(0, 1fr) 74px;
+    gap: 7px;
+    padding: 12px 12px;
+  }
+
+  .app-header h1 {
+    font-size: 21px;
+    letter-spacing: -0.7px;
+  }
+
+  .menu-button {
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+  }
+
+  .made-by {
+    width: 74px;
+    height: 42px;
+    border-radius: 13px;
+    font-size: 9px;
+  }
+
+  .app-main {
+    width: min(100% - 16px, 1180px);
+    margin-top: 10px;
+  }
+
+  .salary-overview-card {
+    padding: 15px;
+    border-radius: 18px;
+  }
+
+  .salary-year-toolbar {
+    margin-bottom: 14px;
+  }
+
+  .salary-year-button {
+    min-height: 44px;
+    font-size: 19px;
+  }
+
+  .salary-year-grid {
+    gap: 7px;
+  }
+
+  .salary-month-card {
+    min-height: 84px;
+    padding: 10px 4px;
+    gap: 7px;
+    border-radius: 13px;
+  }
+
+  .salary-month-card span {
+    font-size: 13px;
+  }
+
+  .salary-month-card strong {
+    font-size: 12px;
+  }
+
+  .annual-salary-row {
+    margin-top: 12px;
+    padding: 15px;
+  }
+
+  .annual-salary-row strong {
+    font-size: 19px;
+  }
+
+  .hours-leave-card {
+    padding: 15px;
+    border-radius: 18px;
+  }
+
+  .hours-leave-card .weekly-date-range {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-header {
+    grid-template-columns: 74px minmax(0, 1fr) 74px;
+  }
+
+  .menu-button {
+    justify-self: start;
+  }
+}
+
+/* 공통 연도 스크롤 선택기 */
+.year-scroll-picker-label {
+  margin: 0 0 8px;
+  color: #5b687e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.year-scroll-picker {
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: thin;
+  border: 1px solid #dce4ef;
+  border-radius: 13px;
+  background: #ffffff;
+}
+
+.year-scroll-option {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  display: block;
+  border: 0;
+  border-bottom: 1px solid #edf1f6;
+  color: #3f4d63;
+  background: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  scroll-snap-align: center;
+}
+
+.year-scroll-option:last-child {
+  border-bottom: 0;
+}
+
+.year-scroll-option:hover,
+.year-scroll-option:focus-visible {
+  color: #1d4ed8;
+  background: #f4f7ff;
+  outline: none;
+}
+
+.year-scroll-option.selected {
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.month-picker-year-display {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid #d9e2ef;
+  border-radius: 13px;
+  color: #23324a;
+  background: #f8fafc;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.month-picker-year-display:hover,
+.month-picker-year-display:focus-visible {
+  border-color: var(--primary);
+  color: #1d4ed8;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.month-picker-year-scroller {
+  margin: 10px 0 14px;
+}
+
+.annual-leave-section-heading {
+  position: relative;
+}
+
+.annual-leave-year-selector {
+  position: relative;
+}
+
+.annual-leave-year-button {
+  min-width: 88px;
+  height: 38px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 12px;
+  color: #047857;
+  background: #ecfdf5;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.annual-leave-year-button:hover,
+.annual-leave-year-button:focus-visible {
+  background: #d1fae5;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.13);
+}
+
+.annual-leave-year-picker {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 35;
+  width: 180px;
+  padding: 12px;
+  border: 1px solid #dce4ef;
+  border-radius: 15px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+}
+
+@media (max-width: 620px) {
+  html.mobile-pager-enabled .app-page[data-app-page="attendance"] {
+    height: 100%;
+    min-height: 0;
+  }
+
+  html.mobile-pager-enabled .attendance-pager {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: block;
+    overflow: hidden;
+  }
+
+  html.mobile-pager-enabled .attendance-pager .mobile-page-track {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: hidden;
+  }
+
+  html.mobile-pager-enabled .attendance-pager .mobile-page {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .salary-year-picker {
+    width: min(260px, calc(100% - 28px));
+  }
+
+  .year-scroll-picker {
+    max-height: 220px;
+  }
+
+  .annual-leave-year-picker {
+    width: 168px;
+  }
+}

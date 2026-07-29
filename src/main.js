@@ -6,6 +6,8 @@ const PREVIOUS_SETTINGS_KEY = "cat-attendance-settings-v2";
 const LEGACY_SETTINGS_KEY = "cat-attendance-settings-v1";
 const WEEKLY_RANGE_KEY = "cat-attendance-52-hour-range-v1";
 const ANNUAL_LEAVE_KEY = "cat-attendance-annual-leave-by-year-v1";
+const YEAR_MIN = 2000;
+const YEAR_MAX = 2100;
 
 const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
@@ -121,6 +123,12 @@ currentMonth = new Date(
   1,
 );
 
+let currentAppPage = "attendance";
+let salarySelectedYear = currentMonth.getFullYear();
+let salarySelectedMonth = currentMonth.getMonth();
+let annualLeaveSelectedYear = new Date().getFullYear();
+let monthPickerSelectedYear = currentMonth.getFullYear();
+
 let selectedDateKey = null;
 let summarySlideIndex = 0;
 let mobilePageIndex = 0;
@@ -151,411 +159,555 @@ const app = document.querySelector("#app");
 app.innerHTML = `
   <div class="app-shell">
     <header class="app-header">
-      <div>
-        <p class="header-caption">근무 기록과 급여 관리</p>
-        <h1>CAT 근태관리</h1>
-      </div>
+      <button
+        id="menuButton"
+        class="menu-button"
+        type="button"
+        aria-label="페이지 메뉴 열기"
+        aria-controls="navigationDrawer"
+        aria-expanded="false"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <h1>CAT 근태관리</h1>
 
       <div class="made-by" aria-label="Made by 제민">
         Made by 제민
       </div>
     </header>
 
-    <main id="mobilePager" class="main-content">
-      <div id="mobilePageTrack" class="mobile-page-track">
-      <section
-        class="calendar-card mobile-page mobile-page-active"
-        data-mobile-page="0"
-        aria-label="달력"
+    <div
+      id="navigationDrawer"
+      class="navigation-drawer"
+      aria-hidden="true"
+    >
+      <button
+        class="navigation-backdrop"
+        type="button"
+        data-close-navigation
+        aria-label="메뉴 닫기"
+      ></button>
+
+      <aside
+        class="navigation-panel"
+        aria-label="페이지 목록"
       >
-        <div class="calendar-toolbar">
-          <button
-            id="previousMonth"
-            class="month-button"
-            type="button"
-            aria-label="이전 달"
-          >
-            ‹
-          </button>
-
-          <button
-            id="monthTitle"
-            class="calendar-month-title"
-            type="button"
-            aria-label="연도와 월 선택"
-          ></button>
-
-          <button
-            id="nextMonth"
-            class="month-button"
-            type="button"
-            aria-label="다음 달"
-          >
-            ›
-          </button>
-        </div>
-
-        <div class="calendar-actions">
-          <button
-            id="todayButton"
-            class="today-button"
-            type="button"
-          >
-            이번 달로 이동
-          </button>
-
-          <button
-            id="resetMonthButton"
-            class="reset-month-button"
-            type="button"
-          >
-            이번 달 기록 초기화
-          </button>
-        </div>
-
-        <div class="weekdays" aria-hidden="true">
-          <div>월</div>
-          <div>화</div>
-          <div>수</div>
-          <div>목</div>
-          <div>금</div>
-          <div class="saturday">토</div>
-          <div class="sunday">일</div>
-        </div>
-
-        <div id="calendarGrid" class="calendar-grid"></div>
-      </section>
-
-      <section
-        id="summaryCard"
-        class="summary-card mobile-page"
-        data-mobile-page="1"
-        tabindex="0"
-        aria-label="월간 근무 현황"
-        aria-roledescription="carousel"
-      >
-        <div id="summaryCarousel" class="summary-carousel">
-          <div id="summaryTrack" class="summary-track">
-            <article
-              class="summary-slide"
-              data-summary-slide="0"
-              aria-label="근무 기록 요약"
-            >
-              <div class="section-title-row">
-                <div>
-                  <p class="section-caption">월간 현황</p>
-                  <h2>근무 기록 요약</h2>
-                </div>
-
-                <div id="recordedDays" class="recorded-days">
-                  0&thinsp;일
-                </div>
-              </div>
-
-              <div id="summaryGrid" class="summary-grid"></div>
-            </article>
-
-            <article
-              class="summary-slide"
-              data-summary-slide="1"
-              aria-label="근무시간 집계"
-            >
-              <div class="section-title-row">
-                <div>
-                  <p class="section-caption">월간 현황</p>
-                  <h2>근무시간 집계</h2>
-                </div>
-              </div>
-
-              <div id="workTotalsGrid" class="work-totals-grid"></div>
-            </article>
-
-            <article
-              class="summary-slide"
-              data-summary-slide="2"
-              aria-label="52시간 계산기"
-            >
-              <div class="section-title-row summary-part-heading">
-                <h2 id="weeklyCalculatorTitle">52시간 계산기</h2>
-              </div>
-
-              <section
-                class="weekly-calculator"
-                aria-labelledby="weeklyCalculatorTitle"
-              >
-                <div class="weekly-date-range">
-                  <div class="weekly-date-field">
-                    <label for="weeklyStartDate">언제부터</label>
-
-                    <div class="weekly-date-control">
-                      <input
-                        id="weeklyStartDate"
-                        type="text"
-                        placeholder="날짜 선택"
-                        aria-label="52시간 계산 시작 날짜"
-                        aria-haspopup="dialog"
-                        readonly
-                      />
-
-                      <button
-                        class="weekly-date-open-button"
-                        type="button"
-                        data-date-picker-target="weeklyStartDate"
-                        aria-label="시작 날짜 달력 열기"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path d="M7 2v3M17 2v3M3.5 9h17M5.5 4h13a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="weekly-date-field">
-                    <label for="weeklyEndDate">언제까지</label>
-
-                    <div class="weekly-date-control">
-                      <input
-                        id="weeklyEndDate"
-                        type="text"
-                        placeholder="날짜 선택"
-                        aria-label="52시간 계산 종료 날짜"
-                        aria-haspopup="dialog"
-                        readonly
-                      />
-
-                      <button
-                        class="weekly-date-open-button"
-                        type="button"
-                        data-date-picker-target="weeklyEndDate"
-                        aria-label="종료 날짜 달력 열기"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path d="M7 2v3M17 2v3M3.5 9h17M5.5 4h13a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  id="weeklyAverageResult"
-                  class="weekly-average-result"
-                  aria-live="polite"
-                >
-                  시작일과 종료일을 선택해 주세요.
-                </div>
-              </section>
-
-              <section
-                class="annual-leave-section"
-                aria-labelledby="annualLeaveTitle"
-              >
-                <div class="section-title-row annual-leave-section-heading">
-                  <h2 id="annualLeaveTitle">잔여 연차</h2>
-                  <span id="annualLeaveYearLabel"></span>
-                </div>
-
-                <div class="annual-leave-card">
-                  <div class="annual-leave-grid">
-                    <label class="annual-leave-item annual-leave-input-item">
-                      <span>발생 연차</span>
-
-                      <span class="annual-leave-input-control">
-                        <input
-                          id="accruedAnnualLeave"
-                          type="text"
-                          inputmode="decimal"
-                          pattern="[0-9]*[.]?[0-9]?"
-                          autocomplete="off"
-                          aria-label="발생 연차"
-                        />
-                        <span>일</span>
-                      </span>
-                    </label>
-
-                    <div class="annual-leave-item">
-                      <span>사용 연차</span>
-                      <strong id="usedAnnualLeave">0&thinsp;일</strong>
-                    </div>
-
-                    <div class="annual-leave-item">
-                      <span>잔여 연차</span>
-                      <strong id="remainingAnnualLeave">0&thinsp;일</strong>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </article>
+        <div class="navigation-heading">
+          <div>
+            <p>CAT</p>
+            <strong>페이지 목록</strong>
           </div>
+          <button
+            id="closeNavigationButton"
+            class="navigation-close-button"
+            type="button"
+            aria-label="메뉴 닫기"
+          >×</button>
         </div>
 
-        <div class="summary-pagination" aria-label="요약 페이지 선택">
+        <nav class="navigation-list">
           <button
-            class="carousel-dot active"
+            class="navigation-item active"
             type="button"
-            data-summary-page="0"
-            aria-label="근무 기록 요약 보기"
-            aria-current="true"
-          ></button>
+            data-app-navigation="attendance"
+            aria-current="page"
+          >
+            <span class="navigation-icon">▦</span>
+            <span>근태관리</span>
+          </button>
           <button
-            class="carousel-dot"
+            class="navigation-item"
             type="button"
-            data-summary-page="1"
-            aria-label="근무시간 집계 보기"
-            aria-current="false"
-          ></button>
+            data-app-navigation="salary"
+          >
+            <span class="navigation-icon">₩</span>
+            <span>급여내역</span>
+          </button>
           <button
-            class="carousel-dot"
+            class="navigation-item"
             type="button"
-            data-summary-page="2"
-            aria-label="52시간 계산기 보기"
-            aria-current="false"
-          ></button>
-        </div>
+            data-app-navigation="hours-leave"
+          >
+            <span class="navigation-icon">52</span>
+            <span>52h / 연차</span>
+          </button>
+        </nav>
+      </aside>
+    </div>
 
-        <p class="summary-swipe-hint">옆으로 넘겨 확인</p>
+    <main class="main-content app-main">
+      <section
+        class="app-page active"
+        data-app-page="attendance"
+        aria-label="근태관리"
+      >
+        <div id="mobilePager" class="attendance-layout attendance-pager">
+          <div id="mobilePageTrack" class="mobile-page-track">
+          <section
+            class="calendar-card mobile-page mobile-page-active"
+            data-mobile-page="0"
+            aria-label="달력"
+          >
+            <div class="calendar-toolbar">
+              <button
+                id="previousMonth"
+                class="month-button"
+                type="button"
+                aria-label="이전 달"
+              >
+                ‹
+              </button>
+
+              <button
+                id="monthTitle"
+                class="calendar-month-title"
+                type="button"
+                aria-label="연도와 월 선택"
+              ></button>
+
+              <button
+                id="nextMonth"
+                class="month-button"
+                type="button"
+                aria-label="다음 달"
+              >
+                ›
+              </button>
+            </div>
+
+            <div class="calendar-actions">
+              <button
+                id="todayButton"
+                class="today-button"
+                type="button"
+              >
+                이번 달로 이동
+              </button>
+
+              <button
+                id="resetMonthButton"
+                class="reset-month-button"
+                type="button"
+              >
+                이번 달 기록 초기화
+              </button>
+            </div>
+
+            <div class="weekdays" aria-hidden="true">
+              <div>월</div>
+              <div>화</div>
+              <div>수</div>
+              <div>목</div>
+              <div>금</div>
+              <div class="saturday">토</div>
+              <div class="sunday">일</div>
+            </div>
+
+            <div id="calendarGrid" class="calendar-grid"></div>
+          </section>
+
+          <section
+            id="summaryCard"
+            class="summary-card mobile-page"
+            data-mobile-page="1"
+            tabindex="0"
+            aria-label="월간 근무 현황"
+            aria-roledescription="carousel"
+          >
+            <div id="summaryCarousel" class="summary-carousel">
+              <div id="summaryTrack" class="summary-track">
+                <article
+                  class="summary-slide"
+                  data-summary-slide="0"
+                  aria-label="근무 기록 요약"
+                >
+                  <div class="section-title-row">
+                    <div>
+                      <p class="section-caption">월간 현황</p>
+                      <h2>근무 기록 요약</h2>
+                    </div>
+
+                    <div id="recordedDays" class="recorded-days">
+                      0&thinsp;일
+                    </div>
+                  </div>
+
+                  <div id="summaryGrid" class="summary-grid"></div>
+                </article>
+
+                <article
+                  class="summary-slide"
+                  data-summary-slide="1"
+                  aria-label="근무시간 집계"
+                >
+                  <div class="section-title-row">
+                    <div>
+                      <p class="section-caption">월간 현황</p>
+                      <h2>근무시간 집계</h2>
+                    </div>
+                  </div>
+
+                  <div id="workTotalsGrid" class="work-totals-grid"></div>
+                </article>
+              </div>
+            </div>
+
+            <div class="summary-pagination" aria-label="요약 페이지 선택">
+              <button
+                class="carousel-dot active"
+                type="button"
+                data-summary-page="0"
+                aria-label="근무 기록 요약 보기"
+                aria-current="true"
+              ></button>
+              <button
+                class="carousel-dot"
+                type="button"
+                data-summary-page="1"
+                aria-label="근무시간 집계 보기"
+                aria-current="false"
+              ></button>
+            </div>
+
+            <p class="summary-swipe-hint">옆으로 넘겨 확인</p>
+          </section>
+          </div>
+
+          <nav
+            class="mobile-page-pagination"
+            aria-label="근태관리 화면 선택"
+          >
+            <button
+              class="mobile-page-dot active"
+              type="button"
+              data-mobile-page-button="0"
+              aria-label="달력 화면 보기"
+              aria-current="true"
+            ></button>
+            <button
+              class="mobile-page-dot"
+              type="button"
+              data-mobile-page-button="1"
+              aria-label="근무 기록 요약 화면 보기"
+              aria-current="false"
+            ></button>
+          </nav>
+        </div>
       </section>
 
       <section
-        class="salary-card mobile-page"
-        data-mobile-page="2"
-        aria-label="자동 급여 계산"
+        class="app-page"
+        data-app-page="salary"
+        aria-label="급여내역"
+        hidden
       >
-        <div class="salary-heading">
-          <h2 id="salaryMonthTitle">이번 달 예상 급여</h2>
-        </div>
+        <div class="salary-page-layout">
+          <section class="salary-overview-card">
+            <div class="salary-year-toolbar">
+              <button
+                id="salaryPreviousYear"
+                class="salary-year-arrow"
+                type="button"
+                aria-label="이전 연도"
+              >‹</button>
 
-        <div class="salary-layout">
-          <section class="salary-panel settings-panel">
-            <h3>급여 설정</h3>
+              <button
+                id="salaryYearButton"
+                class="salary-year-button"
+                type="button"
+                aria-expanded="false"
+                aria-controls="salaryYearPicker"
+              ></button>
 
-            <label class="salary-input-row">
-              <span>기본시급</span>
-
-              <div class="input-with-unit">
-                <input
-                  id="baseHourlyWage"
-                  type="number"
-                  inputmode="numeric"
-                  min="0"
-                  placeholder="0"
-                  value=""
-                />
-                <span>원</span>
-              </div>
-            </label>
-
-            <label class="salary-input-row">
-              <span>안전수당</span>
-
-              <div class="input-with-unit">
-                <input
-                  id="safetyAllowance"
-                  type="number"
-                  inputmode="numeric"
-                  min="0"
-                  placeholder="0"
-                  value=""
-                />
-                <span>원</span>
-              </div>
-            </label>
-
-            <label class="salary-input-row">
-              <span>근속수당</span>
-
-              <div class="input-with-unit">
-                <input
-                  id="longevityAllowance"
-                  type="number"
-                  inputmode="numeric"
-                  min="0"
-                  placeholder="0"
-                  value=""
-                />
-                <span>원</span>
-              </div>
-            </label>
-
-            <label class="salary-input-row">
-              <span>기타수당</span>
-
-              <div class="input-with-unit">
-                <input
-                  id="otherAllowance"
-                  type="number"
-                  inputmode="numeric"
-                  min="0"
-                  placeholder="0"
-                  value=""
-                />
-                <span>원</span>
-              </div>
-            </label>
-
-            <div class="salary-input-row salary-output-row">
-              <span>통상시급</span>
-
-              <div
-                class="salary-inline-output"
-                aria-label="자동 계산된 통상시급"
-              >
-                <output id="ordinaryHourlyWageOutput">0</output>
-                <span>원</span>
-              </div>
+              <button
+                id="salaryNextYear"
+                class="salary-year-arrow"
+                type="button"
+                aria-label="다음 연도"
+              >›</button>
             </div>
 
-            <p class="formula-note">
-              통상시급 = 기본시급 + (안전수당 + 근속수당) ÷ 243
-            </p>
+            <div
+              id="salaryYearPicker"
+              class="salary-year-picker"
+              hidden
+            >
+              <p class="year-scroll-picker-label">연도 선택</p>
+              <div
+                id="salaryYearScroller"
+                class="year-scroll-picker"
+                role="listbox"
+                aria-label="급여내역 연도 선택"
+              ></div>
+            </div>
+
+            <div
+              id="salaryYearGrid"
+              class="salary-year-grid"
+              aria-label="월별 예상 총급여"
+            ></div>
+
+            <div class="annual-salary-row">
+              <span>예상 연봉</span>
+              <strong id="annualSalaryTotal">0&thinsp;원</strong>
+            </div>
           </section>
 
-          <section class="salary-panel payment-panel">
-            <h3>지급내역</h3>
+          <section
+            id="salaryDetailCard"
+            class="salary-card"
+            aria-label="선택한 달의 예상 급여와 지급내역"
+          >
+            <div class="salary-heading">
+              <h2 id="salaryMonthTitle">이번 달 예상 급여</h2>
+            </div>
 
-            <div id="payBreakdown" class="pay-breakdown"></div>
+            <div class="salary-layout">
+              <section class="salary-panel settings-panel">
+                <h3>급여 설정</h3>
 
-            <div class="total-pay-row">
-              <span>예상 총급여</span>
-              <strong id="totalPayOutput">0&thinsp;원</strong>
+                <label class="salary-input-row">
+                  <span>기본시급</span>
+
+                  <div class="input-with-unit">
+                    <input
+                      id="baseHourlyWage"
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      placeholder="0"
+                      value=""
+                    />
+                    <span>원</span>
+                  </div>
+                </label>
+
+                <label class="salary-input-row">
+                  <span>안전수당</span>
+
+                  <div class="input-with-unit">
+                    <input
+                      id="safetyAllowance"
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      placeholder="0"
+                      value=""
+                    />
+                    <span>원</span>
+                  </div>
+                </label>
+
+                <label class="salary-input-row">
+                  <span>근속수당</span>
+
+                  <div class="input-with-unit">
+                    <input
+                      id="longevityAllowance"
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      placeholder="0"
+                      value=""
+                    />
+                    <span>원</span>
+                  </div>
+                </label>
+
+                <label class="salary-input-row">
+                  <span>기타수당</span>
+
+                  <div class="input-with-unit">
+                    <input
+                      id="otherAllowance"
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      placeholder="0"
+                      value=""
+                    />
+                    <span>원</span>
+                  </div>
+                </label>
+
+                <div class="salary-input-row salary-output-row">
+                  <span>통상시급</span>
+
+                  <div
+                    class="salary-inline-output"
+                    aria-label="자동 계산된 통상시급"
+                  >
+                    <output id="ordinaryHourlyWageOutput">0</output>
+                    <span>원</span>
+                  </div>
+                </div>
+
+                <p class="formula-note">
+                  통상시급 = 기본시급 + (안전수당 + 근속수당) ÷ 243
+                </p>
+              </section>
+
+              <section class="salary-panel payment-panel">
+                <h3>지급내역</h3>
+
+                <div id="payBreakdown" class="pay-breakdown"></div>
+
+                <div class="total-pay-row">
+                  <span>예상 총급여</span>
+                  <strong id="totalPayOutput">0&thinsp;원</strong>
+                </div>
+              </section>
             </div>
           </section>
         </div>
       </section>
-      </div>
 
-      <nav
-        class="mobile-page-pagination"
-        aria-label="주요 화면 선택"
+      <section
+        class="app-page"
+        data-app-page="hours-leave"
+        aria-label="52시간 계산기와 연차"
+        hidden
       >
-        <button
-          class="mobile-page-dot active"
-          type="button"
-          data-mobile-page-button="0"
-          aria-label="달력 화면 보기"
-          aria-current="true"
-        ></button>
-        <button
-          class="mobile-page-dot"
-          type="button"
-          data-mobile-page-button="1"
-          aria-label="근무 기록 요약 화면 보기"
-          aria-current="false"
-        ></button>
-        <button
-          class="mobile-page-dot"
-          type="button"
-          data-mobile-page-button="2"
-          aria-label="자동 급여 계산 화면 보기"
-          aria-current="false"
-        ></button>
-      </nav>
+        <section class="hours-leave-card summary-card">
+          <div class="section-title-row summary-part-heading">
+            <div>
+              <p class="section-caption">근무시간 확인</p>
+              <h2 id="weeklyCalculatorTitle">52시간 계산기</h2>
+            </div>
+          </div>
+
+          <section
+            class="weekly-calculator"
+            aria-labelledby="weeklyCalculatorTitle"
+          >
+            <div class="weekly-date-range">
+              <div class="weekly-date-field">
+                <label for="weeklyStartDate">언제부터</label>
+
+                <div class="weekly-date-control">
+                  <input
+                    id="weeklyStartDate"
+                    type="text"
+                    placeholder="날짜 선택"
+                    aria-label="52시간 계산 시작 날짜"
+                    aria-haspopup="dialog"
+                    readonly
+                  />
+
+                  <button
+                    class="weekly-date-open-button"
+                    type="button"
+                    data-date-picker-target="weeklyStartDate"
+                    aria-label="시작 날짜 달력 열기"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7 2v3M17 2v3M3.5 9h17M5.5 4h13a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="weekly-date-field">
+                <label for="weeklyEndDate">언제까지</label>
+
+                <div class="weekly-date-control">
+                  <input
+                    id="weeklyEndDate"
+                    type="text"
+                    placeholder="날짜 선택"
+                    aria-label="52시간 계산 종료 날짜"
+                    aria-haspopup="dialog"
+                    readonly
+                  />
+
+                  <button
+                    class="weekly-date-open-button"
+                    type="button"
+                    data-date-picker-target="weeklyEndDate"
+                    aria-label="종료 날짜 달력 열기"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7 2v3M17 2v3M3.5 9h17M5.5 4h13a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              id="weeklyAverageResult"
+              class="weekly-average-result"
+              aria-live="polite"
+            >
+              시작일과 종료일을 선택해 주세요.
+            </div>
+          </section>
+
+          <section
+            class="annual-leave-section"
+            aria-labelledby="annualLeaveTitle"
+          >
+            <div class="section-title-row annual-leave-section-heading">
+              <h2 id="annualLeaveTitle">잔여 연차</h2>
+              <div class="annual-leave-year-selector">
+                <button
+                  id="annualLeaveYearButton"
+                  class="annual-leave-year-button"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="annualLeaveYearPicker"
+                ></button>
+                <div
+                  id="annualLeaveYearPicker"
+                  class="annual-leave-year-picker"
+                  hidden
+                >
+                  <p class="year-scroll-picker-label">연도 선택</p>
+                  <div
+                    id="annualLeaveYearScroller"
+                    class="year-scroll-picker"
+                    role="listbox"
+                    aria-label="연차 연도 선택"
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="annual-leave-card">
+              <div class="annual-leave-grid">
+                <label class="annual-leave-item annual-leave-input-item">
+                  <span>발생 연차</span>
+
+                  <span class="annual-leave-input-control">
+                    <input
+                      id="accruedAnnualLeave"
+                      type="text"
+                      inputmode="decimal"
+                      pattern="[0-9]*[.]?[0-9]?"
+                      autocomplete="off"
+                      aria-label="발생 연차"
+                    />
+                    <span>일</span>
+                  </span>
+                </label>
+
+                <div class="annual-leave-item">
+                  <span>사용 연차</span>
+                  <strong id="usedAnnualLeave">0&thinsp;일</strong>
+                </div>
+
+                <div class="annual-leave-item">
+                  <span>잔여 연차</span>
+                  <strong id="remainingAnnualLeave">0&thinsp;일</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -767,17 +919,13 @@ app.innerHTML = `
           ‹
         </button>
 
-        <label class="month-picker-year-field">
-          <span>연도</span>
-          <input
-            id="monthPickerYearInput"
-            type="number"
-            min="2000"
-            max="2100"
-            inputmode="numeric"
-            aria-label="이동할 연도"
-          />
-        </label>
+        <button
+          id="monthPickerYearButton"
+          class="month-picker-year-display"
+          type="button"
+          aria-expanded="false"
+          aria-controls="monthPickerYearScroller"
+        ></button>
 
         <button
           id="monthPickerNextYear"
@@ -788,6 +936,14 @@ app.innerHTML = `
           ›
         </button>
       </div>
+
+      <div
+        id="monthPickerYearScroller"
+        class="year-scroll-picker month-picker-year-scroller"
+        role="listbox"
+        aria-label="달력 연도 선택"
+        hidden
+      ></div>
 
       <div
         id="monthPickerMonths"
@@ -826,6 +982,37 @@ const mobilePagerTestMode =
   new URLSearchParams(window.location.search).get(
     "mobilePagerTest",
   ) === "1";
+const appPages = [
+  ...document.querySelectorAll("[data-app-page]"),
+];
+const appNavigationButtons = [
+  ...document.querySelectorAll("[data-app-navigation]"),
+];
+const menuButton = document.querySelector("#menuButton");
+const navigationDrawer = document.querySelector(
+  "#navigationDrawer",
+);
+const closeNavigationButton = document.querySelector(
+  "#closeNavigationButton",
+);
+const salaryYearButton = document.querySelector(
+  "#salaryYearButton",
+);
+const salaryYearPicker = document.querySelector(
+  "#salaryYearPicker",
+);
+const salaryYearScroller = document.querySelector(
+  "#salaryYearScroller",
+);
+const salaryYearGrid = document.querySelector(
+  "#salaryYearGrid",
+);
+const annualSalaryTotal = document.querySelector(
+  "#annualSalaryTotal",
+);
+const salaryDetailCard = document.querySelector(
+  "#salaryDetailCard",
+);
 const exitToast = document.querySelector("#exitToast");
 const summaryCard = document.querySelector("#summaryCard");
 const summaryCarousel = document.querySelector("#summaryCarousel");
@@ -847,8 +1034,14 @@ const weeklyEndDateInput = document.querySelector(
 const weeklyAverageResult = document.querySelector(
   "#weeklyAverageResult",
 );
-const annualLeaveYearLabel = document.querySelector(
-  "#annualLeaveYearLabel",
+const annualLeaveYearButton = document.querySelector(
+  "#annualLeaveYearButton",
+);
+const annualLeaveYearPicker = document.querySelector(
+  "#annualLeaveYearPicker",
+);
+const annualLeaveYearScroller = document.querySelector(
+  "#annualLeaveYearScroller",
 );
 const accruedAnnualLeaveInput = document.querySelector(
   "#accruedAnnualLeave",
@@ -874,8 +1067,11 @@ const closeDatePickerButton = document.querySelector(
 const monthPickerModal = document.querySelector(
   "#monthPickerModal",
 );
-const monthPickerYearInput = document.querySelector(
-  "#monthPickerYearInput",
+const monthPickerYearButton = document.querySelector(
+  "#monthPickerYearButton",
+);
+const monthPickerYearScroller = document.querySelector(
+  "#monthPickerYearScroller",
 );
 const monthPickerMonths = [
   ...document.querySelectorAll("[data-month-picker-month]"),
@@ -929,6 +1125,70 @@ const saveCustomWorkTypeButton = document.querySelector(
 const deleteRecordButton = document.querySelector(
   "#deleteRecordButton",
 );
+
+menuButton.addEventListener("click", openNavigationDrawer);
+closeNavigationButton.addEventListener(
+  "click",
+  closeNavigationDrawer,
+);
+document
+  .querySelector("[data-close-navigation]")
+  .addEventListener("click", closeNavigationDrawer);
+
+appNavigationButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setAppPage(button.dataset.appNavigation);
+  });
+});
+
+salaryYearButton.addEventListener("click", () => {
+  if (salaryYearPicker.hidden) {
+    openSalaryYearPicker();
+  } else {
+    closeSalaryYearPicker();
+  }
+});
+
+document
+  .querySelector("#salaryPreviousYear")
+  .addEventListener("click", () => {
+    setSalaryYear(salarySelectedYear - 1);
+  });
+
+document
+  .querySelector("#salaryNextYear")
+  .addEventListener("click", () => {
+    setSalaryYear(salarySelectedYear + 1);
+  });
+
+
+
+salaryYearScroller.addEventListener("click", (event) => {
+  const yearButton = event.target.closest("[data-year-option]");
+
+  if (!yearButton) {
+    return;
+  }
+
+  setSalaryYear(Number(yearButton.dataset.yearOption));
+  closeSalaryYearPicker();
+});
+
+salaryYearGrid.addEventListener("click", (event) => {
+  const monthButton = event.target.closest(
+    "[data-salary-month]",
+  );
+
+  if (!monthButton) {
+    return;
+  }
+
+  salarySelectedMonth = Number(
+    monthButton.dataset.salaryMonth,
+  );
+  syncSalaryInputs();
+  renderSalary();
+});
 
 let mobileTouchStartX = 0;
 let mobileTouchStartY = 0;
@@ -1235,6 +1495,26 @@ document
     });
   });
 
+annualLeaveYearButton.addEventListener("click", () => {
+  if (annualLeaveYearPicker.hidden) {
+    openAnnualLeaveYearPicker();
+  } else {
+    closeAnnualLeaveYearPicker();
+  }
+});
+
+annualLeaveYearScroller.addEventListener("click", (event) => {
+  const yearButton = event.target.closest("[data-year-option]");
+
+  if (!yearButton) {
+    return;
+  }
+
+  annualLeaveSelectedYear = Number(yearButton.dataset.yearOption);
+  closeAnnualLeaveYearPicker();
+  renderAnnualLeaveSummary();
+});
+
 accruedAnnualLeaveInput.addEventListener("input", () => {
   const sanitizedValue = sanitizeAnnualLeaveInput(
     accruedAnnualLeaveInput.value,
@@ -1244,7 +1524,7 @@ accruedAnnualLeaveInput.addEventListener("input", () => {
     accruedAnnualLeaveInput.value = sanitizedValue;
   }
 
-  const yearKey = String(currentMonth.getFullYear());
+  const yearKey = String(annualLeaveSelectedYear);
 
   annualLeaveByYear[yearKey] = getInputNumber(
     accruedAnnualLeaveInput,
@@ -1329,25 +1609,31 @@ document
     setMonthPickerYear(getMonthPickerYear() + 1);
   });
 
-monthPickerYearInput.addEventListener("input", () => {
-  renderMonthPickerMonths();
-});
+monthPickerYearButton.addEventListener("click", () => {
+  const willOpen = monthPickerYearScroller.hidden;
 
-monthPickerYearInput.addEventListener("pointerdown", () => {
-  monthPickerYearInput.inputMode = "numeric";
-});
+  monthPickerYearScroller.hidden = !willOpen;
+  monthPickerYearButton.setAttribute("aria-expanded", String(willOpen));
 
-monthPickerYearInput.addEventListener("focus", () => {
-  monthPickerYearInput.inputMode = "numeric";
-});
-
-monthPickerYearInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    monthPickerMonths.find((button) =>
-      button.classList.contains("active"),
-    )?.focus();
+  if (willOpen) {
+    renderYearScrollPicker(
+      monthPickerYearScroller,
+      monthPickerSelectedYear,
+    );
+    scrollYearPickerToSelected(monthPickerYearScroller);
   }
+});
+
+monthPickerYearScroller.addEventListener("click", (event) => {
+  const yearButton = event.target.closest("[data-year-option]");
+
+  if (!yearButton) {
+    return;
+  }
+
+  setMonthPickerYear(Number(yearButton.dataset.yearOption));
+  monthPickerYearScroller.hidden = true;
+  monthPickerYearButton.setAttribute("aria-expanded", "false");
 });
 
 monthPickerMonths.forEach((button) => {
@@ -1365,7 +1651,10 @@ monthPickerMonths.forEach((button) => {
   otherAllowanceInput,
 ].forEach((input) => {
   input.addEventListener("input", () => {
-    const monthKey = getMonthKey(currentMonth);
+    const monthKey = getMonthKeyFromParts(
+      salarySelectedYear,
+      salarySelectedMonth,
+    );
 
     settingsByMonth[monthKey] = {
       baseHourlyWage: getInputNumber(baseHourlyWageInput),
@@ -1386,6 +1675,16 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (navigationDrawer.classList.contains("open")) {
+    closeNavigationDrawer();
+    return;
+  }
+
+  if (!salaryYearPicker.hidden) {
+    closeSalaryYearPicker();
+    return;
+  }
+
   if (monthPickerModal.classList.contains("open")) {
     closeMonthPicker();
     return;
@@ -1398,6 +1697,169 @@ document.addEventListener("keydown", (event) => {
 
   closeModal();
 });
+
+function openNavigationDrawer() {
+  navigationDrawer.classList.add("open");
+  navigationDrawer.setAttribute("aria-hidden", "false");
+  menuButton.setAttribute("aria-expanded", "true");
+  document.body.classList.add("navigation-open");
+
+  window.requestAnimationFrame(() => {
+    navigationDrawer
+      .querySelector(".navigation-item.active")
+      ?.focus();
+  });
+}
+
+function closeNavigationDrawer() {
+  if (!navigationDrawer.classList.contains("open")) {
+    return;
+  }
+
+  navigationDrawer.classList.remove("open");
+  navigationDrawer.setAttribute("aria-hidden", "true");
+  menuButton.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("navigation-open");
+  menuButton.focus({ preventScroll: true });
+}
+
+function setAppPage(pageId) {
+  const targetPage = appPages.find(
+    (page) => page.dataset.appPage === pageId,
+  );
+
+  if (!targetPage) {
+    return;
+  }
+
+  currentAppPage = pageId;
+
+  appPages.forEach((page) => {
+    const isActive = page === targetPage;
+
+    page.hidden = !isActive;
+    page.classList.toggle("active", isActive);
+    page.setAttribute("aria-hidden", String(!isActive));
+  });
+
+  appNavigationButtons.forEach((button) => {
+    const isActive = button.dataset.appNavigation === pageId;
+
+    button.classList.toggle("active", isActive);
+
+    if (isActive) {
+      button.setAttribute("aria-current", "page");
+    } else {
+      button.removeAttribute("aria-current");
+    }
+  });
+
+  closeNavigationDrawer();
+  closeSalaryYearPicker();
+  closeAnnualLeaveYearPicker();
+
+  if (pageId === "salary") {
+    syncSalaryInputs();
+    renderSalary();
+  }
+
+  if (pageId === "hours-leave") {
+    syncWeeklyDateRangeInputs();
+    render52HourCalculator();
+    renderAnnualLeaveSummary();
+  }
+
+  syncMobilePagerMode();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function openSalaryYearPicker() {
+  renderYearScrollPicker(salaryYearScroller, salarySelectedYear);
+  salaryYearPicker.hidden = false;
+  salaryYearButton.setAttribute("aria-expanded", "true");
+
+  window.requestAnimationFrame(() => {
+    scrollYearPickerToSelected(salaryYearScroller);
+    salaryYearScroller
+      .querySelector("[aria-selected=\"true\"]")
+      ?.focus({ preventScroll: true });
+  });
+}
+
+function closeSalaryYearPicker() {
+  salaryYearPicker.hidden = true;
+  salaryYearButton.setAttribute("aria-expanded", "false");
+}
+
+function setSalaryYear(year) {
+  salarySelectedYear = clampYear(year);
+  syncSalaryInputs();
+  renderSalary();
+}
+
+function openAnnualLeaveYearPicker() {
+  renderYearScrollPicker(
+    annualLeaveYearScroller,
+    annualLeaveSelectedYear,
+  );
+  annualLeaveYearPicker.hidden = false;
+  annualLeaveYearButton.setAttribute("aria-expanded", "true");
+
+  window.requestAnimationFrame(() => {
+    scrollYearPickerToSelected(annualLeaveYearScroller);
+  });
+}
+
+function closeAnnualLeaveYearPicker() {
+  annualLeaveYearPicker.hidden = true;
+  annualLeaveYearButton.setAttribute("aria-expanded", "false");
+}
+
+function clampYear(year) {
+  const numericYear = Number(year);
+
+  if (!Number.isFinite(numericYear)) {
+    return new Date().getFullYear();
+  }
+
+  return Math.min(
+    YEAR_MAX,
+    Math.max(YEAR_MIN, Math.trunc(numericYear)),
+  );
+}
+
+function renderYearScrollPicker(container, selectedYear) {
+  container.innerHTML = Array.from(
+    { length: YEAR_MAX - YEAR_MIN + 1 },
+    (_, index) => {
+      const year = YEAR_MIN + index;
+      const isSelected = year === selectedYear;
+
+      return `
+        <button
+          class="year-scroll-option${isSelected ? " selected" : ""}"
+          type="button"
+          role="option"
+          data-year-option="${year}"
+          aria-selected="${isSelected}"
+        >
+          ${year}년
+        </button>
+      `;
+    },
+  ).join("");
+}
+
+function scrollYearPickerToSelected(container) {
+  const selectedOption = container.querySelector(
+    "[aria-selected=\"true\"]",
+  );
+
+  selectedOption?.scrollIntoView({
+    block: "center",
+    behavior: "auto",
+  });
+}
 
 function openDatePicker(input) {
   const selectedDate = parseDateInputValue(input.value);
@@ -1455,11 +1917,9 @@ function openMonthPicker(target) {
       ? datePickerVisibleMonth
       : currentMonth;
 
-  monthPickerYearInput.value = String(
-    sourceMonth.getFullYear(),
-  );
-  monthPickerYearInput.inputMode = "none";
-  monthPickerYearInput.blur();
+  monthPickerSelectedYear = sourceMonth.getFullYear();
+  monthPickerYearScroller.hidden = true;
+  monthPickerYearButton.setAttribute("aria-expanded", "false");
   renderMonthPickerMonths();
 
   monthPickerModal.classList.add("open");
@@ -1477,8 +1937,8 @@ function closeMonthPicker() {
 
   monthPickerModal.classList.remove("open");
   monthPickerModal.setAttribute("aria-hidden", "true");
-  monthPickerYearInput.inputMode = "none";
-  monthPickerYearInput.blur();
+  monthPickerYearScroller.hidden = true;
+  monthPickerYearButton.setAttribute("aria-expanded", "false");
 
   const focusTarget = monthPickerPreviousFocus;
 
@@ -1488,24 +1948,20 @@ function closeMonthPicker() {
 }
 
 function getMonthPickerYear() {
-  const sourceMonth =
-    monthPickerTarget === "datePicker"
-      ? datePickerVisibleMonth
-      : currentMonth;
-  const value = Number(monthPickerYearInput.value);
-
-  if (!Number.isInteger(value)) {
-    return sourceMonth.getFullYear();
-  }
-
-  return Math.min(2100, Math.max(2000, value));
+  return monthPickerSelectedYear;
 }
 
 function setMonthPickerYear(year) {
-  monthPickerYearInput.value = String(
-    Math.min(2100, Math.max(2000, year)),
-  );
+  monthPickerSelectedYear = clampYear(year);
   renderMonthPickerMonths();
+
+  if (!monthPickerYearScroller.hidden) {
+    renderYearScrollPicker(
+      monthPickerYearScroller,
+      monthPickerSelectedYear,
+    );
+    scrollYearPickerToSelected(monthPickerYearScroller);
+  }
 }
 
 function renderMonthPickerMonths() {
@@ -1514,6 +1970,8 @@ function renderMonthPickerMonths() {
       ? datePickerVisibleMonth
       : currentMonth;
   const selectedYear = getMonthPickerYear();
+
+  monthPickerYearButton.textContent = `${selectedYear}년`;
 
   monthPickerMonths.forEach((button, monthIndex) => {
     const isActive =
@@ -1810,7 +2268,11 @@ function selectDatePickerDate(dateKey) {
 }
 
 function isMobilePagerMode() {
-  return mobilePagerMedia.matches || mobilePagerTestMode;
+  return (
+    (mobilePagerMedia.matches || mobilePagerTestMode) &&
+    mobilePages.length > 0 &&
+    currentAppPage === "attendance"
+  );
 }
 
 function syncMobilePagerMode() {
@@ -2038,6 +2500,24 @@ function installBackExitTestHook() {
 function handleAppCloseRequest() {
   appCloseWatcher = null;
 
+  if (navigationDrawer.classList.contains("open")) {
+    closeNavigationDrawer();
+    resetBackExitState();
+    return;
+  }
+
+  if (!salaryYearPicker.hidden) {
+    closeSalaryYearPicker();
+    resetBackExitState();
+    return;
+  }
+
+  if (!annualLeaveYearPicker.hidden) {
+    closeAnnualLeaveYearPicker();
+    resetBackExitState();
+    return;
+  }
+
   if (workModal.classList.contains("open")) {
     closeModal();
     resetBackExitState();
@@ -2184,6 +2664,24 @@ function handleAppBackNavigation() {
     return;
   }
 
+  if (navigationDrawer.classList.contains("open")) {
+    closeNavigationDrawer();
+    resetBackExitState();
+    return;
+  }
+
+  if (!salaryYearPicker.hidden) {
+    closeSalaryYearPicker();
+    resetBackExitState();
+    return;
+  }
+
+  if (!annualLeaveYearPicker.hidden) {
+    closeAnnualLeaveYearPicker();
+    resetBackExitState();
+    return;
+  }
+
   if (workModal.classList.contains("open")) {
     closeModal();
     resetBackExitState();
@@ -2287,6 +2785,42 @@ function hideExitToast() {
   exitToast.classList.remove("show");
   exitToast.setAttribute("aria-hidden", "true");
 }
+
+function resetExitPromptAfterUserAction(event) {
+  if (!exitBackReady || allowAppExitNavigation) {
+    return;
+  }
+
+  if (
+    event?.type === "keydown" &&
+    (event.key === "BrowserBack" ||
+      (event.altKey && event.key === "ArrowLeft"))
+  ) {
+    return;
+  }
+
+  resetBackExitState();
+}
+
+["pointerdown", "input", "change"].forEach((eventName) => {
+  document.addEventListener(
+    eventName,
+    resetExitPromptAfterUserAction,
+    true,
+  );
+});
+
+document.addEventListener(
+  "keydown",
+  resetExitPromptAfterUserAction,
+  true,
+);
+
+window.addEventListener(
+  "scroll",
+  resetExitPromptAfterUserAction,
+  { passive: true, capture: true },
+);
 
 function setSummarySlide(nextIndex) {
   const slideCount = summarySlides.length;
@@ -2445,6 +2979,50 @@ function renderSummary() {
   const basePayDays = daysInMonth - sundayCount;
   const basePayHours = basePayDays * 8;
 
+  const workTotals = [
+    [
+      "근무기록 일수",
+      formatUnit(formatNumber(stats.regularDays), "일"),
+    ],
+    ["기본급 적용일수", formatUnit(basePayDays, "일")],
+    ["일요일 수", formatUnit(sundayCount, "일")],
+    ["기본급 시간", formatUnit(basePayHours, "시간")],
+    [
+      "연장시간",
+      formatUnit(formatNumber(stats.overtimeHours), "시간"),
+    ],
+    [
+      "심야시간",
+      formatUnit(formatNumber(stats.nightHours), "시간"),
+    ],
+    [
+      "철야시간",
+      formatUnit(formatNumber(stats.overnightHours), "시간"),
+    ],
+    [
+      "휴일시간",
+      formatUnit(formatNumber(stats.holidayHours), "시간"),
+    ],
+    [
+      "휴연시간",
+      formatUnit(
+        formatNumber(stats.holidayOvertimeHours),
+        "시간",
+      ),
+    ],
+  ];
+
+  workTotalsGrid.innerHTML = workTotals
+    .map(
+      ([label, value]) => `
+        <div class="work-total-row">
+          <span>${label}</span>
+          <strong>${value}</strong>
+        </div>
+      `,
+    )
+    .join("");
+
   render52HourCalculator();
   renderAnnualLeaveSummary();
   setSummarySlide(summarySlideIndex);
@@ -2508,12 +3086,12 @@ function render52HourCalculator() {
 }
 
 function renderAnnualLeaveSummary(syncInput = true) {
-  const year = currentMonth.getFullYear();
+  const year = annualLeaveSelectedYear;
   const accruedLeave = getAnnualLeaveForYear(year);
   const usedLeave = countUsedAnnualLeave(year);
   const remainingLeave = accruedLeave - usedLeave;
 
-  annualLeaveYearLabel.textContent = `${year}년`;
+  annualLeaveYearButton.textContent = `${year}년`;
 
   if (syncInput) {
     accruedAnnualLeaveInput.value =
@@ -2665,150 +3243,62 @@ function formatAverageHours(value) {
 }
 
 function renderSalary() {
-  const year = currentMonth.getFullYear();
-  const month = currentMonth.getMonth();
+  salaryYearButton.textContent = `${salarySelectedYear}년 ▾`;
 
-  const stats = calculateMonthStats();
-  const settings = getCurrentMonthSettings();
+  let annualTotalPay = 0;
 
-  const baseHourlyWage = Number(settings.baseHourlyWage) || 0;
-  const safetyAllowance = Number(settings.safetyAllowance) || 0;
+  salaryYearGrid.innerHTML = Array.from(
+    { length: 12 },
+    (_, monthIndex) => {
+      const salary = calculateSalaryForMonth(
+        salarySelectedYear,
+        monthIndex,
+      );
+      const isSelected = monthIndex === salarySelectedMonth;
 
-  const longevityAllowance =
-    Number(settings.longevityAllowance) || 0;
+      annualTotalPay += salary.totalPay;
 
-  const otherAllowance =
-    Number(settings.otherAllowance) || 0;
+      return `
+        <button
+          class="salary-month-card${isSelected ? " selected" : ""}"
+          type="button"
+          data-salary-month="${monthIndex}"
+          aria-current="${isSelected ? "true" : "false"}"
+          aria-label="${salarySelectedYear}년 ${monthIndex + 1}월 예상 총급여 ${formatMoney(salary.totalPay)}"
+        >
+          <span>${monthIndex + 1}월</span>
+          <strong>${formatMoneyValue(salary.totalPay)}</strong>
+        </button>
+      `;
+    },
+  ).join("");
 
-  const ordinaryHourlyWage =
-    baseHourlyWage +
-    (safetyAllowance + longevityAllowance) / 243;
+  annualSalaryTotal.textContent = formatMoney(annualTotalPay);
 
-  const daysInMonth = new Date(
-    year,
-    month + 1,
-    0,
-  ).getDate();
-
-  const sundayCount = countSundaysInMonth(year, month);
-
-  const basePayDays = daysInMonth - sundayCount;
-  const basePayHours = basePayDays * 8;
-
-  const payments = {
-    basePay:
-      basePayHours * baseHourlyWage,
-
-    weeklyAllowance:
-      sundayCount * 8 * baseHourlyWage,
-
-    overtimePay:
-      ordinaryHourlyWage *
-      stats.overtimeHours *
-      1.5,
-
-    nightPay:
-      ordinaryHourlyWage *
-      stats.nightHours *
-      0.5,
-
-    overnightPay:
-      ordinaryHourlyWage *
-      stats.overnightHours *
-      2,
-
-    holidayPay:
-      ordinaryHourlyWage *
-      stats.holidayHours *
-      1.5,
-
-    holidayOvertimePay:
-      ordinaryHourlyWage *
-      stats.holidayOvertimeHours *
-      2,
-  };
-
-  const totalPay =
-    payments.basePay +
-    payments.weeklyAllowance +
-    payments.overtimePay +
-    payments.nightPay +
-    payments.overnightPay +
-    payments.holidayPay +
-    payments.holidayOvertimePay +
-    safetyAllowance +
-    longevityAllowance +
-    otherAllowance;
+  const salary = calculateSalaryForMonth(
+    salarySelectedYear,
+    salarySelectedMonth,
+  );
 
   salaryMonthTitle.textContent =
-    `${year}년 ${month + 1}월 예상 급여`;
+    `${salarySelectedYear}년 ${salarySelectedMonth + 1}월 예상 급여`;
 
   ordinaryHourlyWageOutput.textContent =
-    formatMoneyValue(ordinaryHourlyWage);
+    formatMoneyValue(salary.ordinaryHourlyWage);
 
-  totalPayOutput.textContent = formatMoney(totalPay);
-
-  const workTotals = [
-    [
-      "근무기록 일수",
-      formatUnit(formatNumber(stats.regularDays), "일"),
-    ],
-    [
-      "기본급 적용일수",
-      formatUnit(basePayDays, "일"),
-    ],
-    [
-      "일요일 수",
-      formatUnit(sundayCount, "일"),
-    ],
-    [
-      "기본급 시간",
-      formatUnit(basePayHours, "시간"),
-    ],
-    [
-      "연장시간",
-      formatUnit(formatNumber(stats.overtimeHours), "시간"),
-    ],
-    [
-      "심야시간",
-      formatUnit(formatNumber(stats.nightHours), "시간"),
-    ],
-    [
-      "철야시간",
-      formatUnit(formatNumber(stats.overnightHours), "시간"),
-    ],
-    [
-      "휴일시간",
-      formatUnit(formatNumber(stats.holidayHours), "시간"),
-    ],
-    [
-      "휴연시간",
-      formatUnit(formatNumber(stats.holidayOvertimeHours), "시간"),
-    ],
-  ];
-
-  workTotalsGrid.innerHTML = workTotals
-    .map(
-      ([label, value]) => `
-        <div class="work-total-row">
-          <span>${label}</span>
-          <strong>${value}</strong>
-        </div>
-      `,
-    )
-    .join("");
+  totalPayOutput.textContent = formatMoney(salary.totalPay);
 
   const paymentRows = [
-    ["기본급", payments.basePay],
-    ["주차수당", payments.weeklyAllowance],
-    ["연장수당", payments.overtimePay],
-    ["심야수당", payments.nightPay],
-    ["철야수당", payments.overnightPay],
-    ["휴일수당", payments.holidayPay],
-    ["휴연수당", payments.holidayOvertimePay],
-    ["안전수당", safetyAllowance],
-    ["근속수당", longevityAllowance],
-    ["기타수당", otherAllowance],
+    ["기본급", salary.payments.basePay],
+    ["주차수당", salary.payments.weeklyAllowance],
+    ["연장수당", salary.payments.overtimePay],
+    ["심야수당", salary.payments.nightPay],
+    ["철야수당", salary.payments.overnightPay],
+    ["휴일수당", salary.payments.holidayPay],
+    ["휴연수당", salary.payments.holidayOvertimePay],
+    ["안전수당", salary.safetyAllowance],
+    ["근속수당", salary.longevityAllowance],
+    ["기타수당", salary.otherAllowance],
   ];
 
   payBreakdown.innerHTML = paymentRows
@@ -2823,9 +3313,72 @@ function renderSalary() {
     .join("");
 }
 
-function calculateMonthStats() {
-  const year = currentMonth.getFullYear();
-  const month = currentMonth.getMonth();
+function calculateSalaryForMonth(year, month) {
+  const stats = calculateMonthStats(year, month);
+  const settings = getSettingsForMonth(year, month);
+
+  const baseHourlyWage = Number(settings.baseHourlyWage) || 0;
+  const safetyAllowance = Number(settings.safetyAllowance) || 0;
+  const longevityAllowance =
+    Number(settings.longevityAllowance) || 0;
+  const otherAllowance = Number(settings.otherAllowance) || 0;
+
+  const ordinaryHourlyWage =
+    baseHourlyWage +
+    (safetyAllowance + longevityAllowance) / 243;
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const sundayCount = countSundaysInMonth(year, month);
+  const basePayDays = daysInMonth - sundayCount;
+  const basePayHours = basePayDays * 8;
+
+  const payments = {
+    basePay: basePayHours * baseHourlyWage,
+    weeklyAllowance: sundayCount * 8 * baseHourlyWage,
+    overtimePay:
+      ordinaryHourlyWage * stats.overtimeHours * 1.5,
+    nightPay:
+      ordinaryHourlyWage * stats.nightHours * 0.5,
+    overnightPay:
+      ordinaryHourlyWage * stats.overnightHours * 2,
+    holidayPay:
+      ordinaryHourlyWage * stats.holidayHours * 1.5,
+    holidayOvertimePay:
+      ordinaryHourlyWage * stats.holidayOvertimeHours * 2,
+  };
+
+  const totalPay =
+    payments.basePay +
+    payments.weeklyAllowance +
+    payments.overtimePay +
+    payments.nightPay +
+    payments.overnightPay +
+    payments.holidayPay +
+    payments.holidayOvertimePay +
+    safetyAllowance +
+    longevityAllowance +
+    otherAllowance;
+
+  return {
+    stats,
+    settings,
+    payments,
+    totalPay,
+    ordinaryHourlyWage,
+    baseHourlyWage,
+    safetyAllowance,
+    longevityAllowance,
+    otherAllowance,
+    basePayDays,
+    basePayHours,
+    sundayCount,
+  };
+}
+
+function calculateMonthStats(
+  year = currentMonth.getFullYear(),
+  month = currentMonth.getMonth(),
+) {
 
   const stats = {
     recordedDays: 0,
@@ -3270,14 +3823,18 @@ function saveAnnualLeaveByYear() {
 }
 
 function getMonthKey(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-
-  return `${year}-${month}`;
+  return getMonthKeyFromParts(
+    date.getFullYear(),
+    date.getMonth(),
+  );
 }
 
-function getCurrentMonthSettings() {
-  const monthKey = getMonthKey(currentMonth);
+function getMonthKeyFromParts(year, month) {
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
+function getSettingsForMonth(year, month) {
+  const monthKey = getMonthKeyFromParts(year, month);
 
   return {
     ...DEFAULT_SETTINGS,
@@ -3285,8 +3842,18 @@ function getCurrentMonthSettings() {
   };
 }
 
+function getCurrentMonthSettings() {
+  return getSettingsForMonth(
+    currentMonth.getFullYear(),
+    currentMonth.getMonth(),
+  );
+}
+
 function syncSalaryInputs() {
-  const settings = getCurrentMonthSettings();
+  const settings = getSettingsForMonth(
+    salarySelectedYear,
+    salarySelectedMonth,
+  );
 
   baseHourlyWageInput.value = settings.baseHourlyWage || "";
   safetyAllowanceInput.value = settings.safetyAllowance || "";
