@@ -627,20 +627,25 @@ input {
 }
 
 .annual-leave-date-value {
-  display: inline-grid;
-  grid-template-columns: 2ch auto 2ch auto;
+  display: inline-flex;
   align-items: baseline;
-  column-gap: 2px;
+  justify-content: center;
+  gap: 0.45em;
 }
 
-.annual-leave-date-number {
-  width: 2ch;
-  text-align: right;
+.annual-leave-date-part {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.annual-leave-date-number:nth-child(3) {
-  margin-left: 0.45em;
+.annual-leave-date-number {
+  display: inline-block;
+  min-width: 1ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .annual-leave-date-button {
@@ -744,7 +749,7 @@ input {
   }
 
   .annual-leave-date-value {
-    column-gap: 1px;
+    gap: 0.35em;
   }
 }
 

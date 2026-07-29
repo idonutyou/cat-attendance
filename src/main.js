@@ -3250,8 +3250,12 @@ function formatAnnualLeaveHistoryDate(date) {
 function formatAnnualLeaveHistoryDateMarkup(date) {
   return `
     <span class="annual-leave-date-value">
-      <span class="annual-leave-date-number">${date.month}</span><span>월</span>
-      <span class="annual-leave-date-number">${date.day}</span><span>일</span>
+      <span class="annual-leave-date-part">
+        <span class="annual-leave-date-number">${date.month}</span><span>월</span>
+      </span>
+      <span class="annual-leave-date-part">
+        <span class="annual-leave-date-number">${date.day}</span><span>일</span>
+      </span>
     </span>
   `;
 }
