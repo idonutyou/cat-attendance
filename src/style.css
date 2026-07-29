@@ -62,13 +62,7 @@ html.app-splash-active body {
   justify-content: center;
   overflow: hidden;
   color: #111827;
-  background:
-    radial-gradient(
-      circle at 50% 36%,
-      rgba(255, 197, 0, 0.1),
-      transparent 30%
-    ),
-    #ffffff;
+  background: #ffffff;
   opacity: 1;
   transition: opacity 0.42s ease;
 }
@@ -82,7 +76,7 @@ html.app-splash-active body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  transform: translateY(-8vh);
+  transform: translateY(-10vh);
   animation: splashAppear 0.55s ease-out both;
 }
 
@@ -104,11 +98,11 @@ html.app-splash-active body {
 .app-splash-credit {
   position: absolute;
   left: 50%;
-  bottom: max(9vh, 54px);
+  bottom: max(11vh, 66px);
   margin: 0;
   transform: translateX(-50%);
   color: #64748b;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   white-space: nowrap;
   animation: splashAppear 0.55s 0.12s ease-out both;
@@ -117,12 +111,12 @@ html.app-splash-active body {
 @keyframes splashAppear {
   from {
     opacity: 0;
-    transform: translateY(calc(-8vh + 12px));
+    transform: translateY(calc(-10vh + 12px));
   }
 
   to {
     opacity: 1;
-    transform: translateY(-8vh);
+    transform: translateY(-10vh);
   }
 }
 
