@@ -589,7 +589,7 @@ input {
 .annual-leave-history-head,
 .annual-leave-history-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 2.5fr;
+  grid-template-columns: 1fr 1fr 1fr 2fr;
   align-items: center;
   gap: 6px;
   min-height: 48px;
@@ -637,6 +637,10 @@ input {
   width: 2ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.annual-leave-date-number:nth-child(3) {
+  margin-left: 0.45em;
 }
 
 .annual-leave-date-button {
@@ -728,7 +732,7 @@ input {
 @media (max-width: 420px) {
   .annual-leave-history-head,
   .annual-leave-history-row {
-    grid-template-columns: 1fr 1fr 1fr 2.5fr;
+    grid-template-columns: 1fr 1fr 1fr 2fr;
     gap: 4px;
     padding: 0 8px;
     font-size: 11.5px;
