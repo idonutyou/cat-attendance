@@ -1967,6 +1967,18 @@ input {
   box-shadow: 0 16px 38px rgba(34, 56, 94, 0.08);
 }
 
+html.salary-scroll-snap-enabled {
+  scroll-padding-top: 82px;
+  scroll-snap-type: y mandatory;
+}
+
+html.salary-scroll-snap-enabled .salary-overview-card,
+html.salary-scroll-snap-enabled #salaryDetailCard {
+  scroll-margin-top: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
 .salary-heading {
   display: flex;
   align-items: center;

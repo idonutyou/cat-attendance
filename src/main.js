@@ -134,6 +134,9 @@ let currentAppPage = "attendance";
 let salarySelectedYear = currentMonth.getFullYear();
 let salarySelectedMonth = currentMonth.getMonth();
 let salarySettingsOpen = false;
+let salarySnapSection = 0;
+let salarySnapLocked = false;
+let salaryTouchStartY = null;
 let annualLeaveSelectedYear = new Date().getFullYear();
 let monthPickerSelectedYear = currentMonth.getFullYear();
 
@@ -1064,6 +1067,9 @@ const annualSalaryTotal = document.querySelector(
 const salaryDetailCard = document.querySelector(
   "#salaryDetailCard",
 );
+const salaryOverviewCard = document.querySelector(
+  ".salary-overview-card",
+);
 const salarySettingsToggle = document.querySelector(
   "#salarySettingsToggle",
 );
@@ -1252,6 +1258,7 @@ salaryYearGrid.addEventListener("click", (event) => {
   renderSalary();
 
   window.requestAnimationFrame(() => {
+    salarySnapSection = 1;
     salaryDetailCard.scrollIntoView({
       behavior: "smooth",
       block: "start",
@@ -1270,7 +1277,94 @@ function updateSalarySettingsVisibility() {
     "aria-expanded",
     String(salarySettingsOpen),
   );
+  document.documentElement.classList.toggle(
+    "salary-scroll-snap-enabled",
+    currentAppPage === "salary" && !salarySettingsOpen,
+  );
 }
+
+function snapSalarySection(nextSection) {
+  if (
+    currentAppPage !== "salary" ||
+    salarySettingsOpen ||
+    salarySnapLocked
+  ) {
+    return;
+  }
+
+  const normalizedSection = nextSection > 0 ? 1 : 0;
+
+  if (normalizedSection === salarySnapSection) {
+    return;
+  }
+
+  salarySnapSection = normalizedSection;
+  salarySnapLocked = true;
+
+  const target = normalizedSection === 1
+    ? salaryDetailCard
+    : salaryOverviewCard;
+
+  target.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+
+  window.setTimeout(() => {
+    salarySnapLocked = false;
+  }, 520);
+}
+
+window.addEventListener(
+  "wheel",
+  (event) => {
+    if (Math.abs(event.deltaY) < 24) {
+      return;
+    }
+
+    snapSalarySection(event.deltaY > 0 ? 1 : 0);
+  },
+  { passive: true },
+);
+
+window.addEventListener(
+  "touchstart",
+  (event) => {
+    if (currentAppPage !== "salary" || salarySettingsOpen) {
+      salaryTouchStartY = null;
+      return;
+    }
+
+    salaryTouchStartY = event.touches[0]?.clientY ?? null;
+  },
+  { passive: true },
+);
+
+window.addEventListener(
+  "touchend",
+  (event) => {
+    if (salaryTouchStartY === null) {
+      return;
+    }
+
+    const touchEndY = event.changedTouches[0]?.clientY;
+
+    if (typeof touchEndY !== "number") {
+      salaryTouchStartY = null;
+      return;
+    }
+
+    const distance = salaryTouchStartY - touchEndY;
+    salaryTouchStartY = null;
+
+    if (Math.abs(distance) < 45) {
+      return;
+    }
+
+    snapSalarySection(distance > 0 ? 1 : 0);
+  },
+  { passive: true },
+);
 
 let mobileTouchStartX = 0;
 let mobileTouchStartY = 0;
@@ -1844,6 +1938,11 @@ function setAppPage(pageId) {
   }
 
   currentAppPage = pageId;
+  salarySnapSection = 0;
+  document.documentElement.classList.toggle(
+    "salary-scroll-snap-enabled",
+    pageId === "salary" && !salarySettingsOpen,
+  );
   appPageTitle.textContent = APP_PAGE_TITLES[pageId] || "근태관리";
 
   appPages.forEach((page) => {
