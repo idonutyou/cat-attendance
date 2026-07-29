@@ -165,6 +165,18 @@ let holidays = {};
 const app = document.querySelector("#app");
 
 app.innerHTML = `
+  <div id="appSplash" class="app-splash" aria-label="CAT 근태 및 급여관리 시작 화면">
+    <div class="app-splash-main">
+      <img
+        class="app-splash-logo"
+        src="${import.meta.env.BASE_URL}icon-512.png"
+        alt="CAT"
+      />
+      <p class="app-splash-subtitle">근태 및 급여관리</p>
+    </div>
+    <p class="app-splash-credit">Made by 제민</p>
+  </div>
+
   <div class="app-shell">
     <header class="app-header">
       <button
@@ -4147,6 +4159,25 @@ function saveSettingsByMonth() {
   );
 }
 
+function initializeSplashScreen() {
+  const splash = document.querySelector("#appSplash");
+
+  if (!splash) {
+    return;
+  }
+
+  document.documentElement.classList.add("app-splash-active");
+
+  window.setTimeout(() => {
+    splash.classList.add("hiding");
+
+    window.setTimeout(() => {
+      splash.remove();
+      document.documentElement.classList.remove("app-splash-active");
+    }, 420);
+  }, 1600);
+}
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
@@ -4165,3 +4196,4 @@ initializeBackExitGuard();
 installBackExitTestHook();
 render();
 loadHolidays();
+initializeSplashScreen();
