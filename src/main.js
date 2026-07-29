@@ -133,6 +133,7 @@ currentMonth = new Date(
 let currentAppPage = "attendance";
 let salarySelectedYear = currentMonth.getFullYear();
 let salarySelectedMonth = currentMonth.getMonth();
+let salarySettingsOpen = false;
 let annualLeaveSelectedYear = new Date().getFullYear();
 let monthPickerSelectedYear = currentMonth.getFullYear();
 
@@ -480,10 +481,25 @@ app.innerHTML = `
           >
             <div class="salary-heading">
               <h2 id="salaryMonthTitle">이번 달 예상 급여</h2>
+
+              <button
+                id="salarySettingsToggle"
+                class="salary-settings-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="salarySettingsPanel"
+              >
+                <span>급여 설정</span>
+                <span class="salary-settings-chevron" aria-hidden="true">⌄</span>
+              </button>
             </div>
 
             <div class="salary-layout">
-              <section class="salary-panel settings-panel">
+              <section
+                id="salarySettingsPanel"
+                class="salary-panel settings-panel"
+                hidden
+              >
                 <h3>급여 설정</h3>
 
                 <label class="salary-input-row">
@@ -1048,6 +1064,12 @@ const annualSalaryTotal = document.querySelector(
 const salaryDetailCard = document.querySelector(
   "#salaryDetailCard",
 );
+const salarySettingsToggle = document.querySelector(
+  "#salarySettingsToggle",
+);
+const salarySettingsPanel = document.querySelector(
+  "#salarySettingsPanel",
+);
 const exitToast = document.querySelector("#exitToast");
 const summaryCard = document.querySelector("#summaryCard");
 const summaryCarousel = document.querySelector("#summaryCarousel");
@@ -1224,9 +1246,31 @@ salaryYearGrid.addEventListener("click", (event) => {
   salarySelectedMonth = Number(
     monthButton.dataset.salaryMonth,
   );
+  salarySettingsOpen = false;
+  updateSalarySettingsVisibility();
   syncSalaryInputs();
   renderSalary();
+
+  window.requestAnimationFrame(() => {
+    salaryDetailCard.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
 });
+
+salarySettingsToggle.addEventListener("click", () => {
+  salarySettingsOpen = !salarySettingsOpen;
+  updateSalarySettingsVisibility();
+});
+
+function updateSalarySettingsVisibility() {
+  salarySettingsPanel.hidden = !salarySettingsOpen;
+  salarySettingsToggle.setAttribute(
+    "aria-expanded",
+    String(salarySettingsOpen),
+  );
+}
 
 let mobileTouchStartX = 0;
 let mobileTouchStartY = 0;
