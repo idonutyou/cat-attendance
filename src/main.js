@@ -196,10 +196,7 @@ app.innerHTML = `
         aria-label="페이지 목록"
       >
         <div class="navigation-heading">
-          <div>
-            <p>CAT</p>
-            <strong>페이지 목록</strong>
-          </div>
+          <strong>CATERPILLAR PRECISION SEAL KOREA</strong>
           <button
             id="closeNavigationButton"
             class="navigation-close-button"
@@ -705,6 +702,22 @@ app.innerHTML = `
                 </div>
               </div>
             </div>
+
+            <section
+              class="annual-leave-history"
+              aria-labelledby="annualLeaveHistoryTitle"
+            >
+              <h3 id="annualLeaveHistoryTitle">연차 사용 내역</h3>
+
+              <div class="annual-leave-history-table" role="table">
+                <div class="annual-leave-history-head" role="row">
+                  <span role="columnheader">시작</span>
+                  <span role="columnheader">종료</span>
+                  <span role="columnheader">사용 연차</span>
+                </div>
+                <div id="annualLeaveHistoryBody"></div>
+              </div>
+            </section>
           </section>
         </section>
       </section>
@@ -1051,6 +1064,9 @@ const usedAnnualLeaveOutput = document.querySelector(
 );
 const remainingAnnualLeaveOutput = document.querySelector(
   "#remainingAnnualLeave",
+);
+const annualLeaveHistoryBody = document.querySelector(
+  "#annualLeaveHistoryBody",
 );
 const datePickerModal = document.querySelector(
   "#datePickerModal",
@@ -3106,6 +3122,75 @@ function renderAnnualLeaveSummary(syncInput = true) {
     "negative",
     remainingLeave < 0,
   );
+
+  renderAnnualLeaveHistory(year);
+}
+
+function renderAnnualLeaveHistory(year) {
+  const ranges = getAnnualLeaveRanges(year);
+
+  if (ranges.length === 0) {
+    annualLeaveHistoryBody.innerHTML = `
+      <div class="annual-leave-history-empty">
+        이 연도에 사용한 연차가 없습니다.
+      </div>
+    `;
+    return;
+  }
+
+  annualLeaveHistoryBody.innerHTML = ranges
+    .map((range) => {
+      const endText = range.days === 1
+        ? ""
+        : formatAnnualLeaveHistoryDate(range.end);
+
+      return `
+        <div class="annual-leave-history-row" role="row">
+          <span role="cell">${formatAnnualLeaveHistoryDate(range.start)}</span>
+          <span role="cell">${endText}</span>
+          <strong role="cell">${range.days}일</strong>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function getAnnualLeaveRanges(year) {
+  const yearPrefix = `${year}-`;
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  const leaveDates = Object.entries(records)
+    .filter(([dateKey, workRecord]) =>
+      dateKey.startsWith(yearPrefix) &&
+      getWorkType(workRecord)?.id === "annualLeave"
+    )
+    .map(([dateKey]) => {
+      const [dateYear, month, day] = dateKey.split("-").map(Number);
+      return {
+        dateKey,
+        time: Date.UTC(dateYear, month - 1, day),
+        month,
+        day,
+      };
+    })
+    .sort((left, right) => left.time - right.time);
+
+  return leaveDates.reduce((ranges, date) => {
+    const currentRange = ranges[ranges.length - 1];
+
+    if (!currentRange || date.time - currentRange.end.time !== oneDay) {
+      ranges.push({ start: date, end: date, days: 1 });
+      return ranges;
+    }
+
+    currentRange.end = date;
+    currentRange.days += 1;
+    return ranges;
+  }, []);
+}
+
+function formatAnnualLeaveHistoryDate(date) {
+  return `${date.month}월 ${date.day}일`;
 }
 
 function getAnnualLeaveForYear(year) {

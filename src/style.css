@@ -569,6 +569,66 @@ input {
   box-shadow: 0 3px 0 -1px rgba(37, 99, 235, 0.15);
 }
 
+.annual-leave-history {
+  margin-top: 18px;
+}
+
+.annual-leave-history h3 {
+  margin: 0 0 12px;
+  color: #25334b;
+  font-size: 16px;
+}
+
+.annual-leave-history-table {
+  overflow: hidden;
+  border: 1px solid #e3e9f2;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.annual-leave-history-head,
+.annual-leave-history-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.9fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+}
+
+.annual-leave-history-head {
+  color: #69768c;
+  background: #f4f7fb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.annual-leave-history-row {
+  color: #35435a;
+  border-top: 1px solid #e8edf4;
+  font-size: 13px;
+}
+
+.annual-leave-history-row strong,
+.annual-leave-history-head span:last-child {
+  text-align: right;
+}
+
+.annual-leave-history-empty {
+  padding: 24px 14px;
+  color: #8a96a9;
+  text-align: center;
+  font-size: 13px;
+}
+
+.navigation-heading > strong {
+  max-width: 230px;
+  color: #25334b;
+  font-size: 13px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+
 .weekly-average-result.error {
   border-color: #fecaca;
   color: #b91c1c;
