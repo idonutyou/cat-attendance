@@ -1385,11 +1385,11 @@ salaryYearGrid.addEventListener("pointerup", (event) => {
     return;
   }
 
-  event.preventDefault();
-  event.stopPropagation();
   salaryMonthTouchClickBlocked = true;
 
   if (!salaryMonthPointerMoved && salaryMonthPointerButton) {
+    event.preventDefault();
+    event.stopPropagation();
     selectSalaryMonth(salaryMonthPointerButton);
   }
 
