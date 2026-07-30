@@ -3313,3 +3313,1069 @@ body.navigation-open {
     width: 168px;
   }
 }
+
+/* ===== 상여 및 보너스 v53 ===== */
+.salary-bonus-section {
+  margin: 0 0 22px;
+  overflow: hidden;
+  border: 1px solid #dce5f3;
+  border-radius: 17px;
+  background: #f8fbff;
+}
+
+.salary-bonus-toggle {
+  width: 100%;
+  min-height: 58px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  color: #25334b;
+  background: transparent;
+  text-align: left;
+  font-size: 17px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.salary-bonus-toggle:hover,
+.salary-bonus-toggle:focus-visible {
+  color: #1d4ed8;
+  background: #eef5ff;
+}
+
+.salary-bonus-chevron {
+  flex: 0 0 auto;
+  color: #2563eb;
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 180ms ease;
+}
+
+.salary-bonus-toggle[aria-expanded="true"] .salary-bonus-chevron {
+  transform: rotate(180deg);
+}
+
+.salary-bonus-panel {
+  padding: 0 14px 15px;
+  animation: salary-bonus-reveal 180ms ease-out;
+}
+
+@keyframes salary-bonus-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.salary-bonus-table {
+  overflow: hidden;
+  border: 1px solid #dfe7f2;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.salary-bonus-head,
+.salary-bonus-row {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.8fr) minmax(88px, 0.8fr) minmax(150px, 1.4fr);
+  align-items: center;
+  gap: 9px;
+}
+
+.salary-bonus-head {
+  min-height: 42px;
+  padding: 0 12px;
+  color: #64748b;
+  background: #f1f5fb;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.salary-bonus-row {
+  padding: 9px 12px;
+  border-top: 1px solid #e8edf5;
+}
+
+.salary-bonus-field {
+  min-width: 0;
+}
+
+.salary-bonus-field select,
+.salary-bonus-field input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid #d6e0ed;
+  border-radius: 11px;
+  outline: 0;
+  color: #26364f;
+  background: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.salary-bonus-field select:focus,
+.salary-bonus-field input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.salary-bonus-amount-field {
+  position: relative;
+  display: block;
+}
+
+.salary-bonus-amount-field input {
+  padding-right: 29px;
+  text-align: right;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.salary-bonus-unit {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  transform: translateY(-50%);
+  color: #8a96a9;
+  font-size: 12px;
+  font-weight: 750;
+  pointer-events: none;
+}
+
+.salary-month-card .salary-month-bonus {
+  max-width: 100%;
+  overflow: hidden;
+  color: #0877df;
+  font-size: clamp(11px, 2vw, 14px);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums lining-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payment-row-bonus span,
+.payment-row-bonus strong {
+  color: #0877df;
+  font-weight: 850;
+}
+
+/* 브라우저 기본 스크롤 스냅만 사용해 이중 애니메이션과 끝부분 버벅임을 방지 */
+html.salary-scroll-snap-enabled {
+  overscroll-behavior-y: none;
+  scroll-snap-type: y mandatory;
+}
+
+html.salary-scroll-snap-enabled .salary-overview-card,
+html.salary-scroll-snap-enabled #salaryDetailCard {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+@media (max-width: 620px) {
+  .salary-bonus-section {
+    margin-bottom: 17px;
+    border-radius: 14px;
+  }
+
+  .salary-bonus-toggle {
+    min-height: 52px;
+    padding: 0 14px;
+    font-size: 15px;
+  }
+
+  .salary-bonus-panel {
+    padding: 0 8px 10px;
+  }
+
+  .salary-bonus-head,
+  .salary-bonus-row {
+    grid-template-columns: minmax(72px, 0.78fr) minmax(72px, 0.78fr) minmax(120px, 1.35fr);
+    gap: 5px;
+  }
+
+  .salary-bonus-head {
+    min-height: 36px;
+    padding: 0 6px;
+    font-size: 10.5px;
+  }
+
+  .salary-bonus-row {
+    padding: 7px 6px;
+  }
+
+  .salary-bonus-field select,
+  .salary-bonus-field input {
+    height: 39px;
+    padding: 0 7px;
+    border-radius: 9px;
+    font-size: 11.5px;
+  }
+
+  .salary-bonus-amount-field input {
+    padding-right: 23px;
+  }
+
+  .salary-bonus-unit {
+    right: 7px;
+    font-size: 10.5px;
+  }
+
+  .salary-month-card {
+    gap: 5px;
+  }
+}
+
+
+/* ===== 급여 상세 화면 정리 v54 ===== */
+.salary-bonus-section {
+  scroll-margin-top: 86px;
+}
+
+@media (max-width: 620px) {
+  /* 상여·보너스와 급여 지급내역을 접은 상태에서 한 화면에 확인 */
+  .salary-card.salary-detail-compact {
+    padding: 11px 12px 12px;
+  }
+
+  .salary-detail-compact .salary-bonus-section {
+    margin-bottom: 9px;
+    border-radius: 13px;
+  }
+
+  .salary-detail-compact .salary-bonus-toggle {
+    min-height: 42px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+
+  .salary-detail-compact .salary-heading {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .salary-detail-compact .salary-heading h2 {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.15;
+  }
+
+  .salary-detail-compact .salary-settings-toggle {
+    min-height: 33px;
+    padding: 5px 9px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+
+  .salary-detail-compact .salary-layout {
+    gap: 0;
+  }
+
+  .salary-detail-compact .payment-panel {
+    padding: 10px 12px 11px;
+    border-radius: 14px;
+  }
+
+  .salary-detail-compact .salary-panel h3 {
+    margin-bottom: 5px;
+    font-size: 14px;
+  }
+
+  .salary-detail-compact .pay-breakdown {
+    gap: 0;
+  }
+
+  .salary-detail-compact .payment-row {
+    min-height: 25px;
+    gap: 9px;
+    font-size: 11px;
+  }
+
+  .salary-detail-compact .payment-row strong {
+    font-size: 11.5px;
+  }
+
+  .salary-detail-compact .total-pay-row {
+    min-height: 43px;
+    margin-top: 7px;
+    padding: 9px 11px;
+    border-radius: 11px;
+  }
+
+  .salary-detail-compact .total-pay-row span {
+    font-size: 12px;
+  }
+
+  .salary-detail-compact .total-pay-row strong {
+    font-size: 17px;
+  }
+
+  .salary-bonus-section {
+    scroll-margin-top: 76px;
+  }
+}
+
+
+/* ===== 급여 화면 2단 스냅 및 시작 로고 안정화 v55 ===== */
+@media (max-width: 620px) {
+  /* sticky 헤더의 높이는 문서 흐름에 이미 포함되므로 추가 스크롤 여백을 두지 않는다. */
+  html.salary-scroll-snap-enabled {
+    scroll-padding-top: 0;
+    scroll-snap-type: y mandatory;
+  }
+
+  html.salary-scroll-snap-enabled .salary-overview-card,
+  html.salary-scroll-snap-enabled #salaryDetailCard {
+    scroll-margin-top: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  /* 첫 화면 끝에서 다음 제목이 살짝 보이지 않도록 여백을 확보한다. */
+  .salary-detail-compact .salary-bonus-section {
+    margin-bottom: 18px;
+  }
+
+  /* 두 번째 화면은 상여 및 보너스부터 예상 총급여까지 화면을 넉넉하게 채운다. */
+  .salary-card.salary-detail-compact {
+    min-height: calc(100svh - 82px);
+    padding: 14px 14px 15px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .salary-detail-compact .salary-bonus-toggle {
+    min-height: 50px;
+    padding: 0 15px;
+    font-size: 16px;
+  }
+
+  .salary-detail-compact .salary-heading {
+    flex: 0 0 auto;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .salary-detail-compact .salary-heading h2 {
+    font-size: 19px;
+    line-height: 1.2;
+  }
+
+  .salary-detail-compact .salary-settings-toggle {
+    min-height: 38px;
+    padding: 7px 11px;
+    border-radius: 11px;
+    font-size: 13px;
+  }
+
+  .salary-detail-compact .salary-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .salary-detail-compact .payment-panel {
+    min-height: 0;
+    height: 100%;
+    padding: 13px 14px 14px;
+    border-radius: 15px;
+  }
+
+  .salary-detail-compact .salary-panel h3 {
+    margin-bottom: 8px;
+    font-size: 16px;
+  }
+
+  .salary-detail-compact .pay-breakdown {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: repeat(10, minmax(28px, 1fr));
+    gap: 0;
+  }
+
+  .salary-detail-compact .payment-row {
+    min-height: 28px;
+    gap: 10px;
+    font-size: 12.5px;
+  }
+
+  .salary-detail-compact .payment-row strong {
+    font-size: 13px;
+  }
+
+  .salary-detail-compact .total-pay-row {
+    flex: 0 0 auto;
+    min-height: 54px;
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+  }
+
+  .salary-detail-compact .total-pay-row span {
+    font-size: 13px;
+  }
+
+  .salary-detail-compact .total-pay-row strong {
+    font-size: 19px;
+  }
+
+  /* 작은 화면에서도 첫 화면의 비율은 유지하고 제목이 밑에서 비치지 않게 한다. */
+  @media (max-height: 700px) {
+    .salary-card.salary-detail-compact {
+      min-height: calc(100svh - 74px);
+    }
+
+    .salary-detail-compact .pay-breakdown {
+      grid-template-rows: repeat(10, minmax(26px, 1fr));
+    }
+
+    .salary-detail-compact .payment-row {
+      min-height: 26px;
+    }
+  }
+}
+
+/* ===== 급여 화면 비율 최종 조정 v55.1 ===== */
+@media (max-width: 620px) {
+  html.salary-scroll-snap-enabled {
+    scroll-padding-top: 0;
+  }
+
+  html.salary-scroll-snap-enabled .salary-overview-card,
+  html.salary-scroll-snap-enabled #salaryDetailCard {
+    scroll-margin-top: 78px;
+  }
+
+  /* 첫 화면: 월별 급여 + 예상 연봉 + 접힌 상여/보너스가 정확히 한 화면에 들어오게 한다. */
+  .salary-overview-card {
+    height: calc(100svh - 168px);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .salary-overview-card .salary-year-toolbar {
+    flex: 0 0 auto;
+  }
+
+  .salary-overview-card .salary-year-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+  }
+
+  .salary-overview-card .salary-month-card {
+    min-height: 0;
+  }
+
+  .salary-overview-card .annual-salary-row {
+    flex: 0 0 auto;
+  }
+
+  /* 두 번째 화면: 상여/보너스가 상단에 오고 예상 총급여까지 화면을 가득 채운다. */
+  .salary-card.salary-detail-compact {
+    height: calc(100svh - 78px);
+    min-height: 0;
+    max-height: none;
+  }
+}
+
+
+/* ===== 상여·보너스 고정 항목 분리 v56 ===== */
+.salary-bonus-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.salary-bonus-group {
+  min-width: 0;
+}
+
+.salary-bonus-static {
+  min-width: 0;
+  height: 42px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d6e0ed;
+  border-radius: 11px;
+  color: #26364f;
+  background: #f8fbff;
+  font-size: 13px;
+  font-weight: 850;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.salary-bonus-month {
+  color: #1d5fbf;
+  background: #eef5ff;
+}
+
+@media (max-width: 620px) {
+  .salary-bonus-groups {
+    gap: 9px;
+  }
+
+  .salary-bonus-static {
+    height: 39px;
+    padding: 0 7px;
+    border-radius: 9px;
+    font-size: 11.5px;
+  }
+
+  .salary-bonus-head {
+    font-size: 11px;
+  }
+}
+
+
+/* ===== 급여 3단 페이지 분리 및 근태 페이지 경계 고정 v57 ===== */
+.salary-bonus-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(221, 228, 239, 0.9);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(34, 56, 94, 0.08);
+}
+
+.salary-bonus-card .salary-bonus-section {
+  margin: 0;
+  border: 0;
+  border-radius: inherit;
+  background: #f8fbff;
+}
+
+html.salary-scroll-snap-enabled,
+html.salary-scroll-snap-enabled body {
+  overscroll-behavior-y: none;
+}
+
+html.salary-scroll-snap-enabled .salary-overview-card,
+html.salary-scroll-snap-enabled #salaryDetailCard,
+html.salary-scroll-snap-enabled .salary-bonus-card.salary-bonus-open {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+html.salary-scroll-snap-enabled .salary-bonus-card:not(.salary-bonus-open) {
+  scroll-snap-align: none;
+}
+
+@media (max-width: 620px) {
+  :root {
+    --salary-page-header-offset: 78px;
+    --salary-page-gap: 14px;
+    --salary-bonus-collapsed-height: 58px;
+  }
+
+  html.salary-scroll-snap-enabled {
+    scroll-padding-top: var(--salary-page-header-offset);
+    scroll-snap-type: y mandatory;
+  }
+
+  html.salary-scroll-snap-enabled .salary-overview-card,
+  html.salary-scroll-snap-enabled #salaryDetailCard,
+  html.salary-scroll-snap-enabled .salary-bonus-card.salary-bonus-open {
+    scroll-margin-top: 0;
+  }
+
+  .salary-page-layout {
+    gap: var(--salary-page-gap);
+  }
+
+  /* 첫 화면은 월별 급여표와 예상 연봉, 접힌 상여/보너스 제목까지 표시한다. */
+  .salary-overview-card {
+    height: calc(
+      100svh - var(--salary-page-header-offset) -
+      var(--salary-page-gap) - var(--salary-bonus-collapsed-height) - 10px
+    );
+    min-height: 0;
+  }
+
+  .salary-bonus-card:not(.salary-bonus-open) {
+    height: var(--salary-bonus-collapsed-height);
+    min-height: var(--salary-bonus-collapsed-height);
+  }
+
+  .salary-bonus-card:not(.salary-bonus-open) .salary-bonus-toggle {
+    height: 100%;
+    min-height: 0;
+    padding: 0 16px;
+    font-size: 16px;
+  }
+
+  /* 펼친 상여/보너스는 독립된 한 화면으로 사용한다. */
+  .salary-bonus-card.salary-bonus-open {
+    height: calc(100svh - var(--salary-page-header-offset));
+    min-height: calc(100svh - var(--salary-page-header-offset));
+    max-height: calc(100svh - var(--salary-page-header-offset));
+    display: flex;
+    overflow: hidden;
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-section {
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-toggle {
+    flex: 0 0 58px;
+    min-height: 58px;
+    padding: 0 17px;
+    font-size: 17px;
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 10px 12px;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-groups {
+    width: 100%;
+    min-height: 0;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-group,
+  .salary-bonus-card.salary-bonus-open .salary-bonus-table,
+  .salary-bonus-card.salary-bonus-open .salary-bonus-rows {
+    min-height: 0;
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-table {
+    height: 100%;
+    display: grid;
+    grid-template-rows: 34px minmax(0, 1fr);
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-rows {
+    display: grid;
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-head {
+    min-height: 34px;
+    padding: 0 6px;
+    font-size: 11px;
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-row {
+    min-height: 0;
+    padding: 4px 6px;
+  }
+
+  .salary-bonus-card.salary-bonus-open .salary-bonus-static,
+  .salary-bonus-card.salary-bonus-open .salary-bonus-field input {
+    height: 100%;
+    min-height: 34px;
+  }
+
+  /* 예상 급여는 상여/보너스와 분리된 다음 한 화면이다. */
+  #salaryDetailCard.salary-detail-compact {
+    height: calc(100svh - var(--salary-page-header-offset));
+    min-height: calc(100svh - var(--salary-page-header-offset));
+    max-height: calc(100svh - var(--salary-page-header-offset));
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #salaryDetailCard.salary-detail-compact .salary-heading {
+    flex: 0 0 auto;
+  }
+
+  #salaryDetailCard.salary-detail-compact .salary-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  #salaryDetailCard.salary-detail-compact .payment-panel {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #salaryDetailCard.salary-detail-compact .pay-breakdown {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  #salaryDetailCard.salary-detail-compact .total-pay-row {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+  }
+
+  /* 페이지의 위·아래 끝에서는 브라우저 탄성 스크롤이 이어지지 않는다. */
+  html.mobile-pager-enabled .mobile-page {
+    overscroll-behavior-y: none;
+  }
+
+  @media (max-height: 700px) {
+    .salary-bonus-card.salary-bonus-open .salary-bonus-toggle {
+      flex-basis: 50px;
+      min-height: 50px;
+    }
+
+    .salary-bonus-card.salary-bonus-open .salary-bonus-panel {
+      padding-bottom: 8px;
+    }
+
+    .salary-bonus-card.salary-bonus-open .salary-bonus-table {
+      grid-template-rows: 30px minmax(0, 1fr);
+    }
+
+    .salary-bonus-card.salary-bonus-open .salary-bonus-head {
+      min-height: 30px;
+      font-size: 10px;
+    }
+
+    .salary-bonus-card.salary-bonus-open .salary-bonus-row {
+      padding-block: 3px;
+    }
+
+    .salary-bonus-card.salary-bonus-open .salary-bonus-static,
+    .salary-bonus-card.salary-bonus-open .salary-bonus-field input {
+      min-height: 30px;
+      font-size: 10.5px;
+    }
+  }
+}
+
+/* ===== 접힌 상여 및 보너스 카드 높이 복원 v58 ===== */
+@media (max-width: 620px) {
+  .salary-bonus-card:not(.salary-bonus-open) {
+    height: var(--salary-bonus-collapsed-height) !important;
+    min-height: var(--salary-bonus-collapsed-height) !important;
+    max-height: var(--salary-bonus-collapsed-height) !important;
+    align-self: start;
+    overflow: hidden;
+    border-radius: 18px;
+  }
+
+  .salary-bonus-card:not(.salary-bonus-open) .salary-bonus-section {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    margin: 0;
+    overflow: hidden;
+    border-radius: inherit;
+  }
+
+  .salary-bonus-card:not(.salary-bonus-open) .salary-bonus-toggle {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    padding: 0 16px;
+    font-size: 16px;
+  }
+
+  .salary-bonus-card:not(.salary-bonus-open) .salary-bonus-panel {
+    display: none !important;
+  }
+}
+
+/* ===== 상여 및 보너스 자동 접힘 전환 개선 v61 ===== */
+@media (max-width: 620px) {
+  /*
+   * 페이지 이동 중에는 scroll-snap과 scroll anchoring을 함께 끈다.
+   * 카드 높이가 바뀌어도 브라우저가 별도로 위치를 보정하지 않게 해
+   * 마지막 순간의 튐과 버벅임을 막는다.
+   */
+  html.salary-bonus-transitioning,
+  html.salary-bonus-transitioning body {
+    scroll-snap-type: none !important;
+    scroll-behavior: auto !important;
+    overscroll-behavior-y: none;
+    overflow-anchor: none;
+  }
+
+  html.salary-bonus-transitioning .salary-bonus-card {
+    scroll-snap-align: none !important;
+  }
+
+  html.salary-bonus-transitioning .salary-bonus-toggle,
+  html.salary-bonus-transitioning .salary-bonus-panel {
+    pointer-events: none;
+  }
+}
+
+/* ===== 모바일 급여 화면 고정 레이어 전환 v62 ===== */
+.salary-bonus-launcher {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  html.salary-mobile-pager-enabled,
+  html.salary-mobile-pager-enabled body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  html.salary-mobile-pager-enabled .app-main {
+    margin-bottom: 0;
+  }
+
+  html.salary-mobile-pager-enabled .app-page[data-app-page="salary"] {
+    height: var(--salary-mobile-pager-height, 620px);
+    min-height: 0;
+    overflow: hidden;
+    animation: none;
+  }
+
+  html.salary-mobile-pager-enabled .salary-page-layout {
+    position: relative;
+    width: 100%;
+    height: var(--salary-mobile-pager-height, 620px);
+    min-height: 0;
+    display: block;
+    overflow: hidden;
+    gap: 0;
+    contain: layout paint;
+  }
+
+  html.salary-mobile-pager-enabled .salary-page-layout > .salary-overview-card,
+  html.salary-mobile-pager-enabled .salary-page-layout > .salary-bonus-card,
+  html.salary-mobile-pager-enabled .salary-page-layout > #salaryDetailCard {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    overflow-x: hidden;
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
+    transition: transform 270ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform;
+    scroll-snap-align: none !important;
+    scroll-margin-top: 0 !important;
+  }
+
+  html.salary-mobile-pager-enabled .salary-page-layout > .salary-overview-card {
+    display: flex;
+    flex-direction: column;
+    overflow-y: hidden;
+    touch-action: none;
+  }
+
+  html.salary-mobile-pager-enabled .salary-page-layout > .salary-bonus-card {
+    display: flex;
+    overflow: hidden;
+    border-radius: 18px;
+    touch-action: none;
+  }
+
+  html.salary-mobile-pager-enabled .salary-page-layout > #salaryDetailCard {
+    overflow-y: hidden;
+    touch-action: none;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout.salary-settings-expanded
+    > #salaryDetailCard {
+    overflow-y: auto;
+    touch-action: pan-y;
+  }
+
+  /*
+   * 이동 애니메이션 중에도 새로 활성화된 화면은 즉시 터치할 수 있어야 한다.
+   * 모든 화면의 pointer-events를 막으면 화면은 도착했는데 전환 잠금이 남은
+   * 짧은 구간에서 첫 번째 탭이 사라져 두 번 눌러야 하는 문제가 생긴다.
+   */
+  html.salary-mobile-pager-enabled
+    .salary-page-layout
+    > [aria-hidden="true"] {
+    pointer-events: none !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout
+    > [aria-hidden="false"] {
+    pointer-events: auto !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout.salary-mobile-no-transition
+    > * {
+    transition: none !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout[data-salary-page="0"]
+    > .salary-overview-card {
+    transform: translate3d(0, 0, 0);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout[data-salary-page="0"]
+    > .salary-bonus-card {
+    transform: translate3d(0, 100%, 0);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout[data-salary-page="0"]
+    > #salaryDetailCard {
+    transform: translate3d(0, 200%, 0);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout[data-salary-page="1"]
+    > .salary-overview-card {
+    transform: translate3d(0, -100%, 0);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout[data-salary-page="1"]
+    > .salary-bonus-card {
+    transform: translate3d(0, 0, 0);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout[data-salary-page="1"]
+    > #salaryDetailCard {
+    transform: translate3d(0, 100%, 0);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout[data-salary-page="2"]
+    > .salary-overview-card {
+    transform: translate3d(0, -200%, 0);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout[data-salary-page="2"]
+    > .salary-bonus-card {
+    transform: translate3d(0, -100%, 0);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout[data-salary-page="2"]
+    > #salaryDetailCard {
+    transform: translate3d(0, 0, 0);
+  }
+
+  html.salary-mobile-pager-enabled .salary-bonus-launcher {
+    width: 100%;
+    min-height: 56px;
+    margin-top: 10px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 56px;
+    border: 1px solid rgba(221, 228, 239, 0.95);
+    border-radius: 18px;
+    color: #25334b;
+    background: #f8fbff;
+    font-size: 16px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-launcher[aria-expanded="true"]
+    .salary-bonus-chevron {
+    transform: rotate(180deg);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card:not(.salary-bonus-open) {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    align-self: auto;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card:not(.salary-bonus-open)
+    .salary-bonus-section {
+    height: 100%;
+    max-height: none;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-bonus-open
+    .salary-bonus-section {
+    width: 100%;
+    height: 100%;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-bonus-open
+    .salary-bonus-panel {
+    animation: none;
+  }
+
+  html.salary-mobile-pager-enabled #salaryDetailCard.salary-detail-compact {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  html.salary-mobile-pager-enabled .salary-overview-card,
+  html.salary-mobile-pager-enabled .salary-bonus-card,
+  html.salary-mobile-pager-enabled #salaryDetailCard {
+    scroll-snap-align: none !important;
+    scroll-snap-stop: normal !important;
+  }
+}
+
+
+/* ===== 회계연도 급여 설정 및 고정 안전수당 v65 ===== */
+.salary-output-row .salary-inline-output,
+.salary-input-row .input-with-unit {
+  flex: 0 0 145px;
+  width: 145px;
+  min-width: 145px;
+  box-sizing: border-box;
+}
+
+.salary-fixed-output-row .salary-inline-output {
+  background: #f4f7fb;
+}
+
+.salary-fixed-output-row output {
+  color: #34435d;
+}
+
+@media (max-width: 620px) {
+  .settings-panel .salary-input-row {
+    display: grid;
+    grid-template-columns: minmax(88px, 1fr) 145px;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .settings-panel .salary-input-row > span {
+    min-width: 0;
+  }
+
+  .settings-panel .salary-input-row .input-with-unit,
+  .settings-panel .salary-input-row .salary-inline-output {
+    justify-self: end;
+    width: 145px;
+    min-width: 145px;
+  }
+}
