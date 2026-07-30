@@ -148,6 +148,7 @@ let salaryBonusGestureLocked = false;
 let salaryMobilePageIndex = 0;
 let salaryMobilePageTransitioning = false;
 let salaryMobileCollapseAfterTransition = false;
+let salaryMobileCollapseSettingsAfterTransition = false;
 let salaryMobilePendingBonusOpen = false;
 let salaryMobilePointerStartX = null;
 let salaryMobilePointerStartY = null;
@@ -1331,6 +1332,18 @@ salaryYearGrid.addEventListener("click", (event) => {
   updateSalarySettingsVisibility();
   syncSalaryInputs();
   renderSalary();
+
+  if (isSalaryMobilePager()) {
+    setSalaryMobilePage(2);
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    salaryDetailCard.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
 });
 
 function isSalaryMobilePager() {
@@ -1398,6 +1411,13 @@ function finishSalaryMobileTransition() {
     updateSalaryBonusVisibility({ skipPagerSync: true });
   }
 
+  if (salaryMobileCollapseSettingsAfterTransition) {
+    salaryMobileCollapseSettingsAfterTransition = false;
+    salarySettingsOpen = false;
+    salaryDetailCard.scrollTop = 0;
+    updateSalarySettingsVisibility();
+  }
+
   salaryMobilePageTransitioning = false;
   salaryPageLayout.classList.remove("salary-mobile-moving");
   applySalaryMobilePageState({ immediate: true });
@@ -1410,7 +1430,11 @@ function finishSalaryMobileTransition() {
 
 function setSalaryMobilePage(
   nextPageIndex,
-  { collapseBonusAfter = false, immediate = false } = {},
+  {
+    collapseBonusAfter = false,
+    collapseSettingsAfter = false,
+    immediate = false,
+  } = {},
 ) {
   if (!isSalaryMobilePager() || currentAppPage !== "salary") {
     return;
@@ -1432,6 +1456,8 @@ function setSalaryMobilePage(
 
   salaryMobilePageTransitioning = !immediate;
   salaryMobileCollapseAfterTransition = collapseBonusAfter;
+  salaryMobileCollapseSettingsAfterTransition =
+    collapseSettingsAfter;
   salaryPageLayout.classList.toggle(
     "salary-mobile-moving",
     !immediate,
@@ -1471,11 +1497,9 @@ function moveSalaryMobilePage(direction) {
   }
 
   if (salaryMobilePageIndex === 2 && direction < 0) {
-    if (salarySettingsOpen && salaryDetailCard.scrollTop > 2) {
-      return;
-    }
-
-    setSalaryMobilePage(0);
+    setSalaryMobilePage(0, {
+      collapseSettingsAfter: salarySettingsOpen,
+    });
   }
 }
 
@@ -1626,6 +1650,25 @@ salaryPageLayout.addEventListener(
   "wheel",
   (event) => {
     if (
+      currentAppPage === "salary" &&
+      !isSalaryMobilePager() &&
+      salarySettingsOpen &&
+      event.deltaY < -18
+    ) {
+      event.preventDefault();
+      salarySettingsOpen = false;
+      updateSalarySettingsVisibility();
+
+      window.requestAnimationFrame(() => {
+        salaryOverviewCard.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+      return;
+    }
+
+    if (
       !isSalaryMobilePager() ||
       currentAppPage !== "salary" ||
       Math.abs(event.deltaY) < 18 ||
@@ -1639,10 +1682,9 @@ salaryPageLayout.addEventListener(
     if (
       salaryMobilePageIndex === 2 &&
       salarySettingsOpen &&
-      ((direction > 0 &&
+      direction > 0 &&
         salaryDetailCard.scrollTop + salaryDetailCard.clientHeight <
-          salaryDetailCard.scrollHeight - 2) ||
-        (direction < 0 && salaryDetailCard.scrollTop > 2))
+          salaryDetailCard.scrollHeight - 2
     ) {
       return;
     }
@@ -4465,9 +4507,10 @@ function calculateSalaryForMonth(year, month) {
     Number(settings.longevityAllowance) || 0;
   const otherAllowance = Number(settings.otherAllowance) || 0;
 
-  const ordinaryHourlyWage =
-    baseHourlyWage +
-    (safetyAllowance + longevityAllowance) / 243;
+  const ordinaryHourlyWage = baseHourlyWage > 0
+    ? baseHourlyWage +
+      (safetyAllowance + longevityAllowance) / 243
+    : 0;
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const sundayCount = countSundaysInMonth(year, month);
