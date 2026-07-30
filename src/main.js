@@ -144,6 +144,11 @@ let salarySettingsTouchClickBlocked = false;
 let salarySettingsSwipeStartY = null;
 let salarySettingsSwipeHandled = false;
 let salaryMonthTouchClickBlocked = false;
+let salaryMonthPointerId = null;
+let salaryMonthPointerStartX = null;
+let salaryMonthPointerStartY = null;
+let salaryMonthPointerButton = null;
+let salaryMonthPointerMoved = false;
 let salaryBonusOpen = false;
 let salaryBonusGestureStartY = null;
 let salaryBonusGestureHandled = false;
@@ -1342,7 +1347,7 @@ function selectSalaryMonth(monthButton) {
   });
 }
 
-salaryYearGrid.addEventListener("pointerup", (event) => {
+salaryYearGrid.addEventListener("pointerdown", (event) => {
   if (event.pointerType !== "touch" && event.pointerType !== "pen") {
     return;
   }
@@ -1355,14 +1360,67 @@ salaryYearGrid.addEventListener("pointerup", (event) => {
     return;
   }
 
+  salaryMonthPointerId = event.pointerId;
+  salaryMonthPointerStartX = event.clientX;
+  salaryMonthPointerStartY = event.clientY;
+  salaryMonthPointerButton = monthButton;
+  salaryMonthPointerMoved = false;
+});
+
+salaryYearGrid.addEventListener("pointermove", (event) => {
+  if (event.pointerId !== salaryMonthPointerId) {
+    return;
+  }
+
+  const movedX = Math.abs(event.clientX - salaryMonthPointerStartX);
+  const movedY = Math.abs(event.clientY - salaryMonthPointerStartY);
+
+  if (movedX > 10 || movedY > 10) {
+    salaryMonthPointerMoved = true;
+  }
+});
+
+salaryYearGrid.addEventListener("pointerup", (event) => {
+  if (event.pointerId !== salaryMonthPointerId) {
+    return;
+  }
+
   event.preventDefault();
   event.stopPropagation();
   salaryMonthTouchClickBlocked = true;
-  selectSalaryMonth(monthButton);
+
+  if (!salaryMonthPointerMoved && salaryMonthPointerButton) {
+    selectSalaryMonth(salaryMonthPointerButton);
+  }
+
+  salaryMonthPointerId = null;
+  salaryMonthPointerStartX = null;
+  salaryMonthPointerStartY = null;
+  salaryMonthPointerButton = null;
+  salaryMonthPointerMoved = false;
 
   window.setTimeout(() => {
     salaryMonthTouchClickBlocked = false;
   }, 450);
+});
+
+["pointercancel", "lostpointercapture"].forEach((eventName) => {
+  salaryYearGrid.addEventListener(eventName, (event) => {
+    if (event.pointerId !== salaryMonthPointerId) {
+      return;
+    }
+
+    salaryMonthTouchClickBlocked = true;
+    salaryMonthPointerId = null;
+    salaryMonthPointerStartX = null;
+    salaryMonthPointerStartY = null;
+    salaryMonthPointerButton = null;
+    salaryMonthPointerMoved = false;
+
+    window.setTimeout(() => {
+      salaryMonthTouchClickBlocked = false;
+    }, 450);
+  });
 });
 
 salaryYearGrid.addEventListener("click", (event) => {
@@ -2411,6 +2469,30 @@ annualLeaveYearScroller.addEventListener("click", (event) => {
   annualLeaveSelectedYear = Number(yearButton.dataset.yearOption);
   closeAnnualLeaveYearPicker();
   renderAnnualLeaveSummary();
+});
+
+document.addEventListener("pointerdown", (event) => {
+  const pressedElement = event.target;
+
+  if (!(pressedElement instanceof Node)) {
+    return;
+  }
+
+  if (
+    !salaryYearPicker.hidden &&
+    !salaryYearPicker.contains(pressedElement) &&
+    !salaryYearButton.contains(pressedElement)
+  ) {
+    closeSalaryYearPicker();
+  }
+
+  if (
+    !annualLeaveYearPicker.hidden &&
+    !annualLeaveYearPicker.contains(pressedElement) &&
+    !annualLeaveYearButton.contains(pressedElement)
+  ) {
+    closeAnnualLeaveYearPicker();
+  }
 });
 
 accruedAnnualLeaveInput.addEventListener("input", () => {
@@ -4335,11 +4417,7 @@ function renderSalary() {
         monthIndex,
       );
       const isSelected = monthIndex === salarySelectedMonth;
-      const bonusMarkup = salary.bonusTotal > 0
-        ? `<small class="salary-month-bonus">+${formatMoneyValue(salary.bonusTotal)}</small>`
-        : "";
-
-      annualTotalPay += salary.totalPay;
+      annualTotalPay += salary.baseTotalPay + salary.bonusTotal;
 
       return `
         <button
@@ -4347,11 +4425,10 @@ function renderSalary() {
           type="button"
           data-salary-month="${monthIndex}"
           aria-current="${isSelected ? "true" : "false"}"
-          aria-label="${salarySelectedYear}년 ${monthIndex + 1}월 예상 급여 ${formatMoney(salary.baseTotalPay)}${salary.bonusTotal > 0 ? `, 상여 및 보너스 ${formatMoney(salary.bonusTotal)}` : ""}"
+          aria-label="${salarySelectedYear}년 ${monthIndex + 1}월 예상 급여 ${formatMoney(salary.baseTotalPay)}"
         >
           <span>${monthIndex + 1}월</span>
           <strong>${formatMoneyValue(salary.baseTotalPay)}</strong>
-          ${bonusMarkup}
         </button>
       `;
     },
@@ -4765,10 +4842,8 @@ function calculateSalaryForMonth(year, month) {
     payableSafetyAllowance +
     payableLongevityAllowance +
     payableOtherAllowance;
-  const bonusTotal = hasAttendanceRecords
-    ? getBonusTotalForMonth(year, month)
-    : 0;
-  const totalPay = baseTotalPay + bonusTotal;
+  const bonusTotal = getBonusTotalForMonth(year, month);
+  const totalPay = baseTotalPay;
 
   return {
     stats,

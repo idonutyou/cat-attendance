@@ -4453,3 +4453,12 @@ html.salary-scroll-snap-enabled .salary-bonus-card:not(.salary-bonus-open) {
 .salary-output-row .salary-inline-output span {
   line-height: 16px;
 }
+
+/* 자동 계산값은 입력칸과 혼동되지 않도록 배경 위의 텍스트로만 표시한다. */
+.settings-panel .salary-output-row .salary-inline-output,
+.settings-panel .salary-fixed-output-row .salary-inline-output {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
