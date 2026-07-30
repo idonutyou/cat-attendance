@@ -140,6 +140,7 @@ let currentAppPage = "attendance";
 let salarySelectedYear = currentMonth.getFullYear();
 let salarySelectedMonth = currentMonth.getMonth();
 let salarySettingsOpen = false;
+let salarySettingsTouchClickBlocked = false;
 let salaryBonusOpen = false;
 let salaryBonusGestureStartY = null;
 let salaryBonusGestureHandled = false;
@@ -1341,19 +1342,13 @@ function updateSalaryMobilePagerHeight() {
     return;
   }
 
-  const layoutTop = salaryPageLayout.getBoundingClientRect().top;
-  const bottomGap = Math.max(8, Number.parseFloat(
-    getComputedStyle(document.documentElement)
-      .getPropertyValue("--salary-mobile-bottom-gap"),
-  ) || 8);
-  const availableHeight = Math.max(
-    480,
-    window.innerHeight - layoutTop - bottomGap,
-  );
-
-  salaryPageLayout.style.setProperty(
+  /*
+   * 모바일 급여 화면은 app-main의 남은 높이를 flex로 그대로 사용한다.
+   * window.innerHeight에서 위치를 다시 빼는 방식은 브라우저 도구막대와
+   * 화면 배율에 따라 아래쪽에 빈 공간을 만들 수 있어 사용하지 않는다.
+   */
+  salaryPageLayout.style.removeProperty(
     "--salary-mobile-pager-height",
-    `${availableHeight}px`,
   );
 }
 
@@ -1732,9 +1727,43 @@ salaryBonusRows.addEventListener("input", (event) => {
   updateBonusEntryFromControl(control);
 });
 
-salarySettingsToggle.addEventListener("click", () => {
+function toggleSalarySettings() {
   salarySettingsOpen = !salarySettingsOpen;
   updateSalarySettingsVisibility();
+
+  if (salarySettingsOpen) {
+    salaryDetailCard.scrollTop = 0;
+  }
+}
+
+/*
+ * Android 브라우저에서 페이지 전환 직후 첫 click이 취소되는 경우가 있어
+ * 터치·펜 입력은 pointerup에서 바로 처리한다. 뒤이어 합성되는 click은
+ * 한 번만 차단해 한 번의 터치로 정확히 한 번 토글되게 한다.
+ */
+salarySettingsToggle.addEventListener("pointerup", (event) => {
+  if (event.pointerType !== "touch" && event.pointerType !== "pen") {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  salarySettingsTouchClickBlocked = true;
+  toggleSalarySettings();
+
+  window.setTimeout(() => {
+    salarySettingsTouchClickBlocked = false;
+  }, 450);
+});
+
+salarySettingsToggle.addEventListener("click", (event) => {
+  if (salarySettingsTouchClickBlocked) {
+    event.preventDefault();
+    salarySettingsTouchClickBlocked = false;
+    return;
+  }
+
+  toggleSalarySettings();
 });
 
 function updateSalarySettingsVisibility() {
@@ -4428,6 +4457,7 @@ function saveBonusEntriesByYear() {
 function calculateSalaryForMonth(year, month) {
   const stats = calculateMonthStats(year, month);
   const settings = getSettingsForMonth(year, month);
+  const hasAttendanceRecords = stats.recordedDays > 0;
 
   const baseHourlyWage = Number(settings.baseHourlyWage) || 0;
   const safetyAllowance = Number(settings.safetyAllowance) || 0;
@@ -4445,19 +4475,43 @@ function calculateSalaryForMonth(year, month) {
   const basePayHours = basePayDays * 8;
 
   const payments = {
-    basePay: basePayHours * baseHourlyWage,
-    weeklyAllowance: sundayCount * 8 * baseHourlyWage,
+    basePay: hasAttendanceRecords
+      ? basePayHours * baseHourlyWage
+      : 0,
+    weeklyAllowance: hasAttendanceRecords
+      ? sundayCount * 8 * baseHourlyWage
+      : 0,
     overtimePay:
-      ordinaryHourlyWage * stats.overtimeHours * 1.5,
+      hasAttendanceRecords
+        ? ordinaryHourlyWage * stats.overtimeHours * 1.5
+        : 0,
     nightPay:
-      ordinaryHourlyWage * stats.nightHours * 0.5,
+      hasAttendanceRecords
+        ? ordinaryHourlyWage * stats.nightHours * 0.5
+        : 0,
     overnightPay:
-      ordinaryHourlyWage * stats.overnightHours * 2,
+      hasAttendanceRecords
+        ? ordinaryHourlyWage * stats.overnightHours * 2
+        : 0,
     holidayPay:
-      ordinaryHourlyWage * stats.holidayHours * 1.5,
+      hasAttendanceRecords
+        ? ordinaryHourlyWage * stats.holidayHours * 1.5
+        : 0,
     holidayOvertimePay:
-      ordinaryHourlyWage * stats.holidayOvertimeHours * 2,
+      hasAttendanceRecords
+        ? ordinaryHourlyWage * stats.holidayOvertimeHours * 2
+        : 0,
   };
+
+  const payableSafetyAllowance = hasAttendanceRecords
+    ? safetyAllowance
+    : 0;
+  const payableLongevityAllowance = hasAttendanceRecords
+    ? longevityAllowance
+    : 0;
+  const payableOtherAllowance = hasAttendanceRecords
+    ? otherAllowance
+    : 0;
 
   const baseTotalPay =
     payments.basePay +
@@ -4467,10 +4521,12 @@ function calculateSalaryForMonth(year, month) {
     payments.overnightPay +
     payments.holidayPay +
     payments.holidayOvertimePay +
-    safetyAllowance +
-    longevityAllowance +
-    otherAllowance;
-  const bonusTotal = getBonusTotalForMonth(year, month);
+    payableSafetyAllowance +
+    payableLongevityAllowance +
+    payableOtherAllowance;
+  const bonusTotal = hasAttendanceRecords
+    ? getBonusTotalForMonth(year, month)
+    : 0;
   const totalPay = baseTotalPay + bonusTotal;
 
   return {
@@ -4480,14 +4536,15 @@ function calculateSalaryForMonth(year, month) {
     baseTotalPay,
     bonusTotal,
     totalPay,
+    hasAttendanceRecords,
     ordinaryHourlyWage,
     baseHourlyWage,
-    safetyAllowance,
-    longevityAllowance,
-    otherAllowance,
-    basePayDays,
-    basePayHours,
-    sundayCount,
+    safetyAllowance: payableSafetyAllowance,
+    longevityAllowance: payableLongevityAllowance,
+    otherAllowance: payableOtherAllowance,
+    basePayDays: hasAttendanceRecords ? basePayDays : 0,
+    basePayHours: hasAttendanceRecords ? basePayHours : 0,
+    sundayCount: hasAttendanceRecords ? sundayCount : 0,
   };
 }
 
