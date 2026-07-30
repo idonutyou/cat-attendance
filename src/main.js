@@ -1538,10 +1538,19 @@ function moveSalaryMobilePage(direction) {
     return;
   }
 
-  if (salaryMobilePageIndex === 2 && direction < 0) {
+  if (
+    salaryMobilePageIndex === 2 &&
+    salarySettingsOpen &&
+    direction !== 0
+  ) {
     setSalaryMobilePage(0, {
-      collapseSettingsAfter: salarySettingsOpen,
+      collapseSettingsAfter: true,
     });
+    return;
+  }
+
+  if (salaryMobilePageIndex === 2 && direction < 0) {
+    setSalaryMobilePage(0);
   }
 }
 
@@ -1800,6 +1809,23 @@ salaryPageLayout.addEventListener("pointerup", (event) => {
     return;
   }
 
+  if (
+    salaryMobilePageIndex === 2 &&
+    salarySettingsOpen
+  ) {
+    const isAtTop = salaryDetailCard.scrollTop <= 2;
+    const isAtBottom =
+      salaryDetailCard.scrollTop + salaryDetailCard.clientHeight >=
+      salaryDetailCard.scrollHeight - 2;
+    const canLeaveSettings = deltaY < 0
+      ? isAtTop
+      : isAtBottom;
+
+    if (!canLeaveSettings) {
+      return;
+    }
+  }
+
   moveSalaryMobilePage(deltaY > 0 ? 1 : -1);
 });
 
@@ -1905,11 +1931,18 @@ salaryDetailCard.addEventListener(
     }
 
     const currentY = event.touches[0]?.clientY;
+    const distance = typeof currentY === "number"
+      ? currentY - salarySettingsSwipeStartY
+      : 0;
+    const isAtTop = salaryDetailCard.scrollTop <= 2;
+    const isAtBottom =
+      salaryDetailCard.scrollTop + salaryDetailCard.clientHeight >=
+      salaryDetailCard.scrollHeight - 2;
+    const shouldReturnToOverview =
+      (distance >= 48 && isAtTop) ||
+      (distance <= -48 && isAtBottom);
 
-    if (
-      typeof currentY !== "number" ||
-      currentY - salarySettingsSwipeStartY < 48
-    ) {
+    if (!shouldReturnToOverview) {
       return;
     }
 
@@ -1939,14 +1972,21 @@ salaryDetailCard.addEventListener(
     }
 
     const endY = event.changedTouches[0]?.clientY;
-    const movedDown =
-      typeof endY === "number" &&
-      endY - salarySettingsSwipeStartY >= 48;
+    const distance = typeof endY === "number"
+      ? endY - salarySettingsSwipeStartY
+      : 0;
+    const isAtTop = salaryDetailCard.scrollTop <= 2;
+    const isAtBottom =
+      salaryDetailCard.scrollTop + salaryDetailCard.clientHeight >=
+      salaryDetailCard.scrollHeight - 2;
+    const shouldReturnToOverview =
+      (distance >= 48 && isAtTop) ||
+      (distance <= -48 && isAtBottom);
 
     salarySettingsSwipeStartY = null;
     salarySettingsSwipeHandled = false;
 
-    if (movedDown) {
+    if (shouldReturnToOverview) {
       setSalaryMobilePage(0, {
         collapseSettingsAfter: true,
       });
