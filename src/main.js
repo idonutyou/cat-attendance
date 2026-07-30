@@ -141,6 +141,9 @@ let salarySelectedYear = currentMonth.getFullYear();
 let salarySelectedMonth = currentMonth.getMonth();
 let salarySettingsOpen = false;
 let salarySettingsTouchClickBlocked = false;
+let salarySettingsSwipeStartY = null;
+let salarySettingsSwipeHandled = false;
+let salaryMonthTouchClickBlocked = false;
 let salaryBonusOpen = false;
 let salaryBonusGestureStartY = null;
 let salaryBonusGestureHandled = false;
@@ -150,6 +153,7 @@ let salaryMobilePageTransitioning = false;
 let salaryMobileCollapseAfterTransition = false;
 let salaryMobileCollapseSettingsAfterTransition = false;
 let salaryMobilePendingBonusOpen = false;
+let salaryMobilePendingDetailOpen = false;
 let salaryMobilePointerStartX = null;
 let salaryMobilePointerStartY = null;
 let salaryMobilePointerId = null;
@@ -1316,15 +1320,7 @@ salaryYearScroller.addEventListener("click", (event) => {
   closeSalaryYearPicker();
 });
 
-salaryYearGrid.addEventListener("click", (event) => {
-  const monthButton = event.target.closest(
-    "[data-salary-month]",
-  );
-
-  if (!monthButton) {
-    return;
-  }
-
+function selectSalaryMonth(monthButton) {
   salarySelectedMonth = Number(
     monthButton.dataset.salaryMonth,
   );
@@ -1334,7 +1330,7 @@ salaryYearGrid.addEventListener("click", (event) => {
   renderSalary();
 
   if (isSalaryMobilePager()) {
-    setSalaryMobilePage(2);
+    openSalaryDetailMobilePage();
     return;
   }
 
@@ -1344,6 +1340,47 @@ salaryYearGrid.addEventListener("click", (event) => {
       block: "start",
     });
   });
+}
+
+salaryYearGrid.addEventListener("pointerup", (event) => {
+  if (event.pointerType !== "touch" && event.pointerType !== "pen") {
+    return;
+  }
+
+  const monthButton = event.target.closest(
+    "[data-salary-month]",
+  );
+
+  if (!monthButton) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  salaryMonthTouchClickBlocked = true;
+  selectSalaryMonth(monthButton);
+
+  window.setTimeout(() => {
+    salaryMonthTouchClickBlocked = false;
+  }, 450);
+});
+
+salaryYearGrid.addEventListener("click", (event) => {
+  const monthButton = event.target.closest(
+    "[data-salary-month]",
+  );
+
+  if (!monthButton) {
+    return;
+  }
+
+  if (salaryMonthTouchClickBlocked) {
+    event.preventDefault();
+    salaryMonthTouchClickBlocked = false;
+    return;
+  }
+
+  selectSalaryMonth(monthButton);
 });
 
 function isSalaryMobilePager() {
@@ -1425,6 +1462,11 @@ function finishSalaryMobileTransition() {
   if (salaryMobilePendingBonusOpen) {
     salaryMobilePendingBonusOpen = false;
     requestAnimationFrame(openSalaryBonusMobilePage);
+  }
+
+  if (salaryMobilePendingDetailOpen) {
+    salaryMobilePendingDetailOpen = false;
+    requestAnimationFrame(openSalaryDetailMobilePage);
   }
 }
 
@@ -1538,6 +1580,26 @@ function openSalaryBonusMobilePage() {
   }
 
   setSalaryMobilePage(1);
+}
+
+function openSalaryDetailMobilePage() {
+  if (!isSalaryMobilePager() || currentAppPage !== "salary") {
+    return;
+  }
+
+  if (salaryMobilePageTransitioning) {
+    salaryMobilePendingDetailOpen = true;
+    return;
+  }
+
+  salaryMobilePendingDetailOpen = false;
+
+  if (salaryMobilePageIndex === 2) {
+    applySalaryMobilePageState({ immediate: true });
+    return;
+  }
+
+  setSalaryMobilePage(2);
 }
 
 /*
@@ -1807,6 +1869,100 @@ salarySettingsToggle.addEventListener("click", (event) => {
 
   toggleSalarySettings();
 });
+
+salaryDetailCard.addEventListener(
+  "touchstart",
+  (event) => {
+    if (
+      !isSalaryMobilePager() ||
+      currentAppPage !== "salary" ||
+      salaryMobilePageIndex !== 2 ||
+      !salarySettingsOpen ||
+      salaryMobilePageTransitioning
+    ) {
+      salarySettingsSwipeStartY = null;
+      salarySettingsSwipeHandled = false;
+      return;
+    }
+
+    salarySettingsSwipeStartY =
+      event.touches[0]?.clientY ?? null;
+    salarySettingsSwipeHandled = false;
+  },
+  { passive: true },
+);
+
+salaryDetailCard.addEventListener(
+  "touchmove",
+  (event) => {
+    if (
+      salarySettingsSwipeStartY === null ||
+      salarySettingsSwipeHandled ||
+      !salarySettingsOpen ||
+      salaryMobilePageTransitioning
+    ) {
+      return;
+    }
+
+    const currentY = event.touches[0]?.clientY;
+
+    if (
+      typeof currentY !== "number" ||
+      currentY - salarySettingsSwipeStartY < 48
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    salarySettingsSwipeHandled = true;
+    salarySettingsSwipeStartY = null;
+
+    setSalaryMobilePage(0, {
+      collapseSettingsAfter: true,
+    });
+  },
+  { passive: false },
+);
+
+salaryDetailCard.addEventListener(
+  "touchend",
+  (event) => {
+    if (
+      salarySettingsSwipeStartY === null ||
+      salarySettingsSwipeHandled ||
+      !salarySettingsOpen ||
+      salaryMobilePageTransitioning
+    ) {
+      salarySettingsSwipeStartY = null;
+      salarySettingsSwipeHandled = false;
+      return;
+    }
+
+    const endY = event.changedTouches[0]?.clientY;
+    const movedDown =
+      typeof endY === "number" &&
+      endY - salarySettingsSwipeStartY >= 48;
+
+    salarySettingsSwipeStartY = null;
+    salarySettingsSwipeHandled = false;
+
+    if (movedDown) {
+      setSalaryMobilePage(0, {
+        collapseSettingsAfter: true,
+      });
+    }
+  },
+  { passive: true },
+);
+
+salaryDetailCard.addEventListener(
+  "touchcancel",
+  () => {
+    salarySettingsSwipeStartY = null;
+    salarySettingsSwipeHandled = false;
+  },
+  { passive: true },
+);
 
 function updateSalarySettingsVisibility() {
   salarySettingsPanel.hidden = !salarySettingsOpen;
@@ -2504,7 +2660,9 @@ function setAppPage(pageId) {
     salaryMobilePageIndex = 0;
     salaryMobilePageTransitioning = false;
     salaryMobileCollapseAfterTransition = false;
+    salaryMobileCollapseSettingsAfterTransition = false;
     salaryMobilePendingBonusOpen = false;
+    salaryMobilePendingDetailOpen = false;
     salaryBonusOpen = false;
     updateSalaryBonusVisibility({ skipPagerSync: true });
     syncSalaryInputs();
