@@ -352,20 +352,6 @@ app.innerHTML = `
           </button>
         </nav>
 
-        <section id="accountPanel" class="account-panel" aria-label="현재 로그인 정보">
-          <div class="account-summary">
-            <div id="accountAvatar" class="account-avatar" aria-hidden="true">G</div>
-            <div class="account-copy">
-              <strong id="accountName">Guest 사용 중</strong>
-              <span id="accountEmail">이 기기에만 저장</span>
-            </div>
-          </div>
-          <div class="account-footer">
-            <span id="cloudSyncStatus" class="cloud-sync-status">로컬 저장</span>
-            <button id="accountSwitchButton" type="button">계정 전환</button>
-          </div>
-        </section>
-
         <div
           id="weekStartToggle"
           class="week-start-toggle"
@@ -387,6 +373,20 @@ app.innerHTML = `
             title="일요일부터 시작"
           >일 <span aria-hidden="true">›</span></button>
         </div>
+
+        <section id="accountPanel" class="account-panel" aria-label="현재 로그인 정보">
+          <div class="account-summary">
+            <div id="accountAvatar" class="account-avatar" aria-hidden="true">G</div>
+            <div class="account-copy">
+              <strong id="accountName">Guest 사용 중</strong>
+              <span id="accountEmail">이 기기에만 저장</span>
+            </div>
+          </div>
+          <div class="account-footer">
+            <span id="cloudSyncStatus" class="cloud-sync-status">로컬 저장</span>
+            <button id="accountSwitchButton" type="button">계정 전환</button>
+          </div>
+        </section>
       </aside>
     </div>
 
