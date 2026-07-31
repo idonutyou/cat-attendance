@@ -2562,7 +2562,8 @@ html.mobile-pager-enabled .summary-card .work-total-row {
   position: fixed;
   top: 50%;
   left: 50%;
-  z-index: 300;
+  /* 로그인 화면(auth-gate) 위에도 종료 안내가 보이게 합니다. */
+  z-index: 10000;
 
   width: max-content;
   max-width: calc(100% - 48px);
