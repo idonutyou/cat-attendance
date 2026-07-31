@@ -4541,3 +4541,279 @@ html.salary-scroll-snap-enabled .salary-bonus-card:not(.salary-bonus-open) {
   background: transparent;
   box-shadow: none;
 }
+
+
+/* ===== Guest / Google 로그인 및 기기 간 동기화 v80 ===== */
+html.auth-gate-active,
+html.auth-gate-active body {
+  overflow: hidden;
+}
+
+.app-shell.auth-locked {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.auth-gate {
+  position: fixed;
+  z-index: 9000;
+  inset: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top)) 20px
+    max(24px, env(safe-area-inset-bottom));
+
+  display: grid;
+  place-items: center;
+
+  background:
+    radial-gradient(circle at 85% 8%, rgba(37, 99, 235, 0.16), transparent 34%),
+    linear-gradient(180deg, #f8fbff 0%, #edf3fb 100%);
+}
+
+.auth-gate[hidden] {
+  display: none;
+}
+
+.auth-card {
+  width: min(430px, 100%);
+  padding: 34px 28px 26px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  border: 1px solid rgba(216, 226, 240, 0.96);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 70px rgba(37, 63, 105, 0.15);
+  backdrop-filter: blur(18px);
+  text-align: center;
+}
+
+.auth-logo {
+  width: 170px;
+  height: auto;
+  object-fit: contain;
+}
+
+.auth-subtitle {
+  margin: -5px 0 24px;
+  color: #334155;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.auth-card h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 24px;
+  letter-spacing: -0.045em;
+}
+
+.auth-description {
+  max-width: 330px;
+  margin: 11px 0 24px;
+  color: #6b7689;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.65;
+}
+
+.auth-actions {
+  width: 100%;
+  display: grid;
+  gap: 11px;
+}
+
+.auth-button {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 18px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  border-radius: 15px;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.auth-button:active {
+  transform: scale(0.985);
+}
+
+.auth-button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+
+.auth-button.guest {
+  border: 1px solid #d7e0ec;
+  color: #394860;
+  background: #f7f9fc;
+}
+
+.auth-button.google {
+  border: 1px solid #cfd9e7;
+  color: #26354d;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(38, 53, 77, 0.08);
+}
+
+.auth-button:hover,
+.auth-button:focus-visible {
+  border-color: #7aa2ef;
+  box-shadow: 0 9px 24px rgba(37, 99, 235, 0.13);
+}
+
+.google-mark {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  background: conic-gradient(from -45deg, #4285f4 0 25%, #34a853 0 50%, #fbbc05 0 75%, #ea4335 0);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.auth-status {
+  min-height: 20px;
+  margin: 16px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.auth-status.error {
+  color: #dc2626;
+}
+
+.auth-status.success {
+  color: #15803d;
+}
+
+.auth-credit {
+  margin: 18px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.account-panel {
+  position: absolute;
+  right: 18px;
+  bottom: calc(max(22px, env(safe-area-inset-bottom)) + 56px);
+  left: 18px;
+  padding: 12px;
+
+  border: 1px solid #e0e7f1;
+  border-radius: 15px;
+  background: #f8fafc;
+}
+
+.account-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-avatar {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #ffffff;
+  background: #64748b;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.account-panel.google-account .account-avatar {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+}
+
+.account-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-copy strong,
+.account-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-copy strong {
+  color: #27354c;
+  font-size: 13px;
+}
+
+.account-copy span {
+  color: #7b8799;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.account-footer {
+  margin-top: 9px;
+  padding-top: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid #e6ebf2;
+}
+
+.cloud-sync-status {
+  color: #718096;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.cloud-sync-status.success {
+  color: #15803d;
+}
+
+.cloud-sync-status.error {
+  color: #dc2626;
+}
+
+#accountSwitchButton {
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: #2563eb;
+  background: #eaf1ff;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+@media (max-width: 620px) {
+  .auth-card {
+    padding: 30px 22px 23px;
+    border-radius: 24px;
+  }
+
+  .auth-logo {
+    width: 155px;
+  }
+
+  .auth-card h2 {
+    font-size: 22px;
+  }
+}

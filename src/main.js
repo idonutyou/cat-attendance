@@ -1,4 +1,5 @@
 import "./style.css";
+import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
 const SETTINGS_KEY = "cat-attendance-settings-by-month-v2";
@@ -10,6 +11,23 @@ const ANNUAL_LEAVE_KEY = "cat-attendance-annual-leave-by-year-v1";
 const ANNUAL_LEAVE_REASON_KEY = "cat-attendance-annual-leave-reasons-v1";
 const BONUS_ENTRIES_KEY = "cat-attendance-bonus-entries-by-year-v1";
 const WEEK_START_KEY = "cat-attendance-week-start-v1";
+const AUTH_MODE_KEY = "cat-attendance-auth-mode-v1";
+const ACTIVE_GOOGLE_UID_KEY = "cat-attendance-active-google-uid-v1";
+const GUEST_SNAPSHOT_KEY = "cat-attendance-guest-snapshot-v1";
+const GOOGLE_CACHE_PREFIX = "cat-attendance-google-cache-v1";
+const DEVICE_ID_KEY = "cat-attendance-device-id-v1";
+const FIREBASE_SDK_VERSION = "12.16.0";
+const CLOUD_SYNC_DEBOUNCE_MS = 550;
+const SYNCED_STORAGE_KEYS = [
+  STORAGE_KEY,
+  SETTINGS_KEY,
+  FISCAL_SETTINGS_KEY,
+  WEEKLY_RANGE_KEY,
+  ANNUAL_LEAVE_KEY,
+  ANNUAL_LEAVE_REASON_KEY,
+  BONUS_ENTRIES_KEY,
+  WEEK_START_KEY,
+];
 const BONUS_ROW_COUNT = 8;
 const YEAR_MIN = 2000;
 const YEAR_MAX = 2100;
@@ -197,6 +215,17 @@ let annualLeaveByYear = loadAnnualLeaveByYear();
 let annualLeaveReasons = loadAnnualLeaveReasons();
 let bonusEntriesByYear = loadBonusEntriesByYear();
 let holidays = {};
+let authMode = null;
+let activeGoogleUser = null;
+let firebaseServices = null;
+let firebaseInitializationPromise = null;
+let cloudUnsubscribe = null;
+let cloudSyncTimer = null;
+let cloudSyncSuspended = false;
+let cloudWritePending = false;
+let splashFinished = false;
+let authRedirectInProgress = false;
+const deviceId = getOrCreateDeviceId();
 
 const app = document.querySelector("#app");
 
@@ -213,7 +242,41 @@ app.innerHTML = `
     <p class="app-splash-credit">Made by 제민</p>
   </div>
 
-  <div class="app-shell">
+  <section
+    id="authGate"
+    class="auth-gate"
+    aria-label="로그인 방법 선택"
+    aria-hidden="true"
+    hidden
+  >
+    <div class="auth-card">
+      <img
+        class="auth-logo"
+        src="${SPLASH_LOGO_DATA_URI}"
+        alt="CAT 로고"
+      />
+      <p class="auth-subtitle">근태 및 급여관리</p>
+      <h2>사용 방법을 선택하세요</h2>
+      <p class="auth-description">
+        Guest는 이 기기에만 저장되고, Google 로그인은 같은 계정으로 휴대폰과 컴퓨터가 동기화됩니다.
+      </p>
+
+      <div class="auth-actions">
+        <button id="guestLoginButton" class="auth-button guest" type="button">
+          Guest 로그인
+        </button>
+        <button id="googleLoginButton" class="auth-button google" type="button">
+          <span class="google-mark" aria-hidden="true">G</span>
+          Google 로그인
+        </button>
+      </div>
+
+      <p id="authStatus" class="auth-status" role="status" aria-live="polite"></p>
+      <p class="auth-credit">Made by 제민</p>
+    </div>
+  </section>
+
+  <div class="app-shell auth-locked" aria-hidden="true">
     <header class="app-header">
       <button
         id="menuButton"
@@ -288,6 +351,20 @@ app.innerHTML = `
             <span>52h / 연차</span>
           </button>
         </nav>
+
+        <section id="accountPanel" class="account-panel" aria-label="현재 로그인 정보">
+          <div class="account-summary">
+            <div id="accountAvatar" class="account-avatar" aria-hidden="true">G</div>
+            <div class="account-copy">
+              <strong id="accountName">Guest 사용 중</strong>
+              <span id="accountEmail">이 기기에만 저장</span>
+            </div>
+          </div>
+          <div class="account-footer">
+            <span id="cloudSyncStatus" class="cloud-sync-status">로컬 저장</span>
+            <button id="accountSwitchButton" type="button">계정 전환</button>
+          </div>
+        </section>
 
         <div
           id="weekStartToggle"
@@ -1097,6 +1174,17 @@ app.innerHTML = `
   </div>
 `;
 
+const authGate = document.querySelector("#authGate");
+const guestLoginButton = document.querySelector("#guestLoginButton");
+const googleLoginButton = document.querySelector("#googleLoginButton");
+const authStatus = document.querySelector("#authStatus");
+const appShell = document.querySelector(".app-shell");
+const accountPanel = document.querySelector("#accountPanel");
+const accountAvatar = document.querySelector("#accountAvatar");
+const accountName = document.querySelector("#accountName");
+const accountEmail = document.querySelector("#accountEmail");
+const cloudSyncStatus = document.querySelector("#cloudSyncStatus");
+const accountSwitchButton = document.querySelector("#accountSwitchButton");
 const monthTitle = document.querySelector("#monthTitle");
 const calendarGrid = document.querySelector("#calendarGrid");
 const mainCalendarWeekdays = document.querySelector(
@@ -1331,6 +1419,18 @@ appNavigationButtons.forEach((button) => {
   button.addEventListener("click", () => {
     setAppPage(button.dataset.appNavigation);
   });
+});
+
+guestLoginButton.addEventListener("click", () => {
+  enterGuestMode();
+});
+
+googleLoginButton.addEventListener("click", () => {
+  startGoogleLogin();
+});
+
+accountSwitchButton.addEventListener("click", () => {
+  returnToLoginChooser();
 });
 
 salaryYearButton.addEventListener("click", () => {
@@ -2775,6 +2875,7 @@ function saveWeekStartPreference() {
       WEEK_START_KEY,
       weekStartsOnMonday ? "monday" : "sunday",
     );
+    scheduleCloudSync();
   } catch (error) {
     console.error(
       "달력 시작 요일 설정을 저장하지 못했습니다.",
@@ -4903,6 +5004,7 @@ function saveBonusEntriesByYear() {
       BONUS_ENTRIES_KEY,
       JSON.stringify(bonusEntriesByYear),
     );
+    scheduleCloudSync();
   } catch (error) {
     console.error("상여 및 보너스 내역을 저장하지 못했습니다.", error);
   }
@@ -5362,6 +5464,7 @@ function saveRecords() {
     STORAGE_KEY,
     JSON.stringify(records),
   );
+  scheduleCloudSync();
 }
 
 function loadWeeklyDateRange() {
@@ -5412,6 +5515,7 @@ function saveWeeklyDateRangeFromInputs() {
     WEEKLY_RANGE_KEY,
     JSON.stringify(weeklyDateRange),
   );
+  scheduleCloudSync();
 }
 
 function syncWeeklyDateRangeInputs() {
@@ -5455,6 +5559,7 @@ function saveAnnualLeaveByYear() {
     ANNUAL_LEAVE_KEY,
     JSON.stringify(annualLeaveByYear),
   );
+  scheduleCloudSync();
 }
 
 function loadAnnualLeaveReasons() {
@@ -5483,6 +5588,7 @@ function saveAnnualLeaveReasons() {
     ANNUAL_LEAVE_REASON_KEY,
     JSON.stringify(annualLeaveReasons),
   );
+  scheduleCloudSync();
 }
 
 function getMonthKey(date) {
@@ -5691,6 +5797,7 @@ function saveSettingsByMonth() {
     SETTINGS_KEY,
     JSON.stringify(settingsByMonth),
   );
+  scheduleCloudSync();
 }
 
 function loadFiscalSettingsByYear() {
@@ -5724,12 +5831,619 @@ function saveFiscalSettingsByYear() {
     FISCAL_SETTINGS_KEY,
     JSON.stringify(fiscalSettingsByYear),
   );
+  scheduleCloudSync();
+}
+
+
+function getOrCreateDeviceId() {
+  try {
+    const savedDeviceId = localStorage.getItem(DEVICE_ID_KEY);
+
+    if (savedDeviceId) {
+      return savedDeviceId;
+    }
+
+    const newDeviceId =
+      globalThis.crypto?.randomUUID?.() ||
+      `device-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    localStorage.setItem(DEVICE_ID_KEY, newDeviceId);
+    return newDeviceId;
+  } catch (error) {
+    console.error("기기 식별값을 만들지 못했습니다.", error);
+    return `device-${Date.now()}`;
+  }
+}
+
+function isFirebaseConfigured() {
+  const requiredKeys = ["apiKey", "authDomain", "projectId", "appId"];
+
+  return requiredKeys.every((key) => {
+    const value = firebaseConfig?.[key];
+    return (
+      typeof value === "string" &&
+      value.trim() !== "" &&
+      !value.includes("YOUR_") &&
+      !value.includes("여기에")
+    );
+  });
+}
+
+function setAuthStatus(message = "", type = "") {
+  authStatus.textContent = message;
+  authStatus.classList.toggle("error", type === "error");
+  authStatus.classList.toggle("success", type === "success");
+}
+
+function setAuthBusy(isBusy, message = "") {
+  guestLoginButton.disabled = isBusy;
+  googleLoginButton.disabled = isBusy;
+  authGate.classList.toggle("busy", isBusy);
+
+  if (message) {
+    setAuthStatus(message);
+  }
+}
+
+function showAuthGate() {
+  if (!splashFinished) {
+    return;
+  }
+
+  closeNavigationDrawer();
+  authGate.hidden = false;
+  authGate.setAttribute("aria-hidden", "false");
+  appShell.classList.add("auth-locked");
+  appShell.setAttribute("aria-hidden", "true");
+  document.documentElement.classList.add("auth-gate-active");
+  setAuthBusy(false);
+
+  if (!isFirebaseConfigured()) {
+    setAuthStatus("Guest 로그인은 바로 사용할 수 있습니다. Google 로그인은 Firebase 설정 후 사용할 수 있습니다.");
+  } else {
+    setAuthStatus("");
+  }
+
+  window.requestAnimationFrame(() => guestLoginButton.focus());
+}
+
+function showAppShell() {
+  authGate.hidden = true;
+  authGate.setAttribute("aria-hidden", "true");
+  appShell.classList.remove("auth-locked");
+  appShell.setAttribute("aria-hidden", "false");
+  document.documentElement.classList.remove("auth-gate-active");
+  updateAccountPanel();
+  render();
+}
+
+function captureAppStorageSnapshot() {
+  const storage = {};
+
+  SYNCED_STORAGE_KEYS.forEach((key) => {
+    const value = localStorage.getItem(key);
+
+    if (value !== null) {
+      storage[key] = value;
+    }
+  });
+
+  return {
+    schemaVersion: 1,
+    storage,
+  };
+}
+
+function hasMeaningfulSnapshot(snapshot) {
+  if (!snapshot?.storage || typeof snapshot.storage !== "object") {
+    return false;
+  }
+
+  return Object.values(snapshot.storage).some((value) => {
+    if (typeof value !== "string" || value === "" || value === "{}") {
+      return false;
+    }
+
+    return value !== "monday";
+  });
+}
+
+function saveSnapshotToLocalKey(key, snapshot) {
+  try {
+    localStorage.setItem(key, JSON.stringify(snapshot));
+  } catch (error) {
+    console.error("로컬 백업을 저장하지 못했습니다.", error);
+  }
+}
+
+function loadSnapshotFromLocalKey(key) {
+  try {
+    const rawSnapshot = localStorage.getItem(key);
+    return rawSnapshot ? JSON.parse(rawSnapshot) : null;
+  } catch (error) {
+    console.error("로컬 백업을 불러오지 못했습니다.", error);
+    return null;
+  }
+}
+
+function getGoogleCacheKey(uid) {
+  return `${GOOGLE_CACHE_PREFIX}:${uid}`;
+}
+
+function applyAppStorageSnapshot(snapshot) {
+  if (!snapshot?.storage || typeof snapshot.storage !== "object") {
+    return;
+  }
+
+  cloudSyncSuspended = true;
+
+  try {
+    SYNCED_STORAGE_KEYS.forEach((key) => {
+      const value = snapshot.storage[key];
+
+      if (typeof value === "string") {
+        localStorage.setItem(key, value);
+      } else {
+        localStorage.removeItem(key);
+      }
+    });
+
+    reloadAppStateFromStorage();
+  } finally {
+    cloudSyncSuspended = false;
+  }
+}
+
+function reloadAppStateFromStorage() {
+  weekStartsOnMonday = loadWeekStartPreference();
+  records = loadRecords();
+  settingsByMonth = loadSettingsByMonth();
+  fiscalSettingsByYear = loadFiscalSettingsByYear();
+  weeklyDateRange = loadWeeklyDateRange();
+  annualLeaveByYear = loadAnnualLeaveByYear();
+  annualLeaveReasons = loadAnnualLeaveReasons();
+  bonusEntriesByYear = loadBonusEntriesByYear();
+
+  syncWeekStartToggle();
+  render();
+}
+
+function preserveCurrentModeSnapshot() {
+  const currentSnapshot = captureAppStorageSnapshot();
+  const savedMode = localStorage.getItem(AUTH_MODE_KEY);
+  const savedUid = localStorage.getItem(ACTIVE_GOOGLE_UID_KEY);
+
+  if (savedMode === "google" && savedUid) {
+    saveSnapshotToLocalKey(getGoogleCacheKey(savedUid), currentSnapshot);
+  } else {
+    saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, currentSnapshot);
+  }
+}
+
+function restoreGuestSnapshot() {
+  const savedMode = localStorage.getItem(AUTH_MODE_KEY);
+  let guestSnapshot = loadSnapshotFromLocalKey(GUEST_SNAPSHOT_KEY);
+
+  if (!guestSnapshot && savedMode !== "google") {
+    guestSnapshot = captureAppStorageSnapshot();
+    saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, guestSnapshot);
+  }
+
+  if (guestSnapshot) {
+    applyAppStorageSnapshot(guestSnapshot);
+    return;
+  }
+
+  applyAppStorageSnapshot({ schemaVersion: 1, storage: {} });
+}
+
+async function initializeFirebaseServices() {
+  if (firebaseServices) {
+    return firebaseServices;
+  }
+
+  if (firebaseInitializationPromise) {
+    return firebaseInitializationPromise;
+  }
+
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase 설정값이 비어 있습니다.");
+  }
+
+  firebaseInitializationPromise = (async () => {
+    const baseUrl = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
+    const [appModule, authModule, firestoreModule] = await Promise.all([
+      import(/* @vite-ignore */ `${baseUrl}/firebase-app.js`),
+      import(/* @vite-ignore */ `${baseUrl}/firebase-auth.js`),
+      import(/* @vite-ignore */ `${baseUrl}/firebase-firestore.js`),
+    ]);
+
+    const firebaseApp = appModule.initializeApp(firebaseConfig);
+    const auth = authModule.getAuth(firebaseApp);
+    const db = firestoreModule.getFirestore(firebaseApp);
+
+    try {
+      await authModule.setPersistence(
+        auth,
+        authModule.browserLocalPersistence,
+      );
+    } catch (error) {
+      console.warn("Firebase 로그인 유지 설정을 적용하지 못했습니다.", error);
+    }
+
+    firebaseServices = {
+      auth,
+      db,
+      ...authModule,
+      ...firestoreModule,
+    };
+
+    return firebaseServices;
+  })();
+
+  try {
+    return await firebaseInitializationPromise;
+  } catch (error) {
+    firebaseInitializationPromise = null;
+    throw error;
+  }
+}
+
+function getCloudDocumentReference(services, uid) {
+  return services.doc(services.db, "users", uid, "appData", "main");
+}
+
+async function enterGuestMode() {
+  setAuthBusy(true, "Guest 모드로 여는 중입니다…");
+  preserveCurrentModeSnapshot();
+
+  if (cloudSyncTimer) {
+    window.clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = null;
+  }
+
+  cloudUnsubscribe?.();
+  cloudUnsubscribe = null;
+  activeGoogleUser = null;
+  authMode = "guest";
+
+  try {
+    if (firebaseServices?.auth?.currentUser) {
+      await firebaseServices.signOut(firebaseServices.auth);
+    }
+  } catch (error) {
+    console.warn("Google 로그아웃 처리 중 오류가 발생했습니다.", error);
+  }
+
+  restoreGuestSnapshot();
+  localStorage.setItem(AUTH_MODE_KEY, "guest");
+  localStorage.removeItem(ACTIVE_GOOGLE_UID_KEY);
+  setAuthStatus("");
+  showAppShell();
+}
+
+async function startGoogleLogin() {
+  if (!isFirebaseConfigured()) {
+    setAuthStatus(
+      "Google 로그인을 사용하려면 src/firebase-config.js에 Firebase 설정값을 먼저 입력해야 합니다.",
+      "error",
+    );
+    return;
+  }
+
+  setAuthBusy(true, "Google 로그인 창을 여는 중입니다…");
+  preserveCurrentModeSnapshot();
+
+  try {
+    const services = await initializeFirebaseServices();
+    let user = services.auth.currentUser;
+
+    if (!user) {
+      const provider = new services.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+
+      try {
+        const result = await services.signInWithPopup(
+          services.auth,
+          provider,
+        );
+        user = result.user;
+      } catch (error) {
+        const redirectCodes = new Set([
+          "auth/popup-blocked",
+          "auth/operation-not-supported-in-this-environment",
+          "auth/web-storage-unsupported",
+        ]);
+
+        if (redirectCodes.has(error?.code)) {
+          authRedirectInProgress = true;
+          setAuthStatus("Google 로그인 화면으로 이동합니다…");
+          await services.signInWithRedirect(services.auth, provider);
+          return;
+        }
+
+        throw error;
+      }
+    }
+
+    await enterGoogleMode(user);
+  } catch (error) {
+    console.error("Google 로그인 실패:", error);
+    const cancelled = [
+      "auth/popup-closed-by-user",
+      "auth/cancelled-popup-request",
+    ].includes(error?.code);
+
+    setAuthStatus(
+      cancelled
+        ? "Google 로그인이 취소되었습니다."
+        : getFriendlyFirebaseError(error),
+      cancelled ? "" : "error",
+    );
+    setAuthBusy(false);
+  }
+}
+
+async function enterGoogleMode(user) {
+  const services = await initializeFirebaseServices();
+  const documentReference = getCloudDocumentReference(services, user.uid);
+  setAuthStatus("저장된 데이터를 불러오는 중입니다…");
+
+  const localSnapshot = captureAppStorageSnapshot();
+  const cachedSnapshot = loadSnapshotFromLocalKey(
+    getGoogleCacheKey(user.uid),
+  );
+  const remoteSnapshot = await services.getDoc(documentReference);
+
+  cloudSyncSuspended = true;
+
+  try {
+    if (remoteSnapshot.exists()) {
+      const remoteData = remoteSnapshot.data();
+      const snapshot = {
+        schemaVersion: remoteData.schemaVersion || 1,
+        storage: remoteData.storage || {},
+      };
+      applyAppStorageSnapshot(snapshot);
+      saveSnapshotToLocalKey(getGoogleCacheKey(user.uid), snapshot);
+    } else {
+      const startingSnapshot = hasMeaningfulSnapshot(localSnapshot)
+        ? localSnapshot
+        : cachedSnapshot || localSnapshot;
+
+      applyAppStorageSnapshot(startingSnapshot);
+      await services.setDoc(documentReference, {
+        schemaVersion: 1,
+        storage: startingSnapshot.storage || {},
+        sourceDeviceId: deviceId,
+        updatedAt: services.serverTimestamp(),
+      });
+      saveSnapshotToLocalKey(
+        getGoogleCacheKey(user.uid),
+        startingSnapshot,
+      );
+    }
+  } finally {
+    cloudSyncSuspended = false;
+  }
+
+  authMode = "google";
+  activeGoogleUser = user;
+  localStorage.setItem(AUTH_MODE_KEY, "google");
+  localStorage.setItem(ACTIVE_GOOGLE_UID_KEY, user.uid);
+  subscribeToCloudChanges();
+  updateCloudSyncStatus("동기화 완료", "success");
+  setAuthStatus("로그인되었습니다.", "success");
+  showAppShell();
+}
+
+function subscribeToCloudChanges() {
+  cloudUnsubscribe?.();
+
+  if (!firebaseServices || !activeGoogleUser) {
+    cloudUnsubscribe = null;
+    return;
+  }
+
+  const documentReference = getCloudDocumentReference(
+    firebaseServices,
+    activeGoogleUser.uid,
+  );
+
+  cloudUnsubscribe = firebaseServices.onSnapshot(
+    documentReference,
+    (snapshot) => {
+      if (!snapshot.exists() || snapshot.metadata.hasPendingWrites) {
+        return;
+      }
+
+      const data = snapshot.data();
+
+      if (
+        data.sourceDeviceId === deviceId ||
+        cloudWritePending ||
+        cloudSyncTimer
+      ) {
+        return;
+      }
+
+      const incomingSnapshot = {
+        schemaVersion: data.schemaVersion || 1,
+        storage: data.storage || {},
+      };
+
+      applyAppStorageSnapshot(incomingSnapshot);
+      saveSnapshotToLocalKey(
+        getGoogleCacheKey(activeGoogleUser.uid),
+        incomingSnapshot,
+      );
+      updateCloudSyncStatus("다른 기기 변경 반영", "success");
+    },
+    (error) => {
+      console.error("실시간 동기화 오류:", error);
+      updateCloudSyncStatus("동기화 오류", "error");
+    },
+  );
+}
+
+function scheduleCloudSync() {
+  if (
+    cloudSyncSuspended ||
+    authMode !== "google" ||
+    !activeGoogleUser ||
+    !firebaseServices
+  ) {
+    return;
+  }
+
+  cloudWritePending = true;
+  updateCloudSyncStatus("동기화 중…");
+
+  if (cloudSyncTimer) {
+    window.clearTimeout(cloudSyncTimer);
+  }
+
+  cloudSyncTimer = window.setTimeout(() => {
+    cloudSyncTimer = null;
+    flushCloudSync();
+  }, CLOUD_SYNC_DEBOUNCE_MS);
+}
+
+async function flushCloudSync() {
+  if (
+    authMode !== "google" ||
+    !activeGoogleUser ||
+    !firebaseServices
+  ) {
+    cloudWritePending = false;
+    return;
+  }
+
+  const snapshot = captureAppStorageSnapshot();
+  const documentReference = getCloudDocumentReference(
+    firebaseServices,
+    activeGoogleUser.uid,
+  );
+
+  try {
+    await firebaseServices.setDoc(documentReference, {
+      schemaVersion: 1,
+      storage: snapshot.storage,
+      sourceDeviceId: deviceId,
+      updatedAt: firebaseServices.serverTimestamp(),
+    });
+    saveSnapshotToLocalKey(
+      getGoogleCacheKey(activeGoogleUser.uid),
+      snapshot,
+    );
+    updateCloudSyncStatus("동기화 완료", "success");
+  } catch (error) {
+    console.error("클라우드 저장 실패:", error);
+    updateCloudSyncStatus("오프라인 · 재시도 필요", "error");
+  } finally {
+    cloudWritePending = false;
+  }
+}
+
+function updateCloudSyncStatus(message, type = "") {
+  cloudSyncStatus.textContent = message;
+  cloudSyncStatus.classList.toggle("success", type === "success");
+  cloudSyncStatus.classList.toggle("error", type === "error");
+}
+
+function updateAccountPanel() {
+  if (authMode === "google" && activeGoogleUser) {
+    accountPanel.classList.add("google-account");
+    accountAvatar.textContent = (
+      activeGoogleUser.displayName ||
+      activeGoogleUser.email ||
+      "G"
+    )
+      .trim()
+      .charAt(0)
+      .toUpperCase();
+    accountName.textContent = activeGoogleUser.displayName || "Google 사용자";
+    accountEmail.textContent = activeGoogleUser.email || "Google 로그인";
+    accountSwitchButton.textContent = "로그아웃";
+    return;
+  }
+
+  accountPanel.classList.remove("google-account");
+  accountAvatar.textContent = "G";
+  accountName.textContent = "Guest 사용 중";
+  accountEmail.textContent = "이 기기에만 저장";
+  accountSwitchButton.textContent = "계정 전환";
+  updateCloudSyncStatus("로컬 저장");
+}
+
+async function returnToLoginChooser() {
+  closeNavigationDrawer();
+  preserveCurrentModeSnapshot();
+
+  if (authMode === "google") {
+    await flushCloudSync();
+  }
+
+  cloudUnsubscribe?.();
+  cloudUnsubscribe = null;
+  authMode = null;
+  activeGoogleUser = null;
+
+  try {
+    if (firebaseServices?.auth?.currentUser) {
+      await firebaseServices.signOut(firebaseServices.auth);
+    }
+  } catch (error) {
+    console.warn("로그아웃 처리 중 오류가 발생했습니다.", error);
+  }
+
+  restoreGuestSnapshot();
+  localStorage.setItem(AUTH_MODE_KEY, "guest");
+  localStorage.removeItem(ACTIVE_GOOGLE_UID_KEY);
+  showAuthGate();
+}
+
+function getFriendlyFirebaseError(error) {
+  const messages = {
+    "auth/unauthorized-domain":
+      "현재 주소가 Firebase 승인 도메인에 등록되지 않았습니다.",
+    "auth/network-request-failed":
+      "인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
+    "auth/internal-error":
+      "Google 로그인 처리 중 오류가 발생했습니다.",
+    "permission-denied":
+      "Firestore 보안 규칙 때문에 데이터를 읽거나 저장할 수 없습니다.",
+  };
+
+  return messages[error?.code] || error?.message || "Google 로그인에 실패했습니다.";
+}
+
+async function processGoogleRedirectResult() {
+  if (!isFirebaseConfigured()) {
+    return;
+  }
+
+  try {
+    const services = await initializeFirebaseServices();
+    const result = await services.getRedirectResult(services.auth);
+
+    if (result?.user) {
+      authRedirectInProgress = true;
+      preserveCurrentModeSnapshot();
+      await enterGoogleMode(result.user);
+    }
+  } catch (error) {
+    console.error("Google 리디렉션 로그인 처리 실패:", error);
+    setAuthStatus(getFriendlyFirebaseError(error), "error");
+  }
 }
 
 function initializeSplashScreen() {
   const splash = document.querySelector("#appSplash");
 
   if (!splash) {
+    splashFinished = true;
+    showAuthGate();
     return;
   }
 
@@ -5740,7 +6454,14 @@ function initializeSplashScreen() {
 
     window.setTimeout(() => {
       splash.remove();
+      splashFinished = true;
       document.documentElement.classList.remove("app-splash-active");
+
+      if (authMode === "google" && activeGoogleUser) {
+        showAppShell();
+      } else if (!authRedirectInProgress) {
+        showAuthGate();
+      }
     }, 420);
   }, 1600);
 }
@@ -5764,4 +6485,5 @@ installBackExitTestHook();
 syncWeekStartToggle();
 render();
 loadHolidays();
+processGoogleRedirectResult();
 initializeSplashScreen();
