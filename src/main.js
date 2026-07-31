@@ -9,6 +9,7 @@ const WEEKLY_RANGE_KEY = "cat-attendance-52-hour-range-v1";
 const ANNUAL_LEAVE_KEY = "cat-attendance-annual-leave-by-year-v1";
 const ANNUAL_LEAVE_REASON_KEY = "cat-attendance-annual-leave-reasons-v1";
 const BONUS_ENTRIES_KEY = "cat-attendance-bonus-entries-by-year-v1";
+const WEEK_START_KEY = "cat-attendance-week-start-v1";
 const BONUS_ROW_COUNT = 8;
 const YEAR_MIN = 2000;
 const YEAR_MAX = 2100;
@@ -187,6 +188,7 @@ let monthPickerTarget = null;
 let monthPickerPreviousFocus = null;
 let mainCalendarMonthAnimating = false;
 let datePickerMonthAnimating = false;
+let weekStartsOnMonday = loadWeekStartPreference();
 let records = loadRecords();
 let settingsByMonth = loadSettingsByMonth();
 let fiscalSettingsByYear = loadFiscalSettingsByYear();
@@ -286,6 +288,28 @@ app.innerHTML = `
             <span>52h / 연차</span>
           </button>
         </nav>
+
+        <div
+          id="weekStartToggle"
+          class="week-start-toggle"
+          role="group"
+          aria-label="달력 시작 요일 선택"
+        >
+          <button
+            class="week-start-option active"
+            type="button"
+            data-week-start="monday"
+            aria-pressed="true"
+            title="월요일부터 시작"
+          >월 <span aria-hidden="true">›</span></button>
+          <button
+            class="week-start-option"
+            type="button"
+            data-week-start="sunday"
+            aria-pressed="false"
+            title="일요일부터 시작"
+          >일 <span aria-hidden="true">›</span></button>
+        </div>
       </aside>
     </div>
 
@@ -347,15 +371,11 @@ app.innerHTML = `
               </button>
             </div>
 
-            <div class="weekdays" aria-hidden="true">
-              <div>월</div>
-              <div>화</div>
-              <div>수</div>
-              <div>목</div>
-              <div>금</div>
-              <div class="saturday">토</div>
-              <div class="sunday">일</div>
-            </div>
+            <div
+              id="mainCalendarWeekdays"
+              class="weekdays"
+              aria-hidden="true"
+            ></div>
 
             <div id="calendarGrid" class="calendar-grid"></div>
           </section>
@@ -957,17 +977,10 @@ app.innerHTML = `
       </div>
 
       <div
+        id="datePickerWeekdays"
         class="date-picker-weekdays"
         aria-hidden="true"
-      >
-        <span>월</span>
-        <span>화</span>
-        <span>수</span>
-        <span>목</span>
-        <span>금</span>
-        <span class="saturday">토</span>
-        <span class="sunday">일</span>
-      </div>
+      ></div>
 
       <div
         id="datePickerGrid"
@@ -1086,6 +1099,16 @@ app.innerHTML = `
 
 const monthTitle = document.querySelector("#monthTitle");
 const calendarGrid = document.querySelector("#calendarGrid");
+const mainCalendarWeekdays = document.querySelector(
+  "#mainCalendarWeekdays",
+);
+const datePickerWeekdays = document.querySelector(
+  "#datePickerWeekdays",
+);
+const weekStartToggle = document.querySelector("#weekStartToggle");
+const weekStartOptions = [
+  ...document.querySelectorAll("[data-week-start]"),
+];
 const mobilePager = document.querySelector("#mobilePager");
 const mobilePages = [
   ...document.querySelectorAll("[data-mobile-page]"),
@@ -1278,6 +1301,24 @@ const deleteRecordButton = document.querySelector(
 );
 
 menuButton.addEventListener("click", openNavigationDrawer);
+weekStartOptions.forEach((button) => {
+  button.addEventListener("click", () => {
+    const nextStartsOnMonday = button.dataset.weekStart === "monday";
+
+    if (weekStartsOnMonday === nextStartsOnMonday) {
+      return;
+    }
+
+    weekStartsOnMonday = nextStartsOnMonday;
+    saveWeekStartPreference();
+    syncWeekStartToggle();
+    renderCalendar();
+
+    if (datePickerModal.classList.contains("open")) {
+      renderDatePicker();
+    }
+  });
+});
 closeNavigationButton.addEventListener(
   "click",
   closeNavigationDrawer,
@@ -2716,6 +2757,97 @@ document.addEventListener("keydown", (event) => {
   closeModal();
 });
 
+function loadWeekStartPreference() {
+  try {
+    return localStorage.getItem(WEEK_START_KEY) !== "sunday";
+  } catch (error) {
+    console.error(
+      "달력 시작 요일 설정을 불러오지 못했습니다.",
+      error,
+    );
+    return true;
+  }
+}
+
+function saveWeekStartPreference() {
+  try {
+    localStorage.setItem(
+      WEEK_START_KEY,
+      weekStartsOnMonday ? "monday" : "sunday",
+    );
+  } catch (error) {
+    console.error(
+      "달력 시작 요일 설정을 저장하지 못했습니다.",
+      error,
+    );
+  }
+}
+
+function getCalendarWeekdays() {
+  return weekStartsOnMonday
+    ? [
+        { label: "월", day: 1 },
+        { label: "화", day: 2 },
+        { label: "수", day: 3 },
+        { label: "목", day: 4 },
+        { label: "금", day: 5 },
+        { label: "토", day: 6 },
+        { label: "일", day: 0 },
+      ]
+    : [
+        { label: "일", day: 0 },
+        { label: "월", day: 1 },
+        { label: "화", day: 2 },
+        { label: "수", day: 3 },
+        { label: "목", day: 4 },
+        { label: "금", day: 5 },
+        { label: "토", day: 6 },
+      ];
+}
+
+function getCalendarFirstDayPosition(date) {
+  return weekStartsOnMonday
+    ? (date.getDay() + 6) % 7
+    : date.getDay();
+}
+
+function renderCalendarWeekdayHeaders() {
+  const weekdays = getCalendarWeekdays();
+
+  mainCalendarWeekdays.innerHTML = weekdays
+    .map(({ label, day }) => {
+      const className =
+        day === 0 ? "sunday" : day === 6 ? "saturday" : "";
+
+      return `<div${className ? ` class="${className}"` : ""}>${label}</div>`;
+    })
+    .join("");
+
+  datePickerWeekdays.innerHTML = weekdays
+    .map(({ label, day }) => {
+      const className =
+        day === 0 ? "sunday" : day === 6 ? "saturday" : "";
+
+      return `<span${className ? ` class="${className}"` : ""}>${label}</span>`;
+    })
+    .join("");
+}
+
+function syncWeekStartToggle() {
+  const currentValue = weekStartsOnMonday ? "monday" : "sunday";
+
+  weekStartOptions.forEach((button) => {
+    const isActive = button.dataset.weekStart === currentValue;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+
+  weekStartToggle.setAttribute(
+    "aria-label",
+    `달력은 현재 ${weekStartsOnMonday ? "월요일" : "일요일"}부터 시작`,
+  );
+}
+
 function openNavigationDrawer() {
   navigationDrawer.classList.add("open");
   navigationDrawer.setAttribute("aria-hidden", "false");
@@ -3203,11 +3335,14 @@ function attachHorizontalMonthSwipe(element, onSwipe) {
 }
 
 function renderDatePicker() {
+  renderCalendarWeekdayHeaders();
+
   const year = datePickerVisibleMonth.getFullYear();
   const month = datePickerVisibleMonth.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayPosition =
-    (new Date(year, month, 1).getDay() + 6) % 7;
+  const firstDayPosition = getCalendarFirstDayPosition(
+    new Date(year, month, 1),
+  );
   const selectedDateKey = datePickerTargetInput?.value || "";
   const today = new Date();
   const todayDateKey = createDateKey(
@@ -3894,6 +4029,8 @@ function render() {
 }
 
 function renderCalendar() {
+  renderCalendarWeekdayHeaders();
+
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
 
@@ -3903,7 +4040,7 @@ function renderCalendar() {
   const firstDate = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  const firstDayPosition = (firstDate.getDay() + 6) % 7;
+  const firstDayPosition = getCalendarFirstDayPosition(firstDate);
   const today = new Date();
 
   for (let cellIndex = 0; cellIndex < 42; cellIndex += 1) {
@@ -5615,6 +5752,7 @@ if ("serviceWorker" in navigator) {
 syncMobilePagerMode();
 initializeBackExitGuard();
 installBackExitTestHook();
+syncWeekStartToggle();
 render();
 loadHolidays();
 initializeSplashScreen();
