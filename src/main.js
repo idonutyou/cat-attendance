@@ -276,7 +276,7 @@ app.innerHTML = `
     </div>
   </section>
 
-  <div class="app-shell auth-locked" aria-hidden="true">
+  <div class="app-shell auth-locked" aria-hidden="true" hidden>
     <header class="app-header">
       <button
         id="menuButton"
@@ -5893,6 +5893,7 @@ function showAuthGate() {
   closeNavigationDrawer();
   authGate.hidden = false;
   authGate.setAttribute("aria-hidden", "false");
+  appShell.hidden = true;
   appShell.classList.add("auth-locked");
   appShell.setAttribute("aria-hidden", "true");
   document.documentElement.classList.add("auth-gate-active");
@@ -5910,6 +5911,7 @@ function showAuthGate() {
 function showAppShell() {
   authGate.hidden = true;
   authGate.setAttribute("aria-hidden", "true");
+  appShell.hidden = false;
   appShell.classList.remove("auth-locked");
   appShell.setAttribute("aria-hidden", "false");
   document.documentElement.classList.remove("auth-gate-active");
