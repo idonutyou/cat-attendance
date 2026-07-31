@@ -1,10 +1,9 @@
-// Firebase 콘솔 > 프로젝트 설정 > 내 앱 > SDK 설정 및 구성에서 복사한 값을 입력하세요.
-// 이 설정 객체는 웹앱에서 공개되는 값이며, 실제 데이터 보호는 firestore.rules가 담당합니다.
+// Firebase 콘솔 > 프로젝트 설정 > 내 앱 > SDK 설정 및 구성
 export const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyBLtcoKRR_KmqiXJ_oab1d7nC6txVazXh4",
+  authDomain: "cat-attendance.firebaseapp.com",
+  projectId: "cat-attendance",
+  storageBucket: "cat-attendance.firebasestorage.app",
+  messagingSenderId: "644660505012",
+  appId: "1:644660505012:web:26c30453f6ea510a0faaee1",
 };
