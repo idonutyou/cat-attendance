@@ -2840,7 +2840,7 @@ body.navigation-open {
 .week-start-toggle {
   position: absolute;
   right: 18px;
-  bottom: max(22px, env(safe-area-inset-bottom));
+  bottom: calc(max(22px, env(safe-area-inset-bottom)) + 116px);
   z-index: 2;
 
   width: 148px;
@@ -4712,7 +4712,7 @@ html.auth-gate-active body {
 .account-panel {
   position: absolute;
   right: 18px;
-  bottom: calc(max(22px, env(safe-area-inset-bottom)) + 56px);
+  bottom: max(22px, env(safe-area-inset-bottom));
   left: 18px;
   padding: 12px;
 
