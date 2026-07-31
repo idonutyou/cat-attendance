@@ -4911,7 +4911,7 @@ function saveBonusEntriesByYear() {
 function calculateSalaryForMonth(year, month) {
   const stats = calculateMonthStats(year, month);
   const settings = getSettingsForMonth(year, month);
-  const hasAttendanceRecords = stats.recordedDays > 0;
+  const hasAttendanceRecords = stats.salaryRecordedDays > 0;
 
   const baseHourlyWage = Number(settings.baseHourlyWage) || 0;
   const safetyAllowance = Number(settings.safetyAllowance) || 0;
@@ -5008,6 +5008,7 @@ function calculateMonthStats(
 
   const stats = {
     recordedDays: 0,
+    salaryRecordedDays: 0,
     regularDays: 0,
     overtimeHours: 0,
     nightHours: 0,
@@ -5039,6 +5040,14 @@ function calculateMonthStats(
 
     stats.recordedDays += 1;
     stats.counts[workType.id] += 1;
+
+    const affectsSalary = !["annualLeave", "custom"].includes(
+      workType.id,
+    );
+
+    if (affectsSalary) {
+      stats.salaryRecordedDays += 1;
+    }
 
     Object.entries(workType.totals).forEach(
       ([totalName, value]) => {
