@@ -264,7 +264,7 @@ app.innerHTML = `
         alt="CAT 로고"
       />
       <p class="auth-subtitle">근태 및 급여관리</p>
-      <h2>사용 방법을 선택하세요</h2>
+      <h2>로그인 방법을 선택하세요</h2>
       <p class="auth-description">
         Guest는 이 기기에만 저장되고, Google 로그인은 같은 계정으로 휴대폰과 컴퓨터가 동기화됩니다.
       </p>
