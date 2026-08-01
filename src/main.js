@@ -352,6 +352,20 @@ app.innerHTML = `
           </button>
         </nav>
 
+        <section id="accountPanel" class="account-panel" aria-label="현재 로그인 정보">
+          <div class="account-summary">
+            <div id="accountAvatar" class="account-avatar" aria-hidden="true">G</div>
+            <div class="account-copy">
+              <strong id="accountName">Guest 사용 중</strong>
+              <span id="accountEmail">이 기기에만 저장</span>
+            </div>
+          </div>
+          <div class="account-footer">
+            <span id="cloudSyncStatus" class="cloud-sync-status">로컬 저장</span>
+            <button id="accountSwitchButton" type="button">계정 전환</button>
+          </div>
+        </section>
+
         <div
           id="weekStartToggle"
           class="week-start-toggle"
@@ -373,20 +387,6 @@ app.innerHTML = `
             title="일요일부터 시작"
           >일 <span aria-hidden="true">›</span></button>
         </div>
-
-        <section id="accountPanel" class="account-panel" aria-label="현재 로그인 정보">
-          <div class="account-summary">
-            <div id="accountAvatar" class="account-avatar" aria-hidden="true">G</div>
-            <div class="account-copy">
-              <strong id="accountName">Guest 사용 중</strong>
-              <span id="accountEmail">이 기기에만 저장</span>
-            </div>
-          </div>
-          <div class="account-footer">
-            <span id="cloudSyncStatus" class="cloud-sync-status">로컬 저장</span>
-            <button id="accountSwitchButton" type="button">계정 전환</button>
-          </div>
-        </section>
       </aside>
     </div>
 
@@ -4655,7 +4655,11 @@ function renderSalary() {
         monthIndex,
       );
       const isSelected = monthIndex === salarySelectedMonth;
-      annualTotalPay += salary.baseTotalPay + salary.bonusTotal;
+      const bonusMarkup = salary.bonusTotal > 0
+        ? `<small class="salary-month-bonus">+${formatMoneyValue(salary.bonusTotal)}</small>`
+        : "";
+
+      annualTotalPay += salary.totalPay;
 
       return `
         <button
@@ -4663,10 +4667,11 @@ function renderSalary() {
           type="button"
           data-salary-month="${monthIndex}"
           aria-current="${isSelected ? "true" : "false"}"
-          aria-label="${salarySelectedYear}년 ${monthIndex + 1}월 예상 급여 ${formatMoney(salary.baseTotalPay)}"
+          aria-label="${salarySelectedYear}년 ${monthIndex + 1}월 예상 급여 ${formatMoney(salary.baseTotalPay)}${salary.bonusTotal > 0 ? `, 상여 및 보너스 ${formatMoney(salary.bonusTotal)}` : ""}"
         >
           <span>${monthIndex + 1}월</span>
           <strong>${formatMoneyValue(salary.baseTotalPay)}</strong>
+          ${bonusMarkup}
         </button>
       `;
     },
