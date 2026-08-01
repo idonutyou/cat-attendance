@@ -1402,7 +1402,11 @@ const deleteRecordButton = document.querySelector(
   "#deleteRecordButton",
 );
 
-menuButton.addEventListener("click", openNavigationDrawer);
+menuButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  openNavigationDrawer();
+});
 weekStartOptions.forEach((button) => {
   button.addEventListener("click", () => {
     const nextStartsOnMonday = button.dataset.weekStart === "monday";
@@ -3015,15 +3019,27 @@ function scheduleNavigationSwipeClickReset() {
 }
 
 function openNavigationDrawer() {
+  if (navigationDrawer.classList.contains("open")) {
+    return;
+  }
+
   window.clearTimeout(navigationCloseTimer);
-  navigationDrawer.classList.remove("closing");
+  navigationDrawer.classList.remove("closing", "swiping");
   clearNavigationSwipeVisuals();
   resetNavigationSwipeState();
 
-  navigationDrawer.classList.add("open");
+  // 모바일 브라우저가 숨김 상태와 열린 상태를 한 번에 계산하면
+  // 첫 번째 탭에서 패널이 화면 밖에 남는 경우가 있어,
+  // 먼저 표시 상태를 확정한 뒤 열린 위치로 전환합니다.
+  navigationDrawer.classList.add("opening");
   navigationDrawer.setAttribute("aria-hidden", "false");
   menuButton.setAttribute("aria-expanded", "true");
   document.body.classList.add("navigation-open");
+
+  void navigationDrawer.offsetWidth;
+
+  navigationDrawer.classList.add("open");
+  navigationDrawer.classList.remove("opening");
 
   window.requestAnimationFrame(() => {
     navigationDrawer

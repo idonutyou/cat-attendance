@@ -2704,12 +2704,17 @@ html.mobile-pager-enabled .summary-card .work-total-row {
 }
 
 .navigation-drawer.open,
+.navigation-drawer.opening,
 .navigation-drawer.closing {
   visibility: visible;
 }
 
 .navigation-drawer.open {
   pointer-events: auto;
+}
+
+.navigation-drawer.opening {
+  pointer-events: none;
 }
 
 .navigation-drawer.closing {
