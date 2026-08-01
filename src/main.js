@@ -156,6 +156,14 @@ currentMonth = new Date(
 );
 
 let currentAppPage = "attendance";
+let navigationCloseTimer = null;
+let navigationSwipeResetTimer = null;
+let navigationSwipePointerId = null;
+let navigationSwipeStartX = null;
+let navigationSwipeStartY = null;
+let navigationSwipeStartedAt = 0;
+let navigationSwipeActive = false;
+let navigationSwipeClickBlocked = false;
 let salarySelectedYear = currentMonth.getFullYear();
 let salarySelectedMonth = currentMonth.getMonth();
 let salarySettingsOpen = false;
@@ -1221,6 +1229,12 @@ const menuButton = document.querySelector("#menuButton");
 const navigationDrawer = document.querySelector(
   "#navigationDrawer",
 );
+const navigationPanel = navigationDrawer.querySelector(
+  ".navigation-panel",
+);
+const navigationBackdrop = navigationDrawer.querySelector(
+  ".navigation-backdrop",
+);
 const closeNavigationButton = document.querySelector(
   "#closeNavigationButton",
 );
@@ -1414,6 +1428,36 @@ closeNavigationButton.addEventListener(
 document
   .querySelector("[data-close-navigation]")
   .addEventListener("click", closeNavigationDrawer);
+
+navigationPanel.addEventListener(
+  "pointerdown",
+  handleNavigationSwipeStart,
+);
+navigationPanel.addEventListener(
+  "pointermove",
+  handleNavigationSwipeMove,
+);
+navigationPanel.addEventListener(
+  "pointerup",
+  handleNavigationSwipeEnd,
+);
+navigationPanel.addEventListener(
+  "pointercancel",
+  handleNavigationSwipeCancel,
+);
+navigationPanel.addEventListener(
+  "click",
+  (event) => {
+    if (!navigationSwipeClickBlocked) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    navigationSwipeClickBlocked = false;
+  },
+  true,
+);
 
 appNavigationButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -2949,7 +2993,33 @@ function syncWeekStartToggle() {
   );
 }
 
+function clearNavigationSwipeVisuals() {
+  navigationDrawer.classList.remove("swiping");
+  navigationPanel.style.removeProperty("transform");
+  navigationBackdrop.style.removeProperty("opacity");
+}
+
+function resetNavigationSwipeState() {
+  navigationSwipePointerId = null;
+  navigationSwipeStartX = null;
+  navigationSwipeStartY = null;
+  navigationSwipeStartedAt = 0;
+  navigationSwipeActive = false;
+}
+
+function scheduleNavigationSwipeClickReset() {
+  window.clearTimeout(navigationSwipeResetTimer);
+  navigationSwipeResetTimer = window.setTimeout(() => {
+    navigationSwipeClickBlocked = false;
+  }, 420);
+}
+
 function openNavigationDrawer() {
+  window.clearTimeout(navigationCloseTimer);
+  navigationDrawer.classList.remove("closing");
+  clearNavigationSwipeVisuals();
+  resetNavigationSwipeState();
+
   navigationDrawer.classList.add("open");
   navigationDrawer.setAttribute("aria-hidden", "false");
   menuButton.setAttribute("aria-expanded", "true");
@@ -2962,16 +3032,171 @@ function openNavigationDrawer() {
   });
 }
 
-function closeNavigationDrawer() {
-  if (!navigationDrawer.classList.contains("open")) {
+function closeNavigationDrawer({ fromSwipe = false } = {}) {
+  if (
+    !navigationDrawer.classList.contains("open") &&
+    !navigationDrawer.classList.contains("closing")
+  ) {
     return;
   }
 
+  window.clearTimeout(navigationCloseTimer);
+  navigationDrawer.classList.remove("swiping");
+  navigationDrawer.classList.add("closing");
   navigationDrawer.classList.remove("open");
   navigationDrawer.setAttribute("aria-hidden", "true");
   menuButton.setAttribute("aria-expanded", "false");
   document.body.classList.remove("navigation-open");
-  menuButton.focus({ preventScroll: true });
+
+  if (fromSwipe) {
+    window.requestAnimationFrame(() => {
+      navigationPanel.style.transform = "translateX(-104%)";
+      navigationBackdrop.style.opacity = "0";
+    });
+  }
+
+  navigationCloseTimer = window.setTimeout(() => {
+    navigationDrawer.classList.remove("closing");
+    clearNavigationSwipeVisuals();
+    resetNavigationSwipeState();
+    menuButton.focus({ preventScroll: true });
+  }, 300);
+}
+
+function handleNavigationSwipeStart(event) {
+  if (
+    !navigationDrawer.classList.contains("open") ||
+    !["touch", "pen"].includes(event.pointerType)
+  ) {
+    return;
+  }
+
+  window.clearTimeout(navigationSwipeResetTimer);
+  navigationSwipePointerId = event.pointerId;
+  navigationSwipeStartX = event.clientX;
+  navigationSwipeStartY = event.clientY;
+  navigationSwipeStartedAt = performance.now();
+  navigationSwipeActive = false;
+}
+
+function handleNavigationSwipeMove(event) {
+  if (
+    event.pointerId !== navigationSwipePointerId ||
+    navigationSwipeStartX === null ||
+    navigationSwipeStartY === null
+  ) {
+    return;
+  }
+
+  const deltaX = event.clientX - navigationSwipeStartX;
+  const deltaY = event.clientY - navigationSwipeStartY;
+  const absoluteX = Math.abs(deltaX);
+  const absoluteY = Math.abs(deltaY);
+
+  if (!navigationSwipeActive) {
+    if (absoluteY > 12 && absoluteY > absoluteX) {
+      resetNavigationSwipeState();
+      return;
+    }
+
+    if (deltaX >= -8 || absoluteX <= absoluteY) {
+      return;
+    }
+
+    navigationSwipeActive = true;
+    navigationSwipeClickBlocked = true;
+    navigationDrawer.classList.add("swiping");
+
+    try {
+      navigationPanel.setPointerCapture(event.pointerId);
+    } catch (error) {
+      // 일부 모바일 브라우저에서는 포인터 캡처를 지원하지 않을 수 있습니다.
+    }
+  }
+
+  event.preventDefault();
+
+  const panelWidth = Math.max(
+    navigationPanel.getBoundingClientRect().width,
+    1,
+  );
+  const translateX = Math.max(-panelWidth, Math.min(0, deltaX));
+  const progress = Math.min(1, Math.abs(translateX) / panelWidth);
+
+  navigationPanel.style.transform = `translateX(${translateX}px)`;
+  navigationBackdrop.style.opacity = String(1 - progress);
+}
+
+function handleNavigationSwipeEnd(event) {
+  if (event.pointerId !== navigationSwipePointerId) {
+    return;
+  }
+
+  const deltaX =
+    navigationSwipeStartX === null
+      ? 0
+      : event.clientX - navigationSwipeStartX;
+  const duration = Math.max(
+    performance.now() - navigationSwipeStartedAt,
+    1,
+  );
+  const velocityX = deltaX / duration;
+  const panelWidth = Math.max(
+    navigationPanel.getBoundingClientRect().width,
+    1,
+  );
+  const shouldClose =
+    navigationSwipeActive &&
+    (Math.abs(deltaX) >= Math.min(88, panelWidth * 0.26) ||
+      (deltaX <= -34 && velocityX <= -0.45));
+
+  try {
+    if (navigationPanel.hasPointerCapture(event.pointerId)) {
+      navigationPanel.releasePointerCapture(event.pointerId);
+    }
+  } catch (error) {
+    // 일부 모바일 브라우저에서는 포인터 캡처를 지원하지 않을 수 있습니다.
+  }
+
+  if (shouldClose) {
+    closeNavigationDrawer({ fromSwipe: true });
+    scheduleNavigationSwipeClickReset();
+    return;
+  }
+
+  if (navigationSwipeActive) {
+    navigationDrawer.classList.remove("swiping");
+    navigationPanel.style.transform = "translateX(0)";
+    navigationBackdrop.style.opacity = "1";
+
+    window.clearTimeout(navigationSwipeResetTimer);
+    navigationSwipeResetTimer = window.setTimeout(() => {
+      clearNavigationSwipeVisuals();
+      navigationSwipeClickBlocked = false;
+    }, 300);
+  }
+
+  resetNavigationSwipeState();
+}
+
+function handleNavigationSwipeCancel(event) {
+  if (event.pointerId !== navigationSwipePointerId) {
+    return;
+  }
+
+  if (navigationSwipeActive) {
+    navigationDrawer.classList.remove("swiping");
+    navigationPanel.style.transform = "translateX(0)";
+    navigationBackdrop.style.opacity = "1";
+
+    window.clearTimeout(navigationSwipeResetTimer);
+    navigationSwipeResetTimer = window.setTimeout(() => {
+      clearNavigationSwipeVisuals();
+      navigationSwipeClickBlocked = false;
+    }, 300);
+  }
+
+  resetNavigationSwipeState();
 }
 
 function setAppPage(pageId) {

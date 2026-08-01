@@ -2703,9 +2703,17 @@ html.mobile-pager-enabled .summary-card .work-total-row {
   pointer-events: none;
 }
 
-.navigation-drawer.open {
+.navigation-drawer.open,
+.navigation-drawer.closing {
   visibility: visible;
+}
+
+.navigation-drawer.open {
   pointer-events: auto;
+}
+
+.navigation-drawer.closing {
+  pointer-events: none;
 }
 
 .navigation-backdrop {
@@ -2741,11 +2749,18 @@ html.mobile-pager-enabled .summary-card .work-total-row {
   box-shadow: 18px 0 42px rgba(15, 23, 42, 0.22);
 
   transform: translateX(-104%);
-  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  touch-action: pan-y;
+  will-change: transform;
 }
 
 .navigation-drawer.open .navigation-panel {
   transform: translateX(0);
+}
+
+.navigation-drawer.swiping .navigation-panel,
+.navigation-drawer.swiping .navigation-backdrop {
+  transition: none;
 }
 
 body.navigation-open {
