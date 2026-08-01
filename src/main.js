@@ -4659,7 +4659,7 @@ function renderSalary() {
         ? `<small class="salary-month-bonus">+${formatMoneyValue(salary.bonusTotal)}</small>`
         : "";
 
-      annualTotalPay += salary.totalPay;
+      annualTotalPay += salary.totalPay + salary.bonusTotal;
 
       return `
         <button
