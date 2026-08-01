@@ -3618,7 +3618,7 @@ function attachHorizontalMonthSwipe(element, onSwipe) {
   let activePointerId = null;
   let startX = 0;
   let startY = 0;
-  let suppressClickUntil = 0;
+  let suppressSwipeClick = false;
 
   element.addEventListener("pointerdown", (event) => {
     if (
@@ -3628,6 +3628,11 @@ function attachHorizontalMonthSwipe(element, onSwipe) {
       return;
     }
 
+    /*
+     * 새로운 터치가 시작되면 실제 날짜 선택 동작이므로 즉시 허용합니다.
+     * 시간 기준 차단을 사용하지 않아 스와이프 직후 바로 눌러도 작동합니다.
+     */
+    suppressSwipeClick = false;
     activePointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
@@ -3651,27 +3656,27 @@ function attachHorizontalMonthSwipe(element, onSwipe) {
     }
 
     /*
-     * 스와이프 직후 브라우저가 자동 생성하는 click만 막습니다.
-     * 기존 420ms 차단은 새 달력이 나타난 뒤 사용자가 누른 첫 터치까지
-     * 막아 두 번 눌러야 하는 현상을 만들었습니다.
+     * 스와이프 동작 자체에서 브라우저가 자동 생성하는 click 한 번만 막고,
+     * 다음 실제 터치는 기다리는 시간 없이 바로 허용합니다.
      */
     event.preventDefault();
-    suppressClickUntil = performance.now() + 90;
+    suppressSwipeClick = true;
     onSwipe(deltaX < 0 ? 1 : -1);
   });
 
   element.addEventListener("pointercancel", () => {
     activePointerId = null;
+    suppressSwipeClick = false;
   });
 
   element.addEventListener(
     "click",
     (event) => {
-      if (performance.now() > suppressClickUntil) {
+      if (!suppressSwipeClick) {
         return;
       }
 
-      suppressClickUntil = 0;
+      suppressSwipeClick = false;
       event.preventDefault();
       event.stopPropagation();
     },
