@@ -2759,11 +2759,11 @@ datePickerTitle.addEventListener("click", () => {
 });
 
 attachHorizontalMonthSwipe(calendarGrid, (direction) => {
-  changeMainCalendarMonth(direction, { animate: false });
+  changeMainCalendarMonth(direction, { animate: "swipe" });
 });
 
 attachHorizontalMonthSwipe(datePickerGrid, (direction) => {
-  changeDatePickerMonth(direction, { animate: false });
+  changeDatePickerMonth(direction, { animate: "swipe" });
 });
 
 document
@@ -3536,23 +3536,23 @@ async function changeMainCalendarMonth(
     render();
   };
 
-  /*
-   * Android 앱 모드에서는 스와이프 직후 달력에 적용된 Web Animation
-   * 합성 레이어가 잠시 남아 전체 화면의 첫 터치가 무시될 수 있습니다.
-   * 스와이프 이동은 애니메이션 없이 즉시 다시 그려 바로 터치 가능하게 합니다.
-   * 화살표 이동은 기존 애니메이션을 그대로 사용합니다.
-   */
-  if (!animate) {
-    calendarGrid.getAnimations().forEach((animation) => {
-      animation.cancel();
-    });
-    updateMonth();
-    return;
-  }
-
   mainCalendarMonthAnimating = true;
 
   try {
+    if (animate === "swipe") {
+      await animateSwipeMonthTransition(
+        calendarGrid,
+        direction,
+        updateMonth,
+      );
+      return;
+    }
+
+    if (!animate) {
+      updateMonth();
+      return;
+    }
+
     await animateMonthTransition(
       calendarGrid,
       direction,
@@ -3580,17 +3580,23 @@ async function changeDatePickerMonth(
     renderDatePicker();
   };
 
-  if (!animate) {
-    datePickerGrid.getAnimations().forEach((animation) => {
-      animation.cancel();
-    });
-    updateMonth();
-    return;
-  }
-
   datePickerMonthAnimating = true;
 
   try {
+    if (animate === "swipe") {
+      await animateSwipeMonthTransition(
+        datePickerGrid,
+        direction,
+        updateMonth,
+      );
+      return;
+    }
+
+    if (!animate) {
+      updateMonth();
+      return;
+    }
+
     await animateMonthTransition(
       datePickerGrid,
       direction,
@@ -3598,6 +3604,112 @@ async function changeDatePickerMonth(
     );
   } finally {
     datePickerMonthAnimating = false;
+  }
+}
+
+function prepareCalendarAnimationClone(grid) {
+  const clone = grid.cloneNode(true);
+
+  clone.removeAttribute("id");
+  clone.setAttribute("aria-hidden", "true");
+  clone.querySelectorAll("[id]").forEach((element) => {
+    element.removeAttribute("id");
+  });
+  clone.querySelectorAll("button, input, select, textarea, a").forEach(
+    (element) => {
+      element.setAttribute("tabindex", "-1");
+    },
+  );
+
+  return clone;
+}
+
+async function animateSwipeMonthTransition(
+  grid,
+  direction,
+  updateMonth,
+) {
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+
+  if (
+    reduceMotion ||
+    typeof Element.prototype.animate !== "function"
+  ) {
+    updateMonth();
+    return;
+  }
+
+  const rect = grid.getBoundingClientRect();
+
+  if (rect.width <= 0 || rect.height <= 0) {
+    updateMonth();
+    return;
+  }
+
+  const computedStyle = window.getComputedStyle(grid);
+  const ghost = prepareCalendarAnimationClone(grid);
+  const viewport = document.createElement("div");
+
+  viewport.className = "calendar-swipe-animation-viewport";
+  viewport.setAttribute("aria-hidden", "true");
+  Object.assign(viewport.style, {
+    position: "fixed",
+    left: `${rect.left}px`,
+    top: `${rect.top}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    overflow: "hidden",
+    pointerEvents: "none",
+    zIndex: "2",
+    contain: "layout paint style",
+  });
+
+  Object.assign(ghost.style, {
+    position: "absolute",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+    margin: "0",
+    boxSizing: "border-box",
+    pointerEvents: "none",
+    backgroundColor:
+      computedStyle.backgroundColor === "rgba(0, 0, 0, 0)"
+        ? "var(--surface, #ffffff)"
+        : computedStyle.backgroundColor,
+  });
+
+  viewport.appendChild(ghost);
+  document.body.appendChild(viewport);
+
+  /*
+   * 실제 달력은 먼저 새 달로 즉시 교체해 터치 가능한 상태로 둡니다.
+   * 화면 위에는 pointer-events:none인 이전 달 복제본만 움직이므로,
+   * 애니메이션 중에도 첫 번째 터치가 실제 새 달력에 바로 전달됩니다.
+   */
+  updateMonth();
+
+  const exitDistance = direction > 0 ? "-100%" : "100%";
+  const animation = ghost.animate(
+    [
+      { transform: "translateX(0)", opacity: 1 },
+      { transform: `translateX(${exitDistance})`, opacity: 0.12 },
+    ],
+    {
+      duration: 240,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      fill: "forwards",
+    },
+  );
+
+  try {
+    await animation.finished;
+  } catch (error) {
+    // 화면 전환이나 렌더링으로 애니메이션이 취소되어도 정리합니다.
+  } finally {
+    animation.cancel();
+    viewport.remove();
   }
 }
 
