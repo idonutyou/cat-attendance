@@ -214,9 +214,11 @@ let monthPickerTarget = null;
 let monthPickerPreviousFocus = null;
 let mainCalendarMonthAnimating = false;
 let datePickerMonthAnimating = false;
-const CALENDAR_SWIPE_TAP_RECOVERY_MS = 450;
+const CALENDAR_SWIPE_TAP_RECOVERY_MS = 1600;
 let calendarSwipeTapRecoveryUntil = 0;
 let calendarSwipeTapCandidate = null;
+let calendarSwipeNativeClickBlock = null;
+let calendarSwipeSyntheticClickInProgress = false;
 let weekStartsOnMonday = loadWeekStartPreference();
 let records = loadRecords();
 let settingsByMonth = loadSettingsByMonth();
@@ -3772,21 +3774,114 @@ function armCalendarSwipeTapRecovery() {
   calendarSwipeTapRecoveryUntil =
     performance.now() + CALENDAR_SWIPE_TAP_RECOVERY_MS;
   calendarSwipeTapCandidate = null;
+  calendarSwipeNativeClickBlock = null;
 }
 
-function clearCalendarSwipeTapRecovery() {
-  calendarSwipeTapRecoveryUntil = 0;
+function clearCalendarSwipeTapCandidate({ keepRecovery = false } = {}) {
   calendarSwipeTapCandidate = null;
+
+  if (!keepRecovery) {
+    calendarSwipeTapRecoveryUntil = 0;
+  }
+}
+
+function getCalendarSwipeActivationTarget(candidate) {
+  const pointTarget = document.elementFromPoint(
+    candidate.endX,
+    candidate.endY,
+  );
+  const fallbackTarget =
+    candidate.target instanceof Element &&
+    candidate.target.isConnected
+      ? candidate.target
+      : null;
+  const element =
+    pointTarget instanceof Element
+      ? pointTarget
+      : fallbackTarget;
+
+  if (!(element instanceof Element)) {
+    return null;
+  }
+
+  return (
+    element.closest(
+      "button, a[href], input, select, textarea, [role='button']",
+    ) || element
+  );
+}
+
+function activateRecoveredCalendarSwipeTap(candidate) {
+  const target = getCalendarSwipeActivationTarget(candidate);
+
+  if (!(target instanceof Element)) {
+    return;
+  }
+
+  calendarSwipeSyntheticClickInProgress = true;
+
+  try {
+    if (typeof target.click === "function") {
+      target.click();
+      return;
+    }
+
+    target.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        view: window,
+        clientX: candidate.endX,
+        clientY: candidate.endY,
+      }),
+    );
+  } finally {
+    calendarSwipeSyntheticClickInProgress = false;
+  }
+}
+
+function replayCalendarSwipeTapWhenReady(
+  candidate,
+  startedAt = performance.now(),
+) {
+  const mainTransitionActive =
+    candidate.startedInMainCalendar &&
+    mainCalendarMonthAnimating;
+  const pickerTransitionActive =
+    candidate.startedInDatePicker &&
+    datePickerMonthAnimating;
+
+  if (
+    (mainTransitionActive || pickerTransitionActive) &&
+    performance.now() - startedAt < 900
+  ) {
+    window.requestAnimationFrame(() => {
+      replayCalendarSwipeTapWhenReady(candidate, startedAt);
+    });
+    return;
+  }
+
+  activateRecoveredCalendarSwipeTap(candidate);
 }
 
 document.addEventListener(
   "pointerdown",
   (event) => {
     if (
-      (event.pointerType !== "touch" &&
-        event.pointerType !== "pen") ||
-      performance.now() > calendarSwipeTapRecoveryUntil
+      event.pointerType !== "touch" &&
+      event.pointerType !== "pen"
     ) {
+      return;
+    }
+
+    /*
+     * 새로운 실제 손가락 동작이 시작되면 이전 동작의 지연 click 차단은
+     * 더 이상 필요하지 않습니다. 이렇게 해야 빠른 연속 터치도 막히지 않습니다.
+     */
+    calendarSwipeNativeClickBlock = null;
+
+    if (performance.now() > calendarSwipeTapRecoveryUntil) {
       return;
     }
 
@@ -3797,9 +3892,13 @@ document.addEventListener(
       endX: event.clientX,
       endY: event.clientY,
       target: event.target,
+      startedInMainCalendar:
+        event.target instanceof Node &&
+        calendarGrid.contains(event.target),
+      startedInDatePicker:
+        event.target instanceof Node &&
+        datePickerGrid.contains(event.target),
       moved: false,
-      nativeClickSeen: false,
-      nativeClickBlocked: false,
     };
   },
   true,
@@ -3828,102 +3927,71 @@ document.addEventListener(
 );
 
 document.addEventListener(
-  "click",
-  (event) => {
-    const candidate = calendarSwipeTapCandidate;
-
-    if (!candidate) {
-      return;
-    }
-
-    candidate.nativeClickSeen = true;
-
-    /*
-     * 월 전환 애니메이션 중 생성된 click은 이전 달 요소를 누를 수 있으므로
-     * 한 번 보류했다가 애니메이션이 끝난 새 달의 같은 좌표에 재실행합니다.
-     * 애니메이션이 끝난 뒤의 정상 click은 그대로 통과시킵니다.
-     */
-    if (mainCalendarMonthAnimating || datePickerMonthAnimating) {
-      candidate.nativeClickBlocked = true;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
-  },
-  true,
-);
-
-function replayCalendarSwipeTapAfterTransition(
-  candidate,
-  startedAt = performance.now(),
-) {
-  const transitionActive =
-    mainCalendarMonthAnimating || datePickerMonthAnimating;
-
-  if (
-    transitionActive &&
-    performance.now() - startedAt < 700
-  ) {
-    window.requestAnimationFrame(() => {
-      replayCalendarSwipeTapAfterTransition(candidate, startedAt);
-    });
-    return;
-  }
-
-  /*
-   * 이전 달의 요소가 아직 연결돼 있어도 사용하지 않고, 전환이 끝난 뒤
-   * 현재 화면의 같은 좌표에서 새 요소를 다시 찾습니다.
-   */
-  const target = document.elementFromPoint(
-    candidate.endX,
-    candidate.endY,
-  );
-
-  clearCalendarSwipeTapRecovery();
-
-  if (!(target instanceof Element)) {
-    return;
-  }
-
-  target.dispatchEvent(
-    new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      view: window,
-      clientX: candidate.endX,
-      clientY: candidate.endY,
-    }),
-  );
-}
-
-document.addEventListener(
   "pointerup",
   (event) => {
     const candidate = calendarSwipeTapCandidate;
 
-    if (
-      !candidate ||
-      candidate.pointerId !== event.pointerId
-    ) {
+    if (!candidate || candidate.pointerId !== event.pointerId) {
       return;
     }
 
     candidate.endX = event.clientX;
     candidate.endY = event.clientY;
 
-    window.setTimeout(() => {
-      if (
-        candidate.moved ||
-        event.defaultPrevented ||
-        (candidate.nativeClickSeen &&
-          !candidate.nativeClickBlocked)
-      ) {
-        clearCalendarSwipeTapRecovery();
-        return;
-      }
+    if (candidate.moved) {
+      clearCalendarSwipeTapCandidate({ keepRecovery: true });
+      return;
+    }
 
-      replayCalendarSwipeTapAfterTransition(candidate);
-    }, 0);
+    /*
+     * 스와이프 뒤 첫 탭은 브라우저의 click 생성 여부에 맡기지 않고
+     * pointerup에서 직접 한 번만 처리합니다. 실제 click은 아래 차단기가
+     * 같은 좌표의 지연 click 한 번만 막아 중복 실행을 방지합니다.
+     */
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    calendarSwipeNativeClickBlock = {
+      x: candidate.endX,
+      y: candidate.endY,
+      expiresAt: performance.now() + 700,
+    };
+
+    clearCalendarSwipeTapCandidate();
+    replayCalendarSwipeTapWhenReady(candidate);
+  },
+  true,
+);
+
+document.addEventListener(
+  "click",
+  (event) => {
+    if (calendarSwipeSyntheticClickInProgress) {
+      return;
+    }
+
+    const block = calendarSwipeNativeClickBlock;
+
+    if (!block) {
+      return;
+    }
+
+    if (performance.now() > block.expiresAt) {
+      calendarSwipeNativeClickBlock = null;
+      return;
+    }
+
+    const isSameTap =
+      Math.abs(event.clientX - block.x) <= 28 &&
+      Math.abs(event.clientY - block.y) <= 28;
+
+    if (!isSameTap) {
+      return;
+    }
+
+    calendarSwipeNativeClickBlock = null;
+    event.preventDefault();
+    event.stopImmediatePropagation();
   },
   true,
 );
@@ -3935,7 +4003,7 @@ document.addEventListener(
       if (
         calendarSwipeTapCandidate?.pointerId === event.pointerId
       ) {
-        clearCalendarSwipeTapRecovery();
+        clearCalendarSwipeTapCandidate({ keepRecovery: true });
       }
     },
     true,
