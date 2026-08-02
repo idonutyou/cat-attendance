@@ -214,7 +214,7 @@ let monthPickerTarget = null;
 let monthPickerPreviousFocus = null;
 let mainCalendarMonthAnimating = false;
 let datePickerMonthAnimating = false;
-const CALENDAR_SWIPE_TAP_RECOVERY_MS = 1600;
+const CALENDAR_SWIPE_TAP_RECOVERY_MS = 2400;
 let calendarSwipeTapRecoveryUntil = 0;
 let calendarSwipeTapCandidate = null;
 let calendarSwipeNativeClickBlock = null;
@@ -1749,6 +1749,16 @@ function setSalaryMobilePage(
   }
 
   salaryMobilePageTransitioning = !immediate;
+
+  /*
+   * Android 앱 모드에서는 세로 스와이프 페이지 전환 직후 첫 실제 탭의
+   * click이 누락될 수 있습니다. 달력에서 검증된 첫 탭 복구 장치를
+   * 급여 페이지 전환에도 동일하게 활성화합니다.
+   */
+  if (!immediate) {
+    armCalendarSwipeTapRecovery();
+  }
+
   salaryMobileCollapseAfterTransition = collapseBonusAfter;
   salaryMobileCollapseSettingsAfterTransition =
     collapseSettingsAfter;
@@ -3795,10 +3805,19 @@ function getCalendarSwipeActivationTarget(candidate) {
     candidate.target.isConnected
       ? candidate.target
       : null;
+  /*
+   * 급여 페이지는 전환 중 버튼이 세로로 움직이므로, 전환이 끝난 뒤
+   * 같은 좌표를 다시 찾으면 다른 요소가 선택될 수 있습니다.
+   * 실제로 누르기 시작한 버튼이 그대로 연결돼 있으면 그 버튼을 우선합니다.
+   * 달력은 월 변경 때 날짜 요소가 교체되므로 기존 좌표 탐색을 유지합니다.
+   */
   const element =
-    pointTarget instanceof Element
-      ? pointTarget
-      : fallbackTarget;
+    candidate.startedInSalaryPager &&
+    fallbackTarget instanceof Element
+      ? fallbackTarget
+      : pointTarget instanceof Element
+        ? pointTarget
+        : fallbackTarget;
 
   if (!(element instanceof Element)) {
     return null;
@@ -3851,9 +3870,16 @@ function replayCalendarSwipeTapWhenReady(
   const pickerTransitionActive =
     candidate.startedInDatePicker &&
     datePickerMonthAnimating;
+  const salaryTransitionActive =
+    candidate.startedInSalaryPager &&
+    salaryMobilePageTransitioning;
 
   if (
-    (mainTransitionActive || pickerTransitionActive) &&
+    (
+      mainTransitionActive ||
+      pickerTransitionActive ||
+      salaryTransitionActive
+    ) &&
     performance.now() - startedAt < 900
   ) {
     window.requestAnimationFrame(() => {
@@ -3898,6 +3924,9 @@ document.addEventListener(
       startedInDatePicker:
         event.target instanceof Node &&
         datePickerGrid.contains(event.target),
+      startedInSalaryPager:
+        currentAppPage === "salary" &&
+        isSalaryMobilePager(),
       moved: false,
     };
   },
