@@ -214,6 +214,9 @@ let monthPickerTarget = null;
 let monthPickerPreviousFocus = null;
 let mainCalendarMonthAnimating = false;
 let datePickerMonthAnimating = false;
+const CALENDAR_SWIPE_TAP_RECOVERY_MS = 450;
+let calendarSwipeTapRecoveryUntil = 0;
+let calendarSwipeTapCandidate = null;
 let weekStartsOnMonday = loadWeekStartPreference();
 let records = loadRecords();
 let settingsByMonth = loadSettingsByMonth();
@@ -3649,6 +3652,146 @@ async function animateMonthTransition(
   grid.style.removeProperty("opacity");
 }
 
+function armCalendarSwipeTapRecovery() {
+  calendarSwipeTapRecoveryUntil =
+    performance.now() + CALENDAR_SWIPE_TAP_RECOVERY_MS;
+  calendarSwipeTapCandidate = null;
+}
+
+function clearCalendarSwipeTapRecovery() {
+  calendarSwipeTapRecoveryUntil = 0;
+  calendarSwipeTapCandidate = null;
+}
+
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (
+      (event.pointerType !== "touch" &&
+        event.pointerType !== "pen") ||
+      performance.now() > calendarSwipeTapRecoveryUntil
+    ) {
+      return;
+    }
+
+    calendarSwipeTapCandidate = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      endX: event.clientX,
+      endY: event.clientY,
+      target: event.target,
+      moved: false,
+      nativeClickSeen: false,
+    };
+  },
+  true,
+);
+
+document.addEventListener(
+  "pointermove",
+  (event) => {
+    const candidate = calendarSwipeTapCandidate;
+
+    if (!candidate || candidate.pointerId !== event.pointerId) {
+      return;
+    }
+
+    candidate.endX = event.clientX;
+    candidate.endY = event.clientY;
+
+    if (
+      Math.abs(event.clientX - candidate.startX) > 14 ||
+      Math.abs(event.clientY - candidate.startY) > 14
+    ) {
+      candidate.moved = true;
+    }
+  },
+  true,
+);
+
+document.addEventListener(
+  "click",
+  () => {
+    if (calendarSwipeTapCandidate) {
+      calendarSwipeTapCandidate.nativeClickSeen = true;
+    }
+  },
+  true,
+);
+
+document.addEventListener(
+  "pointerup",
+  (event) => {
+    const candidate = calendarSwipeTapCandidate;
+
+    if (
+      !candidate ||
+      candidate.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    candidate.endX = event.clientX;
+    candidate.endY = event.clientY;
+
+    window.setTimeout(() => {
+      if (
+        candidate.moved ||
+        candidate.nativeClickSeen ||
+        event.defaultPrevented
+      ) {
+        clearCalendarSwipeTapRecovery();
+        return;
+      }
+
+      const originalTarget =
+        candidate.target instanceof Element &&
+        candidate.target.isConnected
+          ? candidate.target
+          : null;
+      const target =
+        originalTarget ||
+        document.elementFromPoint(
+          candidate.endX,
+          candidate.endY,
+        );
+
+      clearCalendarSwipeTapRecovery();
+
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      target.dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          view: window,
+          clientX: candidate.endX,
+          clientY: candidate.endY,
+        }),
+      );
+    }, 0);
+  },
+  true,
+);
+
+["pointercancel", "lostpointercapture"].forEach((eventName) => {
+  document.addEventListener(
+    eventName,
+    (event) => {
+      if (
+        calendarSwipeTapCandidate?.pointerId === event.pointerId
+      ) {
+        clearCalendarSwipeTapRecovery();
+      }
+    },
+    true,
+  );
+});
+
 function attachHorizontalMonthSwipe(element, onSwipe) {
   let activePointerId = null;
   let startX = 0;
@@ -3684,11 +3827,7 @@ function attachHorizontalMonthSwipe(element, onSwipe) {
       return;
     }
 
-    /*
-     * 클릭 차단이나 preventDefault를 사용하지 않습니다.
-     * Android 앱 모드에서는 스와이프 종료 뒤 첫 번째 실제 터치까지
-     * 함께 취소되는 경우가 있어 모든 화면을 두 번 눌러야 했습니다.
-     */
+    armCalendarSwipeTapRecovery();
     onSwipe(deltaX < 0 ? 1 : -1);
   });
 
