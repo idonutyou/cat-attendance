@@ -2759,11 +2759,15 @@ datePickerTitle.addEventListener("click", () => {
 });
 
 attachHorizontalMonthSwipe(calendarGrid, (direction) => {
-  changeMainCalendarMonth(direction, { animate: "swipe" });
+  /*
+   * 화살표 버튼과 같은 changeMainCalendarMonth 경로를 그대로 사용해
+   * 스와이프도 완전히 동일한 월 전환 애니메이션을 실행합니다.
+   */
+  changeMainCalendarMonth(direction);
 });
 
 attachHorizontalMonthSwipe(datePickerGrid, (direction) => {
-  changeDatePickerMonth(direction, { animate: "swipe" });
+  changeDatePickerMonth(direction);
 });
 
 document
@@ -3795,6 +3799,7 @@ document.addEventListener(
       target: event.target,
       moved: false,
       nativeClickSeen: false,
+      nativeClickBlocked: false,
     };
   },
   true,
@@ -3824,13 +3829,72 @@ document.addEventListener(
 
 document.addEventListener(
   "click",
-  () => {
-    if (calendarSwipeTapCandidate) {
-      calendarSwipeTapCandidate.nativeClickSeen = true;
+  (event) => {
+    const candidate = calendarSwipeTapCandidate;
+
+    if (!candidate) {
+      return;
+    }
+
+    candidate.nativeClickSeen = true;
+
+    /*
+     * 월 전환 애니메이션 중 생성된 click은 이전 달 요소를 누를 수 있으므로
+     * 한 번 보류했다가 애니메이션이 끝난 새 달의 같은 좌표에 재실행합니다.
+     * 애니메이션이 끝난 뒤의 정상 click은 그대로 통과시킵니다.
+     */
+    if (mainCalendarMonthAnimating || datePickerMonthAnimating) {
+      candidate.nativeClickBlocked = true;
+      event.preventDefault();
+      event.stopImmediatePropagation();
     }
   },
   true,
 );
+
+function replayCalendarSwipeTapAfterTransition(
+  candidate,
+  startedAt = performance.now(),
+) {
+  const transitionActive =
+    mainCalendarMonthAnimating || datePickerMonthAnimating;
+
+  if (
+    transitionActive &&
+    performance.now() - startedAt < 700
+  ) {
+    window.requestAnimationFrame(() => {
+      replayCalendarSwipeTapAfterTransition(candidate, startedAt);
+    });
+    return;
+  }
+
+  /*
+   * 이전 달의 요소가 아직 연결돼 있어도 사용하지 않고, 전환이 끝난 뒤
+   * 현재 화면의 같은 좌표에서 새 요소를 다시 찾습니다.
+   */
+  const target = document.elementFromPoint(
+    candidate.endX,
+    candidate.endY,
+  );
+
+  clearCalendarSwipeTapRecovery();
+
+  if (!(target instanceof Element)) {
+    return;
+  }
+
+  target.dispatchEvent(
+    new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: candidate.endX,
+      clientY: candidate.endY,
+    }),
+  );
+}
 
 document.addEventListener(
   "pointerup",
@@ -3850,41 +3914,15 @@ document.addEventListener(
     window.setTimeout(() => {
       if (
         candidate.moved ||
-        candidate.nativeClickSeen ||
-        event.defaultPrevented
+        event.defaultPrevented ||
+        (candidate.nativeClickSeen &&
+          !candidate.nativeClickBlocked)
       ) {
         clearCalendarSwipeTapRecovery();
         return;
       }
 
-      const originalTarget =
-        candidate.target instanceof Element &&
-        candidate.target.isConnected
-          ? candidate.target
-          : null;
-      const target =
-        originalTarget ||
-        document.elementFromPoint(
-          candidate.endX,
-          candidate.endY,
-        );
-
-      clearCalendarSwipeTapRecovery();
-
-      if (!(target instanceof Element)) {
-        return;
-      }
-
-      target.dispatchEvent(
-        new MouseEvent("click", {
-          bubbles: true,
-          cancelable: true,
-          composed: true,
-          view: window,
-          clientX: candidate.endX,
-          clientY: candidate.endY,
-        }),
-      );
+      replayCalendarSwipeTapAfterTransition(candidate);
     }, 0);
   },
   true,
