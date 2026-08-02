@@ -3649,21 +3649,11 @@ function attachHorizontalMonthSwipe(element, onSwipe) {
       return;
     }
 
-    const blockSwipeClick = (clickEvent) => {
-      clickEvent.preventDefault();
-      clickEvent.stopPropagation();
-    };
-
-    element.addEventListener("click", blockSwipeClick, {
-      capture: true,
-      once: true,
-    });
-
-    window.setTimeout(() => {
-      element.removeEventListener("click", blockSwipeClick, true);
-    }, 0);
-
-    event.preventDefault();
+    /*
+     * 클릭 차단이나 preventDefault를 사용하지 않습니다.
+     * Android 앱 모드에서는 스와이프 종료 뒤 첫 번째 실제 터치까지
+     * 함께 취소되는 경우가 있어 모든 화면을 두 번 눌러야 했습니다.
+     */
     onSwipe(deltaX < 0 ? 1 : -1);
   });
 
@@ -6642,7 +6632,7 @@ async function returnToLoginChooser() {
   }
 
   restoreGuestSnapshot();
-  localStorage.setItem(AUTH_MODE_KEY, "guest");
+  localStorage.setItem(AUTH_MODE_KEY, "chooser");
   localStorage.removeItem(ACTIVE_GOOGLE_UID_KEY);
   showAuthGate();
 }
@@ -6662,23 +6652,73 @@ function getFriendlyFirebaseError(error) {
   return messages[error?.code] || error?.message || "Google 로그인에 실패했습니다.";
 }
 
-async function processGoogleRedirectResult() {
-  if (!isFirebaseConfigured()) {
+async function waitForInitialFirebaseAuthState(services) {
+  if (typeof services.auth.authStateReady === "function") {
+    await services.auth.authStateReady();
     return;
   }
 
+  await new Promise((resolve) => {
+    let unsubscribe = () => {};
+
+    unsubscribe = services.onAuthStateChanged(
+      services.auth,
+      () => {
+        unsubscribe();
+        resolve();
+      },
+      () => {
+        unsubscribe();
+        resolve();
+      },
+    );
+  });
+}
+
+async function restoreSavedLoginMode() {
+  const savedMode = localStorage.getItem(AUTH_MODE_KEY);
+
+  if (savedMode === "guest") {
+    authMode = "guest";
+    activeGoogleUser = null;
+    restoreGuestSnapshot();
+    return;
+  }
+
+  if (savedMode !== "google" || !isFirebaseConfigured()) {
+    return;
+  }
+
+  authRedirectInProgress = true;
+
   try {
     const services = await initializeFirebaseServices();
-    const result = await services.getRedirectResult(services.auth);
+    const redirectResult = await services.getRedirectResult(
+      services.auth,
+    );
 
-    if (result?.user) {
-      authRedirectInProgress = true;
-      preserveCurrentModeSnapshot();
-      await enterGoogleMode(result.user);
+    await waitForInitialFirebaseAuthState(services);
+
+    const user = redirectResult?.user || services.auth.currentUser;
+
+    if (!user) {
+      return;
     }
+
+    await enterGoogleMode(user);
   } catch (error) {
-    console.error("Google 리디렉션 로그인 처리 실패:", error);
+    console.error("저장된 Google 로그인 복원 실패:", error);
     setAuthStatus(getFriendlyFirebaseError(error), "error");
+  } finally {
+    authRedirectInProgress = false;
+
+    if (
+      splashFinished &&
+      authMode !== "guest" &&
+      !(authMode === "google" && activeGoogleUser)
+    ) {
+      showAuthGate();
+    }
   }
 }
 
@@ -6701,7 +6741,10 @@ function initializeSplashScreen() {
       splashFinished = true;
       document.documentElement.classList.remove("app-splash-active");
 
-      if (authMode === "google" && activeGoogleUser) {
+      if (
+        authMode === "guest" ||
+        (authMode === "google" && activeGoogleUser)
+      ) {
         showAppShell();
       } else if (!authRedirectInProgress) {
         showAuthGate();
@@ -6729,5 +6772,5 @@ installBackExitTestHook();
 syncWeekStartToggle();
 render();
 loadHolidays();
-processGoogleRedirectResult();
+restoreSavedLoginMode();
 initializeSplashScreen();
