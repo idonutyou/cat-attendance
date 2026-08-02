@@ -2756,11 +2756,11 @@ datePickerTitle.addEventListener("click", () => {
 });
 
 attachHorizontalMonthSwipe(calendarGrid, (direction) => {
-  changeMainCalendarMonth(direction);
+  changeMainCalendarMonth(direction, { animate: false });
 });
 
 attachHorizontalMonthSwipe(datePickerGrid, (direction) => {
-  changeDatePickerMonth(direction);
+  changeDatePickerMonth(direction, { animate: false });
 });
 
 document
@@ -3516,8 +3516,34 @@ function applyMonthPickerSelection(monthIndex) {
   closeMonthPicker();
 }
 
-async function changeMainCalendarMonth(direction) {
+async function changeMainCalendarMonth(
+  direction,
+  { animate = true } = {},
+) {
   if (mainCalendarMonthAnimating) {
+    return;
+  }
+
+  const updateMonth = () => {
+    currentMonth = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth() + direction,
+      1,
+    );
+    render();
+  };
+
+  /*
+   * Android 앱 모드에서는 스와이프 직후 달력에 적용된 Web Animation
+   * 합성 레이어가 잠시 남아 전체 화면의 첫 터치가 무시될 수 있습니다.
+   * 스와이프 이동은 애니메이션 없이 즉시 다시 그려 바로 터치 가능하게 합니다.
+   * 화살표 이동은 기존 애니메이션을 그대로 사용합니다.
+   */
+  if (!animate) {
+    calendarGrid.getAnimations().forEach((animation) => {
+      animation.cancel();
+    });
+    updateMonth();
     return;
   }
 
@@ -3527,22 +3553,35 @@ async function changeMainCalendarMonth(direction) {
     await animateMonthTransition(
       calendarGrid,
       direction,
-      () => {
-        currentMonth = new Date(
-          currentMonth.getFullYear(),
-          currentMonth.getMonth() + direction,
-          1,
-        );
-        render();
-      },
+      updateMonth,
     );
   } finally {
     mainCalendarMonthAnimating = false;
   }
 }
 
-async function changeDatePickerMonth(direction) {
+async function changeDatePickerMonth(
+  direction,
+  { animate = true } = {},
+) {
   if (datePickerMonthAnimating) {
+    return;
+  }
+
+  const updateMonth = () => {
+    datePickerVisibleMonth = new Date(
+      datePickerVisibleMonth.getFullYear(),
+      datePickerVisibleMonth.getMonth() + direction,
+      1,
+    );
+    renderDatePicker();
+  };
+
+  if (!animate) {
+    datePickerGrid.getAnimations().forEach((animation) => {
+      animation.cancel();
+    });
+    updateMonth();
     return;
   }
 
@@ -3552,14 +3591,7 @@ async function changeDatePickerMonth(direction) {
     await animateMonthTransition(
       datePickerGrid,
       direction,
-      () => {
-        datePickerVisibleMonth = new Date(
-          datePickerVisibleMonth.getFullYear(),
-          datePickerVisibleMonth.getMonth() + direction,
-          1,
-        );
-        renderDatePicker();
-      },
+      updateMonth,
     );
   } finally {
     datePickerMonthAnimating = false;
@@ -3612,6 +3644,9 @@ async function animateMonthTransition(
   );
 
   await enterAnimation.finished.catch(() => {});
+  enterAnimation.cancel();
+  grid.style.removeProperty("transform");
+  grid.style.removeProperty("opacity");
 }
 
 function attachHorizontalMonthSwipe(element, onSwipe) {
