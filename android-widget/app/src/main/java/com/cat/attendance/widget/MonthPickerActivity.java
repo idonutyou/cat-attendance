@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.appwidget.AppWidgetManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -11,9 +12,11 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.AbsListView;
+import android.widget.BaseAdapter;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.NumberPicker;
-import android.widget.ScrollView;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import java.time.YearMonth;
@@ -27,11 +30,13 @@ public class MonthPickerActivity extends Activity {
     private static final int MAX_YEAR = 9999;
 
     private int widgetId;
+    private int sourceYear;
+    private int sourceMonth;
     private int selectedYear;
-    private int selectedMonth;
 
     private TextView currentYearView;
-    private NumberPicker yearPicker;
+    private ListView yearList;
+    private YearAdapter yearAdapter;
     private final TextView[] monthViews = new TextView[12];
 
     @Override
@@ -49,112 +54,103 @@ public class MonthPickerActivity extends Activity {
         }
 
         YearMonth now = YearMonth.now();
-        selectedYear = clampYear(
+        sourceYear = clampYear(
                 getIntent().getIntExtra(EXTRA_YEAR, now.getYear())
         );
-        selectedMonth = getIntent().getIntExtra(
+        sourceMonth = getIntent().getIntExtra(
                 EXTRA_MONTH,
                 now.getMonthValue()
         );
 
-        if (selectedMonth < 1 || selectedMonth > 12) {
-            selectedMonth = now.getMonthValue();
+        if (sourceMonth < 1 || sourceMonth > 12) {
+            sourceMonth = now.getMonthValue();
         }
+
+        selectedYear = sourceYear;
 
         Window window = getWindow();
         if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             window.setDimAmount(0.50f);
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            window.setGravity(Gravity.BOTTOM);
+            window.setGravity(Gravity.FILL);
         }
 
-        setContentView(buildScrollableContent());
+        setFinishOnTouchOutside(false);
+        setContentView(buildOverlay());
 
         if (window != null) {
-            int maxHeight = Math.round(
-                    getResources().getDisplayMetrics().heightPixels * 0.88f
-            );
             window.setLayout(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    maxHeight
+                    ViewGroup.LayoutParams.MATCH_PARENT
             );
         }
     }
 
-    private View buildScrollableContent() {
-        ScrollView scrollView = new ScrollView(this);
-        scrollView.setFillViewport(false);
-        scrollView.setClipToPadding(false);
-        scrollView.setOverScrollMode(
-                View.OVER_SCROLL_IF_CONTENT_SCROLLS
-        );
+    private View buildOverlay() {
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setBackgroundColor(Color.TRANSPARENT);
+        overlay.setClickable(true);
+        overlay.setOnClickListener(v -> finish());
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(2), dp(18), dp(16));
-        root.setBackground(roundRect(
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(16), dp(10), dp(16), dp(18));
+        card.setBackground(roundRect(
                 Color.WHITE,
                 28,
                 0,
                 Color.TRANSPARENT
         ));
+        card.setClickable(true);
+        card.setOnClickListener(v -> {
+            // 카드 내부 빈 공간은 닫기 처리하지 않습니다.
+        });
 
-        scrollView.addView(
-                root,
-                new ScrollView.LayoutParams(
+        FrameLayout.LayoutParams cardParams =
+                new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+        cardParams.leftMargin = dp(14);
+        cardParams.rightMargin = dp(14);
+        cardParams.gravity = Gravity.CENTER;
+        overlay.addView(card, cardParams);
+
+        LinearLayout closeRow = new LinearLayout(this);
+        closeRow.setOrientation(LinearLayout.HORIZONTAL);
+        closeRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        View spacer = new View(this);
+        closeRow.addView(
+                spacer,
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(44),
+                        1f
                 )
         );
 
-        LinearLayout yearHeader = new LinearLayout(this);
-        yearHeader.setOrientation(LinearLayout.HORIZONTAL);
-        yearHeader.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView yearLabel = text(
-                "연도",
-                13,
-                0xFF64748B,
-                true
-        );
-
-        yearLabel.setTranslationY(dp(3));
-
-        TextView closeButton = text("×", 30, 0xFF64748B, false);
+        TextView closeButton = text("×", 31, 0xFF64748B, false);
         closeButton.setGravity(Gravity.CENTER);
-        closeButton.setTranslationY(-dp(3));
-        closeButton.setClickable(true);
-        closeButton.setFocusable(true);
         closeButton.setBackground(roundRect(
                 0xFFF1F5F9,
                 14,
                 0,
                 Color.TRANSPARENT
         ));
-        closeButton.setOnClickListener(v -> {
-            // 선택 중인 연도/월을 저장하지 않고 즉시 닫습니다.
-            finish();
-        });
-
-        yearHeader.addView(
-                yearLabel,
-                new LinearLayout.LayoutParams(
-                        0,
-                        dp(40),
-                        1f
-                )
-        );
-        yearHeader.addView(
+        closeButton.setOnClickListener(v -> finish());
+        closeRow.addView(
                 closeButton,
-                new LinearLayout.LayoutParams(dp(40), dp(40))
+                new LinearLayout.LayoutParams(dp(44), dp(44))
         );
-        root.addView(yearHeader);
+        card.addView(closeRow);
 
         LinearLayout yearControl = new LinearLayout(this);
         yearControl.setOrientation(LinearLayout.HORIZONTAL);
         yearControl.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView previousButton = text("<", 26, 0xFF334155, true);
+        TextView previousButton = text("‹", 30, 0xFF475569, true);
         previousButton.setGravity(Gravity.CENTER);
         previousButton.setBackground(roundRect(
                 0xFFF8FAFC,
@@ -165,23 +161,23 @@ public class MonthPickerActivity extends Activity {
         previousButton.setOnClickListener(v -> changeYear(-1));
 
         currentYearView = text(
-                String.valueOf(selectedYear),
-                20,
-                0xFFFFFFFF,
+                String.format(Locale.KOREA, "%d년", selectedYear),
+                21,
+                0xFF2563EB,
                 true
         );
         currentYearView.setGravity(Gravity.CENTER);
         currentYearView.setClickable(true);
         currentYearView.setFocusable(true);
         currentYearView.setBackground(roundRect(
-                0xFF2563EB,
+                0xFFF8FAFC,
                 14,
-                1,
-                0xFF2563EB
+                2,
+                0xFF60A5FA
         ));
-        currentYearView.setOnClickListener(v -> toggleYearPicker());
+        currentYearView.setOnClickListener(v -> toggleYearList());
 
-        TextView nextButton = text(">", 26, 0xFF334155, true);
+        TextView nextButton = text("›", 30, 0xFF475569, true);
         nextButton.setGravity(Gravity.CENTER);
         nextButton.setBackground(roundRect(
                 0xFFF8FAFC,
@@ -215,49 +211,41 @@ public class MonthPickerActivity extends Activity {
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
                 );
-        yearControlParams.topMargin = dp(3);
-        root.addView(yearControl, yearControlParams);
+        yearControlParams.topMargin = dp(6);
+        card.addView(yearControl, yearControlParams);
 
-        yearPicker = new NumberPicker(this);
-        yearPicker.setMinValue(MIN_YEAR);
-        yearPicker.setMaxValue(MAX_YEAR);
-        yearPicker.setValue(selectedYear);
-        yearPicker.setWrapSelectorWheel(false);
-        yearPicker.setDescendantFocusability(
-                NumberPicker.FOCUS_BLOCK_DESCENDANTS
-        );
-        yearPicker.setVisibility(View.GONE);
-        yearPicker.setOnValueChangedListener(
-                (picker, oldValue, newValue) -> {
-                    selectedYear = newValue;
-                    currentYearView.setText(
-                            String.valueOf(selectedYear)
-                    );
-                    updateMonthStyles();
-                }
-        );
+        yearList = new ListView(this);
+        yearList.setVisibility(View.GONE);
+        yearList.setDivider(new ColorDrawable(0xFFE2E8F0));
+        yearList.setDividerHeight(dp(1));
+        yearList.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        yearList.setVerticalScrollBarEnabled(true);
+        yearList.setBackground(roundRect(
+                Color.WHITE,
+                14,
+                1,
+                0xFFE2E8F0
+        ));
 
-        LinearLayout.LayoutParams pickerParams =
+        yearAdapter = new YearAdapter();
+        yearList.setAdapter(yearAdapter);
+        yearList.setOnItemClickListener((parent, view, position, id) -> {
+            selectedYear = position + MIN_YEAR;
+            currentYearView.setText(
+                    String.format(Locale.KOREA, "%d년", selectedYear)
+            );
+            yearAdapter.notifyDataSetChanged();
+            yearList.setVisibility(View.GONE);
+            updateMonthStyles();
+        });
+
+        LinearLayout.LayoutParams listParams =
                 new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        dp(150)
+                        dp(276)
                 );
-        pickerParams.topMargin = dp(8);
-        root.addView(yearPicker, pickerParams);
-
-        TextView monthLabel = text(
-                "월",
-                13,
-                0xFF64748B,
-                true
-        );
-        LinearLayout.LayoutParams monthLabelParams =
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                );
-        monthLabelParams.topMargin = dp(8);
-        root.addView(monthLabel, monthLabelParams);
+        listParams.topMargin = dp(10);
+        card.addView(yearList, listParams);
 
         LinearLayout monthGrid = new LinearLayout(this);
         monthGrid.setOrientation(LinearLayout.VERTICAL);
@@ -267,44 +255,41 @@ public class MonthPickerActivity extends Activity {
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
                 );
-        gridParams.topMargin = dp(7);
-        root.addView(monthGrid, gridParams);
+        gridParams.topMargin = dp(14);
+        card.addView(monthGrid, gridParams);
 
-        for (int rowIndex = 0; rowIndex < 3; rowIndex++) {
+        for (int rowIndex = 0; rowIndex < 4; rowIndex++) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setWeightSum(4f);
+            row.setWeightSum(3f);
 
             LinearLayout.LayoutParams rowParams =
                     new LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
-                            dp(47)
+                            dp(58)
                     );
             if (rowIndex > 0) {
-                rowParams.topMargin = dp(7);
+                rowParams.topMargin = dp(8);
             }
             monthGrid.addView(row, rowParams);
 
-            for (int column = 0; column < 4; column++) {
-                int month = rowIndex * 4 + column + 1;
+            for (int column = 0; column < 3; column++) {
+                int month = rowIndex * 3 + column + 1;
                 final int targetMonth = month;
 
                 TextView button = text(
                         String.format(Locale.KOREA, "%d월", month),
-                        14,
+                        15,
                         0xFF334155,
                         true
                 );
                 button.setGravity(Gravity.CENTER);
                 button.setOnClickListener(v -> {
-                    selectedMonth = targetMonth;
-
-                    // 월을 눌렀을 때만 실제 위젯 달력에 반영합니다.
                     WidgetDataStore.setVisibleMonth(
                             this,
                             widgetId,
                             selectedYear,
-                            selectedMonth
+                            targetMonth
                     );
                     CatCalendarWidgetProvider.refreshAll(this);
                     finish();
@@ -316,28 +301,34 @@ public class MonthPickerActivity extends Activity {
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 1f
                         );
-                int gap = dp(3);
+                int gap = dp(4);
                 params.leftMargin = column == 0 ? 0 : gap;
-                params.rightMargin = column == 3 ? 0 : gap;
+                params.rightMargin = column == 2 ? 0 : gap;
                 row.addView(button, params);
                 monthViews[month - 1] = button;
             }
         }
 
         updateMonthStyles();
-        return scrollView;
+        return overlay;
     }
 
-    private void toggleYearPicker() {
-        boolean willShow =
-                yearPicker.getVisibility() != View.VISIBLE;
+    private void toggleYearList() {
+        boolean willShow = yearList.getVisibility() != View.VISIBLE;
 
-        if (willShow) {
-            yearPicker.setValue(selectedYear);
-            yearPicker.setVisibility(View.VISIBLE);
-        } else {
-            yearPicker.setVisibility(View.GONE);
+        if (!willShow) {
+            yearList.setVisibility(View.GONE);
+            return;
         }
+
+        yearAdapter.notifyDataSetChanged();
+        yearList.setVisibility(View.VISIBLE);
+
+        yearList.post(() -> {
+            int selectedPosition = selectedYear - MIN_YEAR;
+            int firstPosition = Math.max(0, selectedPosition - 2);
+            yearList.setSelection(firstPosition);
+        });
     }
 
     private void changeYear(int direction) {
@@ -348,10 +339,16 @@ public class MonthPickerActivity extends Activity {
         }
 
         selectedYear = next;
-        currentYearView.setText(String.valueOf(selectedYear));
+        currentYearView.setText(
+                String.format(Locale.KOREA, "%d년", selectedYear)
+        );
+        yearAdapter.notifyDataSetChanged();
 
-        if (yearPicker.getVisibility() == View.VISIBLE) {
-            yearPicker.setValue(selectedYear);
+        if (yearList.getVisibility() == View.VISIBLE) {
+            int selectedPosition = selectedYear - MIN_YEAR;
+            yearList.setSelection(
+                    Math.max(0, selectedPosition - 2)
+            );
         }
 
         updateMonthStyles();
@@ -369,17 +366,73 @@ public class MonthPickerActivity extends Activity {
             }
 
             int month = index + 1;
-            boolean selected = month == selectedMonth;
+            boolean active =
+                    selectedYear == sourceYear &&
+                    month == sourceMonth;
 
             view.setTextColor(
-                    selected ? 0xFF1D4ED8 : 0xFF334155
+                    active ? Color.WHITE : 0xFF334155
             );
             view.setBackground(roundRect(
-                    selected ? 0xFFEFF6FF : 0xFFF8FAFC,
+                    active ? 0xFF2563EB : 0xFFF8FAFC,
                     12,
-                    selected ? 2 : 1,
-                    selected ? 0xFF60A5FA : 0xFFE2E8F0
+                    1,
+                    active ? 0xFF2563EB : 0xFFE2E8F0
             ));
+        }
+    }
+
+    private class YearAdapter extends BaseAdapter {
+        @Override
+        public int getCount() {
+            return MAX_YEAR - MIN_YEAR + 1;
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return position + MIN_YEAR;
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position + MIN_YEAR;
+        }
+
+        @Override
+        public View getView(
+                int position,
+                View convertView,
+                ViewGroup parent
+        ) {
+            TextView row;
+
+            if (convertView instanceof TextView) {
+                row = (TextView) convertView;
+            } else {
+                row = text("", 18, 0xFF475569, true);
+                row.setGravity(Gravity.CENTER);
+                row.setLayoutParams(
+                        new AbsListView.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                dp(55)
+                        )
+                );
+            }
+
+            int year = position + MIN_YEAR;
+            boolean selected = year == selectedYear;
+
+            row.setText(
+                    String.format(Locale.KOREA, "%d년", year)
+            );
+            row.setTextColor(
+                    selected ? Color.WHITE : 0xFF475569
+            );
+            row.setBackgroundColor(
+                    selected ? 0xFF2563EB : Color.WHITE
+            );
+
+            return row;
         }
     }
 

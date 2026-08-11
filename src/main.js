@@ -1358,13 +1358,10 @@ app.innerHTML = `
       class="modal-sheet month-picker-sheet"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="monthPickerHeading"
+      aria-label="연도와 월 선택"
     >
       <div class="month-picker-heading-row">
-        <div>
-          <p class="section-caption">빠른 이동</p>
-          <h2 id="monthPickerHeading">연도·월 선택</h2>
-        </div>
+        <div></div>
 
         <button
           id="closeMonthPickerButton"

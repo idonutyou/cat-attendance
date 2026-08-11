@@ -20,6 +20,7 @@ import java.util.Locale;
 public class CatCalendarWidgetProvider extends AppWidgetProvider {
     public static final String ACTION_PREVIOUS_MONTH = "com.cat.attendance.widget.PREVIOUS_MONTH";
     public static final String ACTION_NEXT_MONTH = "com.cat.attendance.widget.NEXT_MONTH";
+    public static final String ACTION_CURRENT_MONTH = "com.cat.attendance.widget.CURRENT_MONTH";
     public static final String ACTION_TOGGLE_WEEK_START = "com.cat.attendance.widget.TOGGLE_WEEK_START";
 
     private static final int[] ROW_IDS = {
@@ -62,6 +63,22 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
         }
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+            return;
+        }
+
+        if (ACTION_CURRENT_MONTH.equals(action)) {
+            YearMonth now = YearMonth.now();
+            WidgetDataStore.setVisibleMonth(
+                    context,
+                    appWidgetId,
+                    now.getYear(),
+                    now.getMonthValue()
+            );
+            updateWidget(
+                    context,
+                    AppWidgetManager.getInstance(context),
+                    appWidgetId
+            );
             return;
         }
 
@@ -132,6 +149,10 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
         views.setOnClickPendingIntent(
                 R.id.week_start_button,
                 broadcastIntent(context, ACTION_TOGGLE_WEEK_START, widgetId, 10)
+        );
+        views.setOnClickPendingIntent(
+                R.id.current_month_button,
+                broadcastIntent(context, ACTION_CURRENT_MONTH, widgetId, 15)
         );
         views.setOnClickPendingIntent(
                 R.id.prev_month_button,

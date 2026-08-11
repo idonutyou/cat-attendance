@@ -13,57 +13,86 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/week_start_button"
-            android:layout_width="52dp"
-            android:layout_height="34dp"
-            android:background="@drawable/widget_header_button"
-            android:gravity="center"
-            android:text="일 &gt;"
-            android:textColor="#334155"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/prev_month_button"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:gravity="center"
-            android:text="‹"
-            android:textColor="#111827"
-            android:textSize="28sp" />
+            <TextView
+                android:id="@+id/week_start_button"
+                android:layout_width="52dp"
+                android:layout_height="34dp"
+                android:background="@drawable/widget_header_button"
+                android:gravity="center"
+                android:text="일 &gt;"
+                android:textColor="#334155"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/month_title"
+            <TextView
+                android:id="@+id/current_month_button"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_header_button"
+                android:gravity="center"
+                android:text="□"
+                android:textColor="#475569"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="38dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:maxLines="1"
-            android:text="2026년 8월"
-            android:textColor="#171717"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/next_month_button"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:gravity="center"
-            android:text="›"
-            android:textColor="#111827"
-            android:textSize="28sp" />
+            <TextView
+                android:id="@+id/prev_month_button"
+                android:layout_width="30dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:gravity="center"
+                android:text="‹"
+                android:textColor="#111827"
+                android:textSize="28sp" />
+
+            <TextView
+                android:id="@+id/month_title"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:gravity="center"
+                android:maxLines="1"
+                android:minWidth="86dp"
+                android:text="2026년 8월"
+                android:textColor="#171717"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/next_month_button"
+                android:layout_width="30dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="4dp"
+                android:gravity="center"
+                android:text="›"
+                android:textColor="#111827"
+                android:textSize="28sp" />
+        </LinearLayout>
 
         <ImageButton
-        android:id="@+id/open_cat_button"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_gravity="center"
-        android:background="@drawable/widget_header_button"
-        android:contentDescription="CAT 앱 열기"
-        android:padding="7dp"
-        android:scaleType="centerInside"
-        android:src="@drawable/ic_launcher" />
+            android:id="@+id/open_cat_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:background="@drawable/widget_header_button"
+            android:contentDescription="CAT 앱 열기"
+            android:padding="7dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_launcher" />
     </LinearLayout>
 
     <LinearLayout
