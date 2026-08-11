@@ -19,8 +19,8 @@ android {
         applicationId 'com.cat.attendance.widget'
         minSdk 26
         targetSdk 36
-        versionCode 17
-        versionName '1.16.0'
+        versionCode 19
+        versionName '1.18.0'
         buildConfigField 'String', 'CAT_APP_URL', '"' + escapedCatAppUrl + '"'
     }
 
