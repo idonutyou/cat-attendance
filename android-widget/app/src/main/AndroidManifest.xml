@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="CAT"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CATWidget">
+
+        <receiver
+            android:name=".CatCalendarWidgetProvider"
+            android:exported="true"
+            android:label="CAT 달력">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/cat_calendar_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".WorkTypeActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.CATWidget.Dialog" />
+
+        <activity
+            android:name=".MonthPickerActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.CATWidget.Dialog" />
+
+        <activity
+            android:name=".OpenCatActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:theme="@style/Theme.CATWidget.Transparent" />
+
+        <activity
+            android:name=".WidgetSyncActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.CATWidget.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="sync"
+                    android:scheme="catattendancewidget" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

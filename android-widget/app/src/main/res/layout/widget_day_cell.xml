@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/day_root"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:background="@drawable/widget_day_bg"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingTop="3dp"
+    android:paddingBottom="2dp">
+
+    <TextView
+        android:id="@+id/day_number"
+        android:layout_width="wrap_content"
+        android:layout_height="18dp"
+        android:gravity="center"
+        android:text="10"
+        android:textColor="#171717"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/work_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:minWidth="24dp"
+        android:paddingLeft="3dp"
+        android:paddingRight="3dp"
+        android:text="주간"
+        android:textColor="#FFFFFF"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/holiday_badge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="2"
+        android:paddingLeft="2dp"
+        android:paddingRight="2dp"
+        android:text="광복절 대체공휴일"
+        android:textColor="#7F1D1D"
+        android:textSize="6sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+</LinearLayout>

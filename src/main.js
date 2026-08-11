@@ -16,6 +16,7 @@ const ACTIVE_GOOGLE_UID_KEY = "cat-attendance-active-google-uid-v1";
 const GUEST_SNAPSHOT_KEY = "cat-attendance-guest-snapshot-v1";
 const GOOGLE_CACHE_PREFIX = "cat-attendance-google-cache-v1";
 const DEVICE_ID_KEY = "cat-attendance-device-id-v1";
+const WIDGET_SYNC_APPLIED_KEY = "cat-attendance-widget-sync-applied-v1";
 const FIREBASE_SDK_VERSION = "12.16.0";
 const CLOUD_SYNC_DEBOUNCE_MS = 550;
 const SYNCED_STORAGE_KEYS = [
@@ -40,6 +41,243 @@ const APP_PAGE_TITLES = {
 };
 
 const FIXED_SAFETY_ALLOWANCE = 50000;
+
+function readNativeWidgetLaunchPayload() {
+  try {
+    const url = new URL(window.location.href);
+    const encodedPayload = url.searchParams.get("catWidgetPayload");
+
+    if (!encodedPayload) {
+      return null;
+    }
+
+    const normalized = encodedPayload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "=",
+    );
+    const binary = window.atob(padded);
+    const bytes = Uint8Array.from(
+      binary,
+      (character) => character.charCodeAt(0),
+    );
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+
+    return payload && typeof payload === "object"
+      ? payload
+      : null;
+  } catch (error) {
+    console.error("위젯 입력 데이터를 읽지 못했습니다.", error);
+    return null;
+  }
+}
+
+const nativeWidgetLaunchPayload = readNativeWidgetLaunchPayload();
+let nativeWidgetLaunchPayloadConsumed = false;
+
+function encodeNativeWidgetPayload(payload) {
+  try {
+    const bytes = new TextEncoder().encode(JSON.stringify(payload));
+    let binary = "";
+
+    bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte);
+    });
+
+    return window
+      .btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  } catch (error) {
+    console.error("위젯 동기화 데이터를 만들지 못했습니다.", error);
+    return "";
+  }
+}
+
+function sendCurrentStateBackToNativeWidget() {
+  try {
+    const url = new URL(window.location.href);
+
+    if (url.searchParams.get("catWidgetReturn") !== "1") {
+      return;
+    }
+
+    url.searchParams.delete("catWidgetReturn");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+
+    const encodedPayload = encodeNativeWidgetPayload({
+      records: loadRecords(),
+      holidays:
+        holidays && Object.keys(holidays).length > 0
+          ? holidays
+          : undefined,
+      weekStart: loadWeekStartPreference()
+        ? "monday"
+        : "sunday",
+      syncedAt: Date.now(),
+    });
+
+    if (!encodedPayload) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      window.location.href =
+        `catattendancewidget://sync?payload=${encodedPayload}`;
+    }, 60);
+  } catch (error) {
+    console.error("앱 데이터를 위젯으로 보내지 못했습니다.", error);
+  }
+}
+
+function clearNativeWidgetLaunchPayloadFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+
+    if (!url.searchParams.has("catWidgetPayload")) {
+      return;
+    }
+
+    url.searchParams.delete("catWidgetPayload");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  } catch (error) {
+    console.warn("위젯 입력 URL 정리 실패:", error);
+  }
+}
+
+function applyNativeWidgetLaunchPayload() {
+  if (
+    nativeWidgetLaunchPayloadConsumed ||
+    !nativeWidgetLaunchPayload
+  ) {
+    return false;
+  }
+
+  nativeWidgetLaunchPayloadConsumed = true;
+
+  try {
+    const appliedState = JSON.parse(
+      localStorage.getItem(WIDGET_SYNC_APPLIED_KEY) || "{}",
+    );
+    const appliedRecords = {
+      ...(appliedState.records || {}),
+    };
+    const nextRecords = loadRecords();
+    const changes = nativeWidgetLaunchPayload.changes;
+    const validWorkTypes = new Set([
+      "day",
+      "night",
+      "dayOvertime",
+      "nightOvertime",
+      "dayHoliday",
+      "nightHoliday",
+      "dayHolidayOvertime",
+      "nightHolidayOvertime",
+      "annualLeave",
+    ]);
+    let recordsChanged = false;
+    let weekStartChanged = false;
+
+    if (changes && typeof changes === "object") {
+      Object.entries(changes).forEach(([dateKey, change]) => {
+        const updatedAt = Number(change?.updatedAt) || 0;
+        const lastAppliedAt = Number(appliedRecords[dateKey]) || 0;
+
+        if (!updatedAt || updatedAt <= lastAppliedAt) {
+          return;
+        }
+
+        const type = typeof change?.type === "string"
+          ? change.type
+          : "";
+        const customRecord = change?.record;
+        const customLabel =
+          customRecord &&
+          typeof customRecord === "object" &&
+          customRecord.type === "custom"
+            ? normalizeCustomLabel(customRecord.label)
+            : "";
+
+        if (type === "custom" && customLabel) {
+          nextRecords[dateKey] = {
+            type: "custom",
+            label: customLabel,
+          };
+        } else if (type && validWorkTypes.has(type)) {
+          nextRecords[dateKey] = type;
+        } else if (!type) {
+          delete nextRecords[dateKey];
+        } else {
+          return;
+        }
+
+        appliedRecords[dateKey] = updatedAt;
+        recordsChanged = true;
+      });
+    }
+
+    const weekStartChange = nativeWidgetLaunchPayload.weekStart;
+    const weekStartUpdatedAt = Number(
+      weekStartChange?.updatedAt,
+    ) || 0;
+    const lastWeekStartAppliedAt = Number(
+      appliedState.weekStart,
+    ) || 0;
+
+    if (
+      weekStartUpdatedAt > lastWeekStartAppliedAt &&
+      ["monday", "sunday"].includes(weekStartChange?.value)
+    ) {
+      localStorage.setItem(
+        WEEK_START_KEY,
+        weekStartChange.value,
+      );
+      appliedState.weekStart = weekStartUpdatedAt;
+      weekStartChanged = true;
+    }
+
+    if (recordsChanged) {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(nextRecords),
+      );
+    }
+
+    localStorage.setItem(
+      WIDGET_SYNC_APPLIED_KEY,
+      JSON.stringify({
+        ...appliedState,
+        records: appliedRecords,
+      }),
+    );
+
+    clearNativeWidgetLaunchPayloadFromUrl();
+
+    if (recordsChanged || weekStartChanged) {
+      reloadAppStateFromStorage();
+      sendCurrentStateBackToNativeWidget();
+      return true;
+    }
+
+    sendCurrentStateBackToNativeWidget();
+    return false;
+  } catch (error) {
+    console.error("위젯 입력 데이터를 반영하지 못했습니다.", error);
+    clearNativeWidgetLaunchPayloadFromUrl();
+    return false;
+  }
+}
 
 const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
@@ -6051,6 +6289,7 @@ async function loadHolidays() {
 
     holidays = await response.json();
     render();
+    sendCurrentStateBackToNativeWidget();
 
   } catch (error) {
     console.error("공휴일 정보를 불러오지 못했습니다.", error);
@@ -6771,6 +7010,12 @@ async function enterGuestMode() {
   }
 
   restoreGuestSnapshot();
+  if (applyNativeWidgetLaunchPayload()) {
+    saveSnapshotToLocalKey(
+      GUEST_SNAPSHOT_KEY,
+      captureAppStorageSnapshot(),
+    );
+  }
   localStorage.setItem(AUTH_MODE_KEY, "guest");
   localStorage.removeItem(ACTIVE_GOOGLE_UID_KEY);
   setAuthStatus("");
@@ -6886,7 +7131,12 @@ async function enterGoogleMode(user) {
   activeGoogleUser = user;
   localStorage.setItem(AUTH_MODE_KEY, "google");
   localStorage.setItem(ACTIVE_GOOGLE_UID_KEY, user.uid);
+  const widgetDataApplied = applyNativeWidgetLaunchPayload();
   subscribeToCloudChanges();
+
+  if (widgetDataApplied) {
+    scheduleCloudSync();
+  }
   updateCloudSyncStatus("동기화 완료", "success");
   setAuthStatus("로그인되었습니다.", "success");
   showAppShell();
@@ -7103,6 +7353,14 @@ async function restoreSavedLoginMode() {
     authMode = "guest";
     activeGoogleUser = null;
     restoreGuestSnapshot();
+
+    if (applyNativeWidgetLaunchPayload()) {
+      saveSnapshotToLocalKey(
+        GUEST_SNAPSHOT_KEY,
+        captureAppStorageSnapshot(),
+      );
+    }
+
     return;
   }
 

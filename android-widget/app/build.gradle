@@ -1,0 +1,32 @@
+plugins {
+    id 'com.android.application'
+}
+
+def rawCatAppUrl = (project.findProperty("CAT_APP_URL")
+        ?: "https://YOUR_GITHUB_USERNAME.github.io/cat-attendance/").toString()
+def escapedCatAppUrl = rawCatAppUrl
+        .replace('\\', '\\\\')
+        .replace('"', '\\"')
+
+android {
+    namespace 'com.cat.attendance.widget'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.cat.attendance.widget'
+        minSdk 26
+        targetSdk 36
+        versionCode 12
+        versionName '1.11.0'
+        buildConfigField 'String', 'CAT_APP_URL', '"' + escapedCatAppUrl + '"'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CAT</string>
+    <string name="widget_description">CAT 근태 달력 위젯</string>
+</resources>
