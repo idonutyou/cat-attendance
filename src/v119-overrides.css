@@ -1,0 +1,10 @@
+/* v119: 급여내역 연도 선택창 상하 여백 균형 */
+.salary-year-picker {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+.salary-year-picker > .year-scroll-picker {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}

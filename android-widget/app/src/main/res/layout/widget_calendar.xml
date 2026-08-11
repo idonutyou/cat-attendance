@@ -7,15 +7,14 @@
     android:orientation="vertical"
     android:padding="9dp">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="42dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_height="42dp">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
+            android:layout_gravity="start|center_vertical"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -44,9 +43,9 @@
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_gravity="center"
             android:gravity="center"
             android:orientation="horizontal">
 
@@ -87,13 +86,13 @@
             android:id="@+id/open_cat_button"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_gravity="center"
+            android:layout_gravity="end|center_vertical"
             android:background="@drawable/widget_header_button"
             android:contentDescription="CAT 앱 열기"
             android:padding="7dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_launcher" />
-    </LinearLayout>
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="match_parent"

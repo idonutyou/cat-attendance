@@ -1,4 +1,5 @@
 import "./style.css";
+import "./v119-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -844,7 +845,7 @@ app.innerHTML = `
               class="salary-year-picker"
               hidden
             >
-              <p class="year-scroll-picker-label">연도 선택</p>
+              
               <div
                 id="salaryYearScroller"
                 class="year-scroll-picker"
