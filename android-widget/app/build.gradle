@@ -8,6 +8,9 @@ def escapedCatAppUrl = rawCatAppUrl
         .replace('\\', '\\\\')
         .replace('"', '\\"')
 
+def widgetKeystorePath = System.getenv("CAT_WIDGET_KEYSTORE_PATH")
+def widgetKeystorePassword = System.getenv("CAT_WIDGET_KEYSTORE_PASSWORD")
+
 android {
     namespace 'com.cat.attendance.widget'
     compileSdk 36
@@ -16,11 +19,29 @@ android {
         applicationId 'com.cat.attendance.widget'
         minSdk 26
         targetSdk 36
-        versionCode 16
-        versionName '1.15.0'
+        versionCode 17
+        versionName '1.16.0'
         buildConfigField 'String', 'CAT_APP_URL', '"' + escapedCatAppUrl + '"'
     }
 
+
+    signingConfigs {
+        catRelease {
+            if (widgetKeystorePath && widgetKeystorePassword) {
+                storeFile file(widgetKeystorePath)
+                storePassword widgetKeystorePassword
+                keyAlias 'cat-widget'
+                keyPassword widgetKeystorePassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.catRelease
+        }
+    }
     buildFeatures {
         buildConfig true
     }

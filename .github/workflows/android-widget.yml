@@ -7,6 +7,7 @@ on:
     paths:
       - 'android-widget/**'
       - '.github/workflows/android-widget.yml'
+      - 'scripts/setup-widget-signing.ps1'
   workflow_dispatch:
 
 permissions:
@@ -37,17 +38,52 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Build widget APK
+      - name: Check signing secrets
         shell: bash
+        env:
+          CAT_WIDGET_KEYSTORE_BASE64: ${{ secrets.CAT_WIDGET_KEYSTORE_BASE64 }}
+          CAT_WIDGET_KEYSTORE_PASSWORD: ${{ secrets.CAT_WIDGET_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "${CAT_WIDGET_KEYSTORE_BASE64}" ]; then
+            echo "::error::Missing repository secret CAT_WIDGET_KEYSTORE_BASE64"
+            exit 1
+          fi
+          if [ -z "${CAT_WIDGET_KEYSTORE_PASSWORD}" ]; then
+            echo "::error::Missing repository secret CAT_WIDGET_KEYSTORE_PASSWORD"
+            exit 1
+          fi
+
+      - name: Restore fixed signing keystore
+        shell: bash
+        env:
+          CAT_WIDGET_KEYSTORE_BASE64: ${{ secrets.CAT_WIDGET_KEYSTORE_BASE64 }}
+        run: |
+          KEYSTORE_PATH="${RUNNER_TEMP}/cat-widget-release.jks"
+          printf '%s' "${CAT_WIDGET_KEYSTORE_BASE64}" | base64 --decode > "${KEYSTORE_PATH}"
+          chmod 600 "${KEYSTORE_PATH}"
+          echo "CAT_WIDGET_KEYSTORE_PATH=${KEYSTORE_PATH}" >> "${GITHUB_ENV}"
+
+      - name: Build signed widget APK
+        shell: bash
+        env:
+          CAT_WIDGET_KEYSTORE_PASSWORD: ${{ secrets.CAT_WIDGET_KEYSTORE_PASSWORD }}
         run: |
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPO="${GITHUB_REPOSITORY##*/}"
           APP_URL="https://${OWNER}.github.io/${REPO}/"
           echo "CAT_APP_URL=${APP_URL}"
-          gradle -p android-widget :app:assembleDebug -PCAT_APP_URL="${APP_URL}"
+          gradle -p android-widget :app:assembleRelease -PCAT_APP_URL="${APP_URL}"
 
-      - name: Upload APK
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          "${ANDROID_HOME}/build-tools/35.0.0/apksigner" verify \
+            --verbose \
+            --print-certs \
+            android-widget/app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: CAT-widget-debug-apk
-          path: android-widget/app/build/outputs/apk/debug/app-debug.apk
+          name: CAT-widget-signed-apk
+          path: android-widget/app/build/outputs/apk/release/app-release.apk
