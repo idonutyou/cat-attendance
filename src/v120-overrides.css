@@ -1,9 +1,4 @@
 /* v120 */
-.hours-leave-label,
-#appPageTitle.hours-leave-title {
-  font-weight: 900 !important;
-}
-
 .type-halfAnnualLeave .work-badge,
 .type-halfAnnualLeave .work-type-color,
 .summary-dot.type-halfAnnualLeave {

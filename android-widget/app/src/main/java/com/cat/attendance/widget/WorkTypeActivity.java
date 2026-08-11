@@ -263,19 +263,10 @@ public class WorkTypeActivity extends Activity {
         dialog.setCancelable(true);
 
         LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(18), dp(16), dp(18), dp(18));
+        panel.setOrientation(LinearLayout.HORIZONTAL);
+        panel.setGravity(Gravity.CENTER);
+        panel.setPadding(dp(12), dp(12), dp(12), dp(12));
         panel.setBackground(roundRect(Color.WHITE, 22, 0, Color.TRANSPARENT));
-
-        TextView title = text("반차 / 연차", 18, 0xFF172033, true);
-        title.setGravity(Gravity.CENTER);
-        panel.addView(
-                title,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        dp(42)
-                )
-        );
 
         String currentType = WidgetDataStore.getWorkType(this, dateKey);
 
@@ -288,18 +279,14 @@ public class WorkTypeActivity extends Activity {
                 "annualLeave".equals(currentType)
         );
 
-        LinearLayout.LayoutParams halfParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(58)
-        );
-        halfParams.topMargin = dp(8);
+        LinearLayout.LayoutParams halfParams =
+                new LinearLayout.LayoutParams(0, dp(62), 1f);
+        halfParams.rightMargin = dp(6);
         panel.addView(halfDay, halfParams);
 
-        LinearLayout.LayoutParams fullParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(58)
-        );
-        fullParams.topMargin = dp(10);
+        LinearLayout.LayoutParams fullParams =
+                new LinearLayout.LayoutParams(0, dp(62), 1f);
+        fullParams.leftMargin = dp(6);
         panel.addView(fullDay, fullParams);
 
         halfDay.setOnClickListener(v -> {
@@ -317,15 +304,21 @@ public class WorkTypeActivity extends Activity {
 
         Window dialogWindow = dialog.getWindow();
         if (dialogWindow != null) {
-            dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialogWindow.setBackgroundDrawable(
+                    new ColorDrawable(Color.TRANSPARENT)
+            );
             dialogWindow.setDimAmount(0.18f);
-            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            dialogWindow.addFlags(
+                    WindowManager.LayoutParams.FLAG_DIM_BEHIND
+            );
             dialogWindow.setGravity(Gravity.CENTER);
 
-            int displayWidth = getResources().getDisplayMetrics().widthPixels;
+            int displayWidth =
+                    getResources().getDisplayMetrics().widthPixels;
             int width = Math.min(displayWidth - dp(40), dp(340));
+
             dialogWindow.setLayout(
-                    Math.max(dp(260), width),
+                    Math.max(dp(280), width),
                     ViewGroup.LayoutParams.WRAP_CONTENT
             );
         }

@@ -1,4 +1,4 @@
-const CACHE_NAME = "cat-attendance-v120";
+const CACHE_NAME = "cat-attendance-v122";
 
 const APP_SHELL = [
   "./",
@@ -57,6 +57,26 @@ self.addEventListener("fetch", (event) => {
             }
           })
         )
+    );
+    return;
+  }
+
+  if (
+    event.request.destination === "script" ||
+    event.request.destination === "style"
+  ) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, copy);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }

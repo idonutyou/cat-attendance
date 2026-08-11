@@ -1,0 +1,30 @@
+/* v122: 52h만 강하게, 연차는 원래 굵기 */
+
+.navigation-item .hours-leave-label {
+  font-weight: 800 !important;
+}
+
+.navigation-item .hours-leave-hours,
+#appPageTitle .hours-leave-hours {
+  font-weight: 900 !important;
+  -webkit-text-stroke: 0.8px currentColor !important;
+  text-shadow:
+    0.25px 0 currentColor,
+    -0.25px 0 currentColor !important;
+}
+
+.navigation-item .hours-leave-rest {
+  font-weight: 800 !important;
+  -webkit-text-stroke: 0 !important;
+  text-shadow: none !important;
+}
+
+#appPageTitle.hours-leave-title {
+  font-weight: 700 !important;
+}
+
+#appPageTitle .hours-leave-rest {
+  font-weight: 700 !important;
+  -webkit-text-stroke: 0 !important;
+  text-shadow: none !important;
+}

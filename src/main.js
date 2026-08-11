@@ -1,6 +1,8 @@
 import "./style.css";
 import "./v119-overrides.css";
 import "./v120-overrides.css";
+import "./v121-overrides.css";
+import "./v122-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -619,7 +621,7 @@ app.innerHTML = `
             data-app-navigation="hours-leave"
           >
             <span class="navigation-icon">52</span>
-            <span class="hours-leave-label">52h / 연차</span>
+            <span class="hours-leave-label"><span class="hours-leave-hours">52h</span><span class="hours-leave-rest"> / 연차</span></span>
           </button>
         </nav>
 
@@ -3541,11 +3543,15 @@ function setAppPage(pageId) {
 
   currentAppPage = pageId;
   updateSalaryScrollSnapState();
-  appPageTitle.textContent = APP_PAGE_TITLES[pageId] || "근태관리";
-  appPageTitle.classList.toggle(
-    "hours-leave-title",
-    pageId === "hours-leave",
-  );
+  if (pageId === "hours-leave") {
+    appPageTitle.innerHTML =
+      '<span class="hours-leave-hours">52h</span><span class="hours-leave-rest"> / 연차</span>';
+    appPageTitle.classList.add("hours-leave-title");
+  } else {
+    appPageTitle.textContent =
+      APP_PAGE_TITLES[pageId] || "근태관리";
+    appPageTitle.classList.remove("hours-leave-title");
+  }
 
   appPages.forEach((page) => {
     const isActive = page === targetPage;

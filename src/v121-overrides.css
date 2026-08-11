@@ -1,0 +1,10 @@
+/* v121: 52h만 강조하고 연차는 기존 굵기 유지 */
+.hours-leave-label,
+#appPageTitle.hours-leave-title {
+  font-weight: inherit !important;
+}
+
+.hours-leave-hours {
+  font-weight: 900 !important;
+  -webkit-text-stroke: 0.2px currentColor;
+}
