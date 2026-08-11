@@ -4,16 +4,19 @@ import android.app.Activity;
 import android.appwidget.AppWidgetManager;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.InputFilter;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -62,10 +65,35 @@ public class WorkTypeActivity extends Activity {
     }
 
     private View buildContent() {
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setFillViewport(false);
+        scrollView.setClipToPadding(false);
+        scrollView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(18), dp(20), dp(18));
+        root.setPadding(dp(16), dp(12), dp(16), dp(16));
         root.setBackground(roundRect(Color.WHITE, 30, 0, Color.TRANSPARENT));
+        scrollView.addView(
+                root,
+                new ScrollView.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+        );
+
+        scrollView.setOnApplyWindowInsetsListener((view, insets) -> {
+            int safeBottom;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                safeBottom = insets.getInsets(
+                        WindowInsets.Type.navigationBars() | WindowInsets.Type.ime()
+                ).bottom;
+            } else {
+                safeBottom = insets.getSystemWindowInsetBottom();
+            }
+            view.setPadding(0, 0, 0, safeBottom);
+            return insets;
+        });
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
@@ -93,7 +121,7 @@ public class WorkTypeActivity extends Activity {
         close.setBackground(roundRect(0xFFF1F5F9, 16, 0, Color.TRANSPARENT));
         close.setOnClickListener(v -> finish());
         header.addView(titleBox);
-        header.addView(close, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        header.addView(close, new LinearLayout.LayoutParams(dp(46), dp(46)));
         root.addView(header);
 
         LinearLayout grid = new LinearLayout(this);
@@ -102,7 +130,7 @@ public class WorkTypeActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
-        gridParams.topMargin = dp(22);
+        gridParams.topMargin = dp(14);
         root.addView(grid, gridParams);
 
         String currentType = WidgetDataStore.getWorkType(this, dateKey);
@@ -127,7 +155,7 @@ public class WorkTypeActivity extends Activity {
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
                 );
-                rowParams.topMargin = dp(10);
+                rowParams.topMargin = dp(8);
                 grid.addView(row, rowParams);
             } else {
                 grid.addView(row);
@@ -140,7 +168,7 @@ public class WorkTypeActivity extends Activity {
                 boolean selected = id.equals(currentType);
                 View tile = createWorkTypeTile(id, label, selected);
                 LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
-                        0, dp(104), 1f
+                        0, dp(88), 1f
                 );
                 int gap = dp(4);
                 tileParams.leftMargin = column == 0 ? 0 : gap;
@@ -154,7 +182,7 @@ public class WorkTypeActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
-        editorParams.topMargin = dp(14);
+        editorParams.topMargin = dp(10);
         root.addView(customEditor, editorParams);
         customEditor.setVisibility(WorkTypes.CUSTOM_ID.equals(currentType) ? View.VISIBLE : View.GONE);
 
@@ -168,20 +196,20 @@ public class WorkTypeActivity extends Activity {
                 finish();
             });
             LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(48)
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(44)
             );
-            deleteParams.topMargin = dp(14);
+            deleteParams.topMargin = dp(10);
             root.addView(delete, deleteParams);
         }
 
-        return root;
+        return scrollView;
     }
 
     private View createWorkTypeTile(String id, String label, boolean selected) {
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER);
-        tile.setPadding(dp(3), dp(10), dp(3), dp(8));
+        tile.setPadding(dp(3), dp(7), dp(3), dp(6));
         tile.setBackground(roundRect(
                 Color.WHITE,
                 18,

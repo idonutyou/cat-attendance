@@ -39,7 +39,6 @@ public class OpenCatActivity extends Activity {
 
         Uri uri = Uri.parse(baseUrl).buildUpon()
                 .appendQueryParameter("catWidgetPayload", encoded)
-                .appendQueryParameter("catWidgetReturn", "1")
                 .build();
         Intent viewIntent = new Intent(Intent.ACTION_VIEW, uri)
                 .addCategory(Intent.CATEGORY_BROWSABLE);

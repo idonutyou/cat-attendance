@@ -97,20 +97,28 @@ function encodeNativeWidgetPayload(payload) {
   }
 }
 
-function sendCurrentStateBackToNativeWidget() {
+function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
   try {
     const url = new URL(window.location.href);
 
-    if (url.searchParams.get("catWidgetReturn") !== "1") {
-      return;
+    // 구버전 위젯이 catWidgetReturn=1을 붙여도 자동으로 외부 앱을
+    // 다시 열지 않습니다. 이 자동 이동이 Android/Chrome의
+    // "이 사이트에서 CAT 앱을 열려고 합니다" 확인창을 만들었습니다.
+    if (url.searchParams.has("catWidgetReturn")) {
+      url.searchParams.delete("catWidgetReturn");
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
     }
 
-    url.searchParams.delete("catWidgetReturn");
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${url.pathname}${url.search}${url.hash}`,
-    );
+    // 앱 -> 위젯 동기화는 사용자가 실제로 근태/설정을 변경한
+    // 클릭/키 입력 동작 안에서만 실행합니다. 자동 페이지 로드에서는
+    // 네이티브 앱 호출을 하지 않아 확인창이 뜨지 않습니다.
+    if (!userInitiated || !navigator.userActivation?.isActive) {
+      return;
+    }
 
     const encodedPayload = encodeNativeWidgetPayload({
       records: loadRecords(),
@@ -128,10 +136,12 @@ function sendCurrentStateBackToNativeWidget() {
       return;
     }
 
-    window.setTimeout(() => {
-      window.location.href =
-        `catattendancewidget://sync?payload=${encodedPayload}`;
-    }, 60);
+    const intentUrl =
+      `intent://sync?payload=${encodedPayload}` +
+      `#Intent;scheme=catattendancewidget;` +
+      `package=com.cat.attendance.widget;end`;
+
+    window.location.href = intentUrl;
   } catch (error) {
     console.error("앱 데이터를 위젯으로 보내지 못했습니다.", error);
   }
@@ -3181,6 +3191,7 @@ function saveWeekStartPreference() {
       weekStartsOnMonday ? "monday" : "sunday",
     );
     scheduleCloudSync();
+    sendCurrentStateBackToNativeWidget({ userInitiated: true });
   } catch (error) {
     console.error(
       "달력 시작 요일 설정을 저장하지 못했습니다.",
@@ -6357,6 +6368,7 @@ function saveRecords() {
     JSON.stringify(records),
   );
   scheduleCloudSync();
+  sendCurrentStateBackToNativeWidget({ userInitiated: true });
 }
 
 function loadWeeklyDateRange() {
