@@ -1,5 +1,6 @@
 import "./style.css";
 import "./v119-overrides.css";
+import "./v120-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -196,6 +197,7 @@ function applyNativeWidgetLaunchPayload() {
       "dayHolidayOvertime",
       "nightHolidayOvertime",
       "annualLeave",
+      "halfAnnualLeave",
     ]);
     let recordsChanged = false;
     let weekStartChanged = false;
@@ -362,6 +364,13 @@ const WORK_TYPES = [
       holidayOvertimeHours: 2,
       nightHours: 6,
       overnightHours: 1,
+    },
+  },
+  {
+    id: "halfAnnualLeave",
+    label: "반차",
+    totals: {
+      regularDays: 0.5,
     },
   },
   {
@@ -610,7 +619,7 @@ app.innerHTML = `
             data-app-navigation="hours-leave"
           >
             <span class="navigation-icon">52</span>
-            <span>52h / 연차</span>
+            <span class="hours-leave-label">52h / 연차</span>
           </button>
         </nav>
 
@@ -1033,7 +1042,6 @@ app.innerHTML = `
         <section class="hours-leave-card summary-card">
           <div class="section-title-row summary-part-heading">
             <div>
-              <p class="section-caption">근무시간 확인</p>
               <h2 id="weeklyCalculatorTitle">52시간 계산기</h2>
             </div>
           </div>
@@ -1226,6 +1234,25 @@ app.innerHTML = `
       </div>
 
       <div id="workTypeList" class="work-type-list"></div>
+
+      <div
+        id="annualLeaveChoice"
+        class="annual-leave-choice"
+        hidden
+      >
+        <button
+          type="button"
+          data-annual-leave-choice="halfAnnualLeave"
+        >
+          반차
+        </button>
+        <button
+          type="button"
+          data-annual-leave-choice="annualLeave"
+        >
+          연차
+        </button>
+      </div>
 
       <div
         id="customWorkTypeEditor"
@@ -1635,6 +1662,9 @@ const otherAllowanceInput = document.querySelector(
 const workModal = document.querySelector("#workModal");
 const modalTitle = document.querySelector("#modalTitle");
 const workTypeList = document.querySelector("#workTypeList");
+const annualLeaveChoice = document.querySelector(
+  "#annualLeaveChoice",
+);
 const customWorkTypeEditor = document.querySelector(
   "#customWorkTypeEditor",
 );
@@ -2799,6 +2829,26 @@ deleteRecordButton.addEventListener("click", () => {
   render();
 });
 
+annualLeaveChoice.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-annual-leave-choice]");
+
+  if (!button || !selectedDateKey) {
+    return;
+  }
+
+  const workTypeId = button.dataset.annualLeaveChoice;
+
+  if (!["halfAnnualLeave", "annualLeave"].includes(workTypeId)) {
+    return;
+  }
+
+  records[selectedDateKey] = workTypeId;
+
+  saveRecords();
+  closeModal();
+  render();
+});
+
 saveCustomWorkTypeButton.addEventListener(
   "click",
   saveCustomWorkType,
@@ -3492,6 +3542,10 @@ function setAppPage(pageId) {
   currentAppPage = pageId;
   updateSalaryScrollSnapState();
   appPageTitle.textContent = APP_PAGE_TITLES[pageId] || "근태관리";
+  appPageTitle.classList.toggle(
+    "hours-leave-title",
+    pageId === "hours-leave",
+  );
 
   appPages.forEach((page) => {
     const isActive = page === targetPage;
@@ -5300,9 +5354,9 @@ function renderAnnualLeaveHistory(year) {
             ${formatAnnualLeaveHistoryDateButton(range.start)}
           </span>
           <span class="annual-leave-date-cell" role="cell">
-            ${range.days === 1 ? "" : formatAnnualLeaveHistoryDateButton(range.end)}
+            ${range.calendarDays === 1 ? "" : formatAnnualLeaveHistoryDateButton(range.end)}
           </span>
-          <span class="annual-leave-days-cell" role="cell">${range.days}일</span>
+          <span class="annual-leave-days-cell" role="cell">${formatAnnualLeaveDays(range.leaveDays)}일</span>
           <label class="annual-leave-reason-cell" role="cell">
             <span class="sr-only">${formatAnnualLeaveHistoryDate(range.start)} 연차 사유</span>
             <input
@@ -5325,17 +5379,22 @@ function getAnnualLeaveRanges(year) {
   const oneDay = 24 * 60 * 60 * 1000;
 
   const leaveDates = Object.entries(records)
-    .filter(([dateKey, workRecord]) =>
-      dateKey.startsWith(yearPrefix) &&
-      getWorkType(workRecord)?.id === "annualLeave"
+    .map(([dateKey, workRecord]) => ({
+      dateKey,
+      usage: getAnnualLeaveUsage(workRecord),
+    }))
+    .filter(
+      ({ dateKey, usage }) =>
+        dateKey.startsWith(yearPrefix) && usage > 0,
     )
-    .map(([dateKey]) => {
+    .map(({ dateKey, usage }) => {
       const [dateYear, month, day] = dateKey.split("-").map(Number);
       return {
         dateKey,
         time: Date.UTC(dateYear, month - 1, day),
         month,
         day,
+        usage,
       };
     })
     .sort((left, right) => left.time - right.time);
@@ -5344,12 +5403,18 @@ function getAnnualLeaveRanges(year) {
     const currentRange = ranges[ranges.length - 1];
 
     if (!currentRange || date.time - currentRange.end.time !== oneDay) {
-      ranges.push({ start: date, end: date, days: 1 });
+      ranges.push({
+        start: date,
+        end: date,
+        calendarDays: 1,
+        leaveDays: date.usage,
+      });
       return ranges;
     }
 
     currentRange.end = date;
-    currentRange.days += 1;
+    currentRange.calendarDays += 1;
+    currentRange.leaveDays += date.usage;
     return ranges;
   }, []);
 }
@@ -5408,6 +5473,20 @@ function getAnnualLeaveForYear(year) {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
+function getAnnualLeaveUsage(workRecord) {
+  const workTypeId = getWorkType(workRecord)?.id;
+
+  if (workTypeId === "annualLeave") {
+    return 1;
+  }
+
+  if (workTypeId === "halfAnnualLeave") {
+    return 0.5;
+  }
+
+  return 0;
+}
+
 function countUsedAnnualLeave(year) {
   const yearPrefix = `${year}-`;
 
@@ -5417,9 +5496,7 @@ function countUsedAnnualLeave(year) {
         return count;
       }
 
-      return getWorkType(workRecord)?.id === "annualLeave"
-        ? count + 1
-        : count;
+      return count + getAnnualLeaveUsage(workRecord);
     },
     0,
   );
@@ -5486,6 +5563,7 @@ function get52HourWorkHours(workRecord) {
   if (
     !workType ||
     workType.id === "annualLeave" ||
+    workType.id === "halfAnnualLeave" ||
     workType.id === CUSTOM_WORK_TYPE.id
   ) {
     return 0;
@@ -6040,9 +6118,10 @@ function calculateMonthStats(
     }
 
     stats.recordedDays += 1;
-    stats.counts[workType.id] += 1;
+    stats.counts[workType.id] +=
+      workType.id === "halfAnnualLeave" ? 0.5 : 1;
 
-    const affectsSalary = !["annualLeave", "custom"].includes(
+    const affectsSalary = !["annualLeave", "halfAnnualLeave", "custom"].includes(
       workType.id,
     );
 
@@ -6089,23 +6168,35 @@ function openModal(dateKey, year, month, dayNumber) {
   const selectedWorkRecord = records[dateKey];
   const selectedWorkType = getWorkType(selectedWorkRecord);
   const selectedWorkTypeId = selectedWorkType?.id || "";
+  const leaveChoiceSelected =
+    ["halfAnnualLeave", "annualLeave"].includes(selectedWorkTypeId);
+
+  annualLeaveChoice.hidden = true;
+  workTypeList.hidden = false;
 
   workTypeList.innerHTML = `
     ${WORK_TYPE_PICKER_ORDER.map((workTypeId) =>
       WORK_TYPES.find((workType) => workType.id === workTypeId),
-    ).map(
-      (workType) => `
+    ).map((workType) => {
+      const isSelected = workType.id === "annualLeave"
+        ? leaveChoiceSelected
+        : selectedWorkTypeId === workType.id;
+      const pickerLabel = workType.id === "annualLeave"
+        ? "반차 / 연차"
+        : workType.label;
+
+      return `
         <button
           type="button"
           class="work-type-button type-${workType.id}
-            ${selectedWorkTypeId === workType.id ? "selected" : ""}"
+            ${isSelected ? "selected" : ""}"
           data-work-type="${workType.id}"
         >
           <span class="work-type-color"></span>
-          <span>${workType.label}</span>
+          <span>${pickerLabel}</span>
         </button>
-      `,
-    ).join("")}
+      `;
+    }).join("")}
 
     <button
       type="button"
@@ -6123,6 +6214,11 @@ function openModal(dateKey, year, month, dayNumber) {
     .forEach((button) => {
       button.addEventListener("click", () => {
         const workTypeId = button.dataset.workType;
+
+        if (workTypeId === "annualLeave") {
+          showAnnualLeaveChoice();
+          return;
+        }
 
         records[selectedDateKey] = workTypeId;
 
@@ -6155,6 +6251,18 @@ function openModal(dateKey, year, month, dayNumber) {
 
   workModal.classList.add("open");
   workModal.setAttribute("aria-hidden", "false");
+}
+
+function showAnnualLeaveChoice() {
+  workTypeList.hidden = true;
+  hideCustomWorkTypeEditor();
+  annualLeaveChoice.hidden = false;
+  deleteRecordButton.hidden = true;
+}
+
+function hideAnnualLeaveChoice() {
+  annualLeaveChoice.hidden = true;
+  workTypeList.hidden = false;
 }
 
 function showCustomWorkTypeEditor(initialValue = "") {
@@ -6209,6 +6317,7 @@ function closeModal() {
   workModal.classList.remove("open");
   workModal.setAttribute("aria-hidden", "true");
 
+  hideAnnualLeaveChoice();
   hideCustomWorkTypeEditor();
   selectedDateKey = null;
 }

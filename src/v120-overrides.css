@@ -1,0 +1,54 @@
+/* v120 */
+.hours-leave-label,
+#appPageTitle.hours-leave-title {
+  font-weight: 900 !important;
+}
+
+.type-halfAnnualLeave .work-badge,
+.type-halfAnnualLeave .work-type-color,
+.summary-dot.type-halfAnnualLeave {
+  background: var(--annual-leave, #10b981) !important;
+}
+
+.date-picker-work-name.type-halfAnnualLeave {
+  color: #047857 !important;
+  background: #d1fae5 !important;
+}
+
+.annual-leave-choice[hidden] {
+  display: none !important;
+}
+
+.annual-leave-choice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 4px 0 2px;
+}
+
+.annual-leave-choice button {
+  min-height: 76px;
+  border: 1px solid #dbe3ec;
+  border-radius: 18px;
+  color: #334155;
+  background: #fff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.annual-leave-choice button:active {
+  transform: scale(0.98);
+  background: #f0fdf4;
+}
+
+@media (max-width: 640px) {
+  .annual-leave-choice {
+    gap: 10px;
+  }
+
+  .annual-leave-choice button {
+    min-height: 72px;
+  }
+}

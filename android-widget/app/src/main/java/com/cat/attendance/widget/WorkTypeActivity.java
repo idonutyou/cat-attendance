@@ -1,8 +1,10 @@
 package com.cat.attendance.widget;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.appwidget.AppWidgetManager;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -141,7 +143,7 @@ public class WorkTypeActivity extends Activity {
                 "night", "nightOvertime", "nightHoliday", "nightHolidayOvertime", WorkTypes.CUSTOM_ID
         };
         String[] labels = {
-                "주간", "주간잔업", "주간특근", "주간특근잔업", "연차",
+                "주간", "주간잔업", "주간특근", "주간특근잔업", "반차 / 연차",
                 "야간", "야간잔업", "야간특근", "야간특근잔업", "직접 입력"
         };
 
@@ -165,7 +167,10 @@ public class WorkTypeActivity extends Activity {
                 int index = rowIndex * 5 + column;
                 String id = ids[index];
                 String label = labels[index];
-                boolean selected = id.equals(currentType);
+                boolean selected =
+                        id.equals(currentType) ||
+                        ("annualLeave".equals(id) &&
+                                WorkTypes.HALF_ANNUAL_LEAVE_ID.equals(currentType));
                 View tile = createWorkTypeTile(id, label, selected);
                 LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
                         0, dp(88), 1f
@@ -240,12 +245,113 @@ public class WorkTypeActivity extends Activity {
                 return;
             }
 
-            WidgetDataStore.setWorkType(this, dateKey, id);
-            CatCalendarWidgetProvider.refreshAll(this);
-            finish();
+            if ("annualLeave".equals(id)) {
+                showAnnualLeaveChoiceDialog();
+                return;
+            }
+
+            saveWorkTypeAndFinish(id);
         });
 
         return tile;
+    }
+
+    private void showAnnualLeaveChoiceDialog() {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.setCancelable(true);
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(18), dp(16), dp(18), dp(18));
+        panel.setBackground(roundRect(Color.WHITE, 22, 0, Color.TRANSPARENT));
+
+        TextView title = text("반차 / 연차", 18, 0xFF172033, true);
+        title.setGravity(Gravity.CENTER);
+        panel.addView(
+                title,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        dp(42)
+                )
+        );
+
+        String currentType = WidgetDataStore.getWorkType(this, dateKey);
+
+        TextView halfDay = createLeaveChoiceButton(
+                "반차",
+                WorkTypes.HALF_ANNUAL_LEAVE_ID.equals(currentType)
+        );
+        TextView fullDay = createLeaveChoiceButton(
+                "연차",
+                "annualLeave".equals(currentType)
+        );
+
+        LinearLayout.LayoutParams halfParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(58)
+        );
+        halfParams.topMargin = dp(8);
+        panel.addView(halfDay, halfParams);
+
+        LinearLayout.LayoutParams fullParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(58)
+        );
+        fullParams.topMargin = dp(10);
+        panel.addView(fullDay, fullParams);
+
+        halfDay.setOnClickListener(v -> {
+            dialog.dismiss();
+            saveWorkTypeAndFinish(WorkTypes.HALF_ANNUAL_LEAVE_ID);
+        });
+
+        fullDay.setOnClickListener(v -> {
+            dialog.dismiss();
+            saveWorkTypeAndFinish("annualLeave");
+        });
+
+        dialog.setContentView(panel);
+        dialog.show();
+
+        Window dialogWindow = dialog.getWindow();
+        if (dialogWindow != null) {
+            dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialogWindow.setDimAmount(0.18f);
+            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            dialogWindow.setGravity(Gravity.CENTER);
+
+            int displayWidth = getResources().getDisplayMetrics().widthPixels;
+            int width = Math.min(displayWidth - dp(40), dp(340));
+            dialogWindow.setLayout(
+                    Math.max(dp(260), width),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+        }
+    }
+
+    private TextView createLeaveChoiceButton(String label, boolean selected) {
+        TextView button = text(
+                label,
+                16,
+                selected ? Color.WHITE : 0xFF334155,
+                true
+        );
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(roundRect(
+                selected ? 0xFF10B981 : 0xFFF8FAFC,
+                16,
+                1,
+                selected ? 0xFF10B981 : 0xFFD8E0EA
+        ));
+        return button;
+    }
+
+    private void saveWorkTypeAndFinish(String id) {
+        WidgetDataStore.setWorkType(this, dateKey, id);
+        CatCalendarWidgetProvider.refreshAll(this);
+        finish();
     }
 
     private LinearLayout buildCustomEditor(String initialValue) {
