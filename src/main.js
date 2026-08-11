@@ -1211,8 +1211,7 @@ app.innerHTML = `
     >
       <div class="modal-header">
         <div>
-          <p class="section-caption">근무 형태 선택</p>
-          <h2 id="modalTitle">날짜</h2>
+                    <h2 id="modalTitle">날짜</h2>
         </div>
 
         <button

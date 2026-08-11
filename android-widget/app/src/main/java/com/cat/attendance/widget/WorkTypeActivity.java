@@ -31,6 +31,9 @@ public class WorkTypeActivity extends Activity {
     private int widgetId;
     private LinearLayout customEditor;
     private EditText customInput;
+    private ScrollView contentScrollView;
+    private LinearLayout rootContent;
+    private Window activityWindow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,53 +50,53 @@ public class WorkTypeActivity extends Activity {
             return;
         }
 
-        Window window = getWindow();
-        if (window != null) {
-            window.setDimAmount(0.50f);
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            window.setGravity(Gravity.BOTTOM);
+        activityWindow = getWindow();
+        if (activityWindow != null) {
+            activityWindow.setDimAmount(0.50f);
+            activityWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            activityWindow.setGravity(Gravity.BOTTOM);
+            activityWindow.setSoftInputMode(
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            );
         }
 
         setContentView(buildContent());
 
-        if (window != null) {
-            window.setLayout(
+        if (activityWindow != null) {
+            activityWindow.setLayout(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
             );
+
+            View decorView = activityWindow.getDecorView();
+            decorView.setOnApplyWindowInsetsListener((view, insets) -> {
+                updateWindowBounds();
+                return insets;
+            });
+            decorView.post(this::updateWindowBounds);
+            decorView.requestApplyInsets();
         }
     }
 
     private View buildContent() {
-        ScrollView scrollView = new ScrollView(this);
-        scrollView.setFillViewport(false);
-        scrollView.setClipToPadding(false);
-        scrollView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        contentScrollView = new ScrollView(this);
+        contentScrollView.setFillViewport(false);
+        contentScrollView.setClipToPadding(false);
+        contentScrollView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(12), dp(16), dp(16));
-        root.setBackground(roundRect(Color.WHITE, 30, 0, Color.TRANSPARENT));
-        scrollView.addView(
-                root,
+        rootContent = new LinearLayout(this);
+        rootContent.setOrientation(LinearLayout.VERTICAL);
+        rootContent.setPadding(dp(16), dp(12), dp(16), dp(14));
+        rootContent.setBackground(roundRect(Color.WHITE, 30, 0, Color.TRANSPARENT));
+        contentScrollView.addView(
+                rootContent,
                 new ScrollView.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
                 )
         );
 
-        scrollView.setOnApplyWindowInsetsListener((view, insets) -> {
-            int safeBottom;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                safeBottom = insets.getInsets(
-                        WindowInsets.Type.navigationBars() | WindowInsets.Type.ime()
-                ).bottom;
-            } else {
-                safeBottom = insets.getSystemWindowInsetBottom();
-            }
-            view.setPadding(0, 0, 0, safeBottom);
-            return insets;
-        });
+        LinearLayout root = rootContent;
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
@@ -105,15 +108,12 @@ public class WorkTypeActivity extends Activity {
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
         ));
 
-        TextView caption = text("근무 형태 선택", 13, 0xFF64748B, true);
-        titleBox.addView(caption);
-
         TextView title = text(formatDateTitle(), 25, 0xFF172033, true);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
-        titleParams.topMargin = dp(2);
+        titleParams.topMargin = 0;
         titleBox.addView(title, titleParams);
 
         TextView close = text("×", 34, 0xFF64748B, false);
@@ -202,7 +202,7 @@ public class WorkTypeActivity extends Activity {
             root.addView(delete, deleteParams);
         }
 
-        return scrollView;
+        return contentScrollView;
     }
 
     private View createWorkTypeTile(String id, String label, boolean selected) {
@@ -236,6 +236,7 @@ public class WorkTypeActivity extends Activity {
                 customEditor.setVisibility(View.VISIBLE);
                 customInput.requestFocus();
                 customInput.setSelection(customInput.getText().length());
+                rootContent.post(this::updateWindowBounds);
                 return;
             }
 
@@ -335,6 +336,81 @@ public class WorkTypeActivity extends Activity {
         WidgetDataStore.setCustomWorkType(this, dateKey, label);
         CatCalendarWidgetProvider.refreshAll(this);
         finish();
+    }
+
+    private void updateWindowBounds() {
+        if (activityWindow == null || rootContent == null) {
+            return;
+        }
+
+        View decorView = activityWindow.getDecorView();
+        int navigationBottom = getNavigationBarInset(decorView);
+        int statusTop = getStatusBarInset(decorView);
+
+        int displayHeight = getResources().getDisplayMetrics().heightPixels;
+        int safeTopGap = dp(10);
+        int maxHeight = Math.max(
+                dp(260),
+                displayHeight - statusTop - navigationBottom - safeTopGap
+        );
+
+        int contentHeight = rootContent.getMeasuredHeight();
+        int targetHeight = contentHeight > 0
+                ? Math.min(contentHeight, maxHeight)
+                : ViewGroup.LayoutParams.WRAP_CONTENT;
+
+        activityWindow.setLayout(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                targetHeight
+        );
+
+        WindowManager.LayoutParams params = activityWindow.getAttributes();
+        params.gravity = Gravity.BOTTOM;
+        // Move the actual bottom-sheet window above the Android navigation bar.
+        // This keeps the final button/field physically above the three system buttons.
+        params.y = Math.max(0, navigationBottom);
+        activityWindow.setAttributes(params);
+    }
+
+    private int getNavigationBarInset(View decorView) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            WindowInsets insets = decorView.getRootWindowInsets();
+            if (insets != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    int bottom = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+                    if (bottom > 0) {
+                        return bottom;
+                    }
+                } else {
+                    int bottom = insets.getStableInsetBottom();
+                    if (bottom > 0) {
+                        return bottom;
+                    }
+                }
+            }
+        }
+
+        int resourceId = getResources().getIdentifier(
+                "navigation_bar_height",
+                "dimen",
+                "android"
+        );
+        return resourceId > 0
+                ? getResources().getDimensionPixelSize(resourceId)
+                : dp(48);
+    }
+
+    private int getStatusBarInset(View decorView) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            WindowInsets insets = decorView.getRootWindowInsets();
+            if (insets != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    return insets.getInsets(WindowInsets.Type.statusBars()).top;
+                }
+                return insets.getStableInsetTop();
+            }
+        }
+        return 0;
     }
 
     private String formatDateTitle() {
