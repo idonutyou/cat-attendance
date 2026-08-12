@@ -3,6 +3,8 @@ import "./v119-overrides.css";
 import "./v120-overrides.css";
 import "./v121-overrides.css";
 import "./v122-overrides.css";
+import "./v123-overrides.css";
+import "./v126-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -436,6 +438,7 @@ let salaryMonthPointerStartX = null;
 let salaryMonthPointerStartY = null;
 let salaryMonthPointerButton = null;
 let salaryMonthPointerMoved = false;
+let salaryYearAnimating = false;
 let salaryBonusOpen = false;
 let salaryBonusGestureStartY = null;
 let salaryBonusGestureHandled = false;
@@ -918,10 +921,10 @@ app.innerHTML = `
           <section
             id="salaryDetailCard"
             class="salary-card"
-            aria-label="선택한 달의 예상 급여와 지급내역"
+            aria-label="선택한 달의 급여와 지급 및 공제내역"
           >
             <div class="salary-heading">
-              <h2 id="salaryMonthTitle">이번 달 예상 급여</h2>
+              <h2 id="salaryMonthTitle">이번 달 급여</h2>
 
               <button
                 id="salarySettingsToggle"
@@ -1020,17 +1023,44 @@ app.innerHTML = `
                 </p>
               </section>
 
-              <section class="salary-panel payment-panel">
-                <h3>지급내역</h3>
+              <section class="salary-panel payment-panel salary-net-panel">
+                <div class="salary-pay-deduction-table">
+                  <div class="salary-pay-side">
+                    <div class="salary-pay-side-title">지급내역</div>
+                    <div
+                      id="payBreakdown"
+                      class="salary-pay-side-rows"
+                    ></div>
+                  </div>
 
-                <div id="payBreakdown" class="pay-breakdown"></div>
+                  <div class="salary-pay-side">
+                    <div class="salary-pay-side-title">공제내역</div>
+                    <div
+                      id="deductionBreakdown"
+                      class="salary-pay-side-rows salary-deduction-rows"
+                    ></div>
+                  </div>
+                </div>
 
-                <div class="total-pay-row">
-                  <span>예상 총급여</span>
-                  <strong id="totalPayOutput">0&thinsp;원</strong>
+                <div class="salary-net-summary">
+                  <div class="salary-net-line">
+                    <span>총급여</span>
+                    <strong id="totalPayOutput">0&thinsp;원</strong>
+                  </div>
+
+                  <div class="salary-net-line salary-net-deduction">
+                    <span>총공제</span>
+                    <strong id="totalDeductionOutput">0&thinsp;원</strong>
+                  </div>
+
+                  <div class="salary-net-receive">
+                    <span>실수령액</span>
+                    <strong id="netPayOutput">0&thinsp;원</strong>
+                  </div>
                 </div>
               </section>
             </div>
+          </section>
           </section>
         </div>
       </section>
@@ -1638,12 +1668,19 @@ const closeMonthPickerButton = document.querySelector(
 const salaryMonthTitle = document.querySelector("#salaryMonthTitle");
 const workTotalsGrid = document.querySelector("#workTotalsGrid");
 const payBreakdown = document.querySelector("#payBreakdown");
+const deductionBreakdown = document.querySelector(
+  "#deductionBreakdown",
+);
 
 const ordinaryHourlyWageOutput = document.querySelector(
   "#ordinaryHourlyWageOutput",
 );
 
 const totalPayOutput = document.querySelector("#totalPayOutput");
+const totalDeductionOutput = document.querySelector(
+  "#totalDeductionOutput",
+);
+const netPayOutput = document.querySelector("#netPayOutput");
 
 const baseHourlyWageInput = document.querySelector(
   "#baseHourlyWage",
@@ -1774,13 +1811,13 @@ salaryYearButton.addEventListener("click", () => {
 document
   .querySelector("#salaryPreviousYear")
   .addEventListener("click", () => {
-    setSalaryYear(salarySelectedYear - 1);
+    changeSalaryYear(-1);
   });
 
 document
   .querySelector("#salaryNextYear")
   .addEventListener("click", () => {
-    setSalaryYear(salarySelectedYear + 1);
+    changeSalaryYear(1);
   });
 
 
@@ -1823,18 +1860,16 @@ salaryYearGrid.addEventListener("pointerdown", (event) => {
     return;
   }
 
-  const monthButton = event.target.closest(
-    "[data-salary-month]",
-  );
-
-  if (!monthButton) {
-    return;
-  }
+  salaryMonthTouchClickBlocked = false;
+  salarySettingsTouchClickBlocked = false;
+  calendarSwipeNativeClickBlock = null;
 
   salaryMonthPointerId = event.pointerId;
   salaryMonthPointerStartX = event.clientX;
   salaryMonthPointerStartY = event.clientY;
-  salaryMonthPointerButton = monthButton;
+  salaryMonthPointerButton = event.target.closest(
+    "[data-salary-month]",
+  );
   salaryMonthPointerMoved = false;
 });
 
@@ -1856,11 +1891,29 @@ salaryYearGrid.addEventListener("pointerup", (event) => {
     return;
   }
 
-  salaryMonthTouchClickBlocked = true;
+  const deltaX =
+    salaryMonthPointerStartX - event.clientX;
+  const deltaY =
+    salaryMonthPointerStartY - event.clientY;
 
-  if (!salaryMonthPointerMoved && salaryMonthPointerButton) {
+  const isHorizontalYearSwipe =
+    Math.abs(deltaX) >= 52 &&
+    Math.abs(deltaX) > Math.abs(deltaY) * 1.15;
+
+  if (isHorizontalYearSwipe) {
     event.preventDefault();
     event.stopPropagation();
+
+    salaryMonthTouchClickBlocked = true;
+
+    changeSalaryYear(
+      deltaX > 0 ? 1 : -1,
+    );
+  } else if (!salaryMonthPointerMoved && salaryMonthPointerButton) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    salaryMonthTouchClickBlocked = true;
     selectSalaryMonth(salaryMonthPointerButton);
   }
 
@@ -1870,9 +1923,11 @@ salaryYearGrid.addEventListener("pointerup", (event) => {
   salaryMonthPointerButton = null;
   salaryMonthPointerMoved = false;
 
-  window.setTimeout(() => {
-    salaryMonthTouchClickBlocked = false;
-  }, 450);
+  if (salaryMonthTouchClickBlocked) {
+    window.setTimeout(() => {
+      salaryMonthTouchClickBlocked = false;
+    }, 450);
+  }
 });
 
 ["pointercancel", "lostpointercapture"].forEach((eventName) => {
@@ -1881,16 +1936,16 @@ salaryYearGrid.addEventListener("pointerup", (event) => {
       return;
     }
 
-    salaryMonthTouchClickBlocked = true;
+    /*
+     * 취소된 스와이프가 다음 실제 터치를 막으면 안 됩니다.
+     * 합성 click이 없으므로 추가 차단 시간도 필요하지 않습니다.
+     */
+    salaryMonthTouchClickBlocked = false;
     salaryMonthPointerId = null;
     salaryMonthPointerStartX = null;
     salaryMonthPointerStartY = null;
     salaryMonthPointerButton = null;
     salaryMonthPointerMoved = false;
-
-    window.setTimeout(() => {
-      salaryMonthTouchClickBlocked = false;
-    }, 450);
   });
 });
 
@@ -2291,12 +2346,19 @@ salaryPageLayout.addEventListener(
 
     if (
       salaryMobilePageIndex === 2 &&
-      salarySettingsOpen &&
-      direction > 0 &&
-        salaryDetailCard.scrollTop + salaryDetailCard.clientHeight <
-          salaryDetailCard.scrollHeight - 2
+      salarySettingsOpen
     ) {
-      return;
+      const isAtTop = salaryDetailCard.scrollTop <= 2;
+      const isAtBottom =
+        salaryDetailCard.scrollTop +
+          salaryDetailCard.clientHeight >=
+        salaryDetailCard.scrollHeight - 2;
+      const canLeaveSettings =
+        direction < 0 ? isAtTop : isAtBottom;
+
+      if (!canLeaveSettings) {
+        return;
+      }
     }
 
     event.preventDefault();
@@ -2315,7 +2377,11 @@ salaryPageLayout.addEventListener("pointerdown", (event) => {
     !isSalaryMobilePager() ||
     currentAppPage !== "salary" ||
     event.pointerType === "mouse" ||
-    salaryMobilePageTransitioning
+    salaryMobilePageTransitioning ||
+    (
+      salaryMobilePageIndex === 2 &&
+      salarySettingsOpen
+    )
   ) {
     return;
   }
@@ -3625,6 +3691,52 @@ function closeSalaryYearPicker() {
   salaryYearButton.setAttribute("aria-expanded", "false");
 }
 
+async function changeSalaryYear(
+  direction,
+  { animate = true } = {},
+) {
+  if (
+    salaryYearAnimating ||
+    !Number.isFinite(direction) ||
+    direction === 0
+  ) {
+    return;
+  }
+
+  const normalizedDirection = direction > 0 ? 1 : -1;
+  const nextYear = clampYear(
+    salarySelectedYear + normalizedDirection,
+  );
+
+  if (nextYear === salarySelectedYear) {
+    return;
+  }
+
+  const updateYear = () => {
+    setSalaryYear(nextYear);
+  };
+
+  salaryYearAnimating = true;
+
+  try {
+    if (!animate) {
+      updateYear();
+      return;
+    }
+
+    /*
+     * 근태관리 달력의 월 화살표와 같은 전환 함수를 그대로 사용한다.
+     */
+    await animateMonthTransition(
+      salaryYearGrid,
+      normalizedDirection,
+      updateYear,
+    );
+  } finally {
+    salaryYearAnimating = false;
+  }
+}
+
 function setSalaryYear(year) {
   salarySelectedYear = clampYear(year);
   syncSalaryInputs();
@@ -4208,12 +4320,42 @@ document.addEventListener(
     }
 
     /*
+     * 급여 페이지의 새 실제 터치는 이전 스와이프/합성 click 차단보다
+     * 항상 우선합니다. 이 값을 여기서 먼저 해제해야 스와이프 직후
+     * 첫 번째 터치가 이전 동작의 차단 플래그에 먹히지 않습니다.
+     */
+    if (
+      currentAppPage === "salary" &&
+      isSalaryMobilePager()
+    ) {
+      salaryMonthTouchClickBlocked = false;
+      salarySettingsTouchClickBlocked = false;
+    }
+
+    /*
      * 새로운 실제 손가락 동작이 시작되면 이전 동작의 지연 click 차단은
      * 더 이상 필요하지 않습니다. 이렇게 해야 빠른 연속 터치도 막히지 않습니다.
      */
     calendarSwipeNativeClickBlock = null;
 
     if (performance.now() > calendarSwipeTapRecoveryUntil) {
+      return;
+    }
+
+    if (
+      currentAppPage === "salary" &&
+      isSalaryMobilePager() &&
+      event.target instanceof Element &&
+      event.target.closest(
+        "input, select, textarea, label, [contenteditable='true']",
+      )
+    ) {
+      /*
+       * 입력 컨트롤은 브라우저의 실제 터치/포커스를 그대로 사용합니다.
+       * synthetic click으로 바꾸면 첫 터치에서 키보드가 안 뜨는 문제가
+       * 생길 수 있습니다.
+       */
+      calendarSwipeTapCandidate = null;
       return;
     }
 
@@ -5620,6 +5762,110 @@ function formatAverageHours(value) {
   }).format(value);
 }
 
+
+function truncatePayrollToTen(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return Math.floor(value / 10) * 10;
+}
+
+function getVerifiedPayrollInsuranceForMonth(year, month) {
+  /*
+   * 실제 급여명세서로 검증한 개인 기준값.
+   * 새 기준소득월액/보수월액이 확인되기 전까지 가장 최근 확정값을 유지한다.
+   */
+  if (year <= 2025) {
+    return {
+      pension: 202500,
+      health: 180170,
+    };
+  }
+
+  if (year === 2026 && month <= 5) {
+    return {
+      pension: 213750,
+      health: 183020,
+    };
+  }
+
+  return {
+    pension: 231180,
+    health: 202090,
+  };
+}
+
+function calculatePayrollDeductions(year, month, totalPay) {
+  if (!Number.isFinite(totalPay) || totalPay <= 0) {
+    return {
+      incomeTax: 0,
+      localIncomeTax: 0,
+      pension: 0,
+      health: 0,
+      employment: 0,
+      employeeClub: 0,
+      totalDeduction: 0,
+      netPay: 0,
+    };
+  }
+
+  const {
+    pension,
+    health,
+  } = getVerifiedPayrollInsuranceForMonth(year, month);
+
+  const annualizedPay = totalPay * 12;
+  let incomeTaxConstant;
+
+  if (annualizedPay <= 55000000) {
+    incomeTaxConstant = 345625;
+  } else if (annualizedPay >= 55060000) {
+    incomeTaxConstant = 343125;
+  } else {
+    const transitionRatio =
+      (annualizedPay - 55000000) / 60000;
+
+    incomeTaxConstant =
+      345625 - transitionRatio * 2500;
+  }
+
+  const incomeTax = truncatePayrollToTen(
+    totalPay * 0.1395 -
+      pension * 0.15 -
+      incomeTaxConstant,
+  );
+
+  const localIncomeTax = truncatePayrollToTen(
+    incomeTax * 0.1,
+  );
+
+  const employment = truncatePayrollToTen(
+    totalPay * 0.009,
+  );
+
+  const employeeClub = 10000;
+
+  const totalDeduction =
+    incomeTax +
+    localIncomeTax +
+    pension +
+    health +
+    employment +
+    employeeClub;
+
+  return {
+    incomeTax,
+    localIncomeTax,
+    pension,
+    health,
+    employment,
+    employeeClub,
+    totalDeduction,
+    netPay: Math.max(0, totalPay - totalDeduction),
+  };
+}
+
 function renderSalary() {
   salaryYearButton.textContent = `${salarySelectedYear}년 ▾`;
 
@@ -5663,36 +5909,73 @@ function renderSalary() {
   );
 
   salaryMonthTitle.textContent =
-    `${salarySelectedYear}년 ${salarySelectedMonth + 1}월 예상 급여`;
+    `${salarySelectedYear}년 ${salarySelectedMonth + 1}월 급여`;
 
   ordinaryHourlyWageOutput.textContent =
     formatMoneyValue(salary.ordinaryHourlyWage);
 
+  const deductions = calculatePayrollDeductions(
+    salarySelectedYear,
+    salarySelectedMonth,
+    salary.totalPay,
+  );
+
   totalPayOutput.textContent = formatMoney(salary.totalPay);
+  totalDeductionOutput.textContent = formatMoney(
+    deductions.totalDeduction,
+  );
+  netPayOutput.textContent = formatMoney(deductions.netPay);
 
   const paymentRows = [
     ["기본급", salary.payments.basePay],
-    ["주차수당", salary.payments.weeklyAllowance],
     ["연장수당", salary.payments.overtimePay],
     ["심야수당", salary.payments.nightPay],
-    ["철야수당", salary.payments.overnightPay],
     ["휴일수당", salary.payments.holidayPay],
+    ["철야수당", salary.payments.overnightPay],
+    ["주차수당", salary.payments.weeklyAllowance],
     ["휴연수당", salary.payments.holidayOvertimePay],
     ["안전수당", salary.safetyAllowance],
     ["근속수당", salary.longevityAllowance],
     ["기타수당", salary.otherAllowance],
-  ];
+  ].filter(([label, value]) => {
+    if (label === "기본급" || label === "안전수당") {
+      return true;
+    }
+
+    return Number(value) !== 0;
+  });
 
   payBreakdown.innerHTML = paymentRows
     .map(
       ([label, value]) => `
-        <div class="payment-row">
+        <div class="salary-payment-row">
           <span>${label}</span>
-          <strong>${formatMoney(value)}</strong>
+          <strong>${formatMoneyValue(value)}</strong>
         </div>
       `,
     )
     .join("");
+
+  const deductionRows = [
+    ["갑근세", deductions.incomeTax],
+    ["주민세", deductions.localIncomeTax],
+    ["국민연금", deductions.pension],
+    ["건강보험", deductions.health],
+    ["고용보험", deductions.employment],
+    ["사우회비", deductions.employeeClub],
+  ];
+
+  deductionBreakdown.innerHTML = deductionRows
+    .map(
+      ([label, value]) => `
+        <div class="salary-deduction-row">
+          <span>${label}</span>
+          <strong>${formatMoneyValue(value)}</strong>
+        </div>
+      `,
+    )
+    .join("");
+
 }
 
 function getHolidayMonthForBonus(year, holidayName, fallbackMonth) {

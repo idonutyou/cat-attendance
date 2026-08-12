@@ -1,0 +1,39 @@
+/* v126: 급여 설정 내부 스크롤 + edge swipe 복구 */
+
+@media (max-width: 620px) {
+  html.salary-mobile-pager-enabled
+    .salary-page-layout.salary-settings-expanded
+    > #salaryDetailCard {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    touch-action: pan-y !important;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout.salary-settings-expanded
+    > #salaryDetailCard
+    .salary-layout {
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout.salary-settings-expanded
+    > #salaryDetailCard
+    .settings-panel:not([hidden]) {
+    flex: 0 0 auto;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-page-layout.salary-settings-expanded
+    > #salaryDetailCard
+    .payment-panel.salary-net-panel {
+    flex: 0 0 auto;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible;
+  }
+}
