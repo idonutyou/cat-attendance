@@ -1,10 +1,10 @@
-const CACHE_NAME = "cat-attendance-v133";
+const CACHE_NAME = "cat-attendance-v137";
 
 const APP_SHELL = [
   "./",
   "./manifest.webmanifest",
   "./holidays.json",
-  "./applause.wav",
+  "./madeby-fireworks.mp3",
   "./icon-192.png",
   "./icon-512.png",
   "./icon-512-maskable.png"

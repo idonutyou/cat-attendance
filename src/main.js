@@ -10,6 +10,7 @@ import "./v129-overrides.css";
 import "./v130-overrides.css";
 import "./v131-overrides.css";
 import "./v132-overrides.css";
+import "./v137-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -3693,7 +3694,18 @@ function setAppPage(pageId) {
   }
 
   syncMobilePagerMode();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  if (pageId === "hours-leave") {
+    targetPage.scrollTop = 0;
+    window.scrollTo({ top: 0, behavior: "auto" });
+
+    requestAnimationFrame(() => {
+      targetPage.scrollTop = 0;
+      window.scrollTo({ top: 0, behavior: "auto" });
+    });
+  } else {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 }
 
 function openSalaryYearPicker() {
@@ -6726,7 +6738,10 @@ async function loadHolidays() {
 }
 
 const REAL_FIREWORKS_AUDIO_URL =
-  "https://commons.wikimedia.org/wiki/Special:Redirect/file/Silvester_in_berlin_fireworks_1.ogg";
+  new URL(
+    "madeby-fireworks.mp3",
+    document.baseURI,
+  ).href;
 
 let realFireworksAudio = null;
 let realFireworksStopTimer = null;
@@ -6798,7 +6813,7 @@ function playRealFireworksAudio() {
       }
 
       realFireworksStopTimer = null;
-    }, 2950);
+    }, 2450);
 }
 
 function hexToRgb(hex) {

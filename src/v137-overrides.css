@@ -1,0 +1,37 @@
+/* v137: 52h / 연차 페이지 상단 공백 회귀 방지 */
+
+.app-page[data-app-page="hours-leave"] {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  transform: none !important;
+  overflow: visible !important;
+}
+
+.app-page[data-app-page="hours-leave"] > .hours-leave-card {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  margin-top: 0 !important;
+  transform: none !important;
+}
+
+@media (max-width: 620px) {
+  html.mobile-pager-enabled .app-page[data-app-page="hours-leave"],
+  html.salary-mobile-pager-enabled .app-page[data-app-page="hours-leave"] {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .app-page[data-app-page="hours-leave"] > .hours-leave-card {
+    margin: 0 auto !important;
+  }
+}
