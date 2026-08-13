@@ -61,7 +61,12 @@ function readNativeWidgetLaunchPayload(
 ) {
   try {
     const url = new URL(sourceUrl, window.location.href);
-    const encodedPayload = url.searchParams.get("catWidgetPayload");
+    const hashParams = new URLSearchParams(
+      url.hash.startsWith("#") ? url.hash.slice(1) : url.hash,
+    );
+    const encodedPayload =
+      url.searchParams.get("catWidgetPayload") ||
+      hashParams.get("catWidgetPayload");
 
     if (!encodedPayload) {
       return null;
@@ -167,15 +172,23 @@ function clearNativeWidgetLaunchPayloadFromUrl() {
   try {
     const url = new URL(window.location.href);
 
-    if (!url.searchParams.has("catWidgetPayload")) {
+    const hashParams = new URLSearchParams(
+      url.hash.startsWith("#") ? url.hash.slice(1) : url.hash,
+    );
+    const hasQueryPayload = url.searchParams.has("catWidgetPayload");
+    const hasHashPayload = hashParams.has("catWidgetPayload");
+
+    if (!hasQueryPayload && !hasHashPayload) {
       return;
     }
 
     url.searchParams.delete("catWidgetPayload");
+    hashParams.delete("catWidgetPayload");
+    const nextHash = hashParams.toString();
     window.history.replaceState(
       window.history.state,
       "",
-      `${url.pathname}${url.search}${url.hash}`,
+      `${url.pathname}${url.search}${nextHash ? `#${nextHash}` : ""}`,
     );
   } catch (error) {
     console.warn("위젯 입력 URL 정리 실패:", error);
@@ -311,7 +324,7 @@ function applyNativeWidgetLaunchPayload(
     clearNativeWidgetLaunchPayloadFromUrl();
 
     if (recordsChanged || weekStartChanged) {
-      reloadAppStateFromStorage();
+      refreshVisibleAppValuesAfterWidgetSync();
       sendCurrentStateBackToNativeWidget();
       return true;
     }
@@ -8710,6 +8723,32 @@ function applyAppStorageSnapshot(snapshot) {
   } finally {
     cloudSyncSuspended = false;
   }
+}
+
+function refreshVisibleAppValuesAfterWidgetSync() {
+  const appMain = document.querySelector(".app-main");
+  const appMainScrollTop = appMain?.scrollTop ?? 0;
+  const windowScrollX = window.scrollX;
+  const windowScrollY = window.scrollY;
+
+  weekStartsOnMonday = loadWeekStartPreference();
+  records = loadRecords();
+  settingsByMonth = loadSettingsByMonth();
+  fiscalSettingsByYear = loadFiscalSettingsByYear();
+  weeklyDateRange = loadWeeklyDateRange();
+  annualLeaveByYear = loadAnnualLeaveByYear();
+  annualLeaveReasons = loadAnnualLeaveReasons();
+  bonusEntriesByYear = loadBonusEntriesByYear();
+
+  syncWeekStartToggle();
+  render();
+
+  window.requestAnimationFrame(() => {
+    if (appMain) {
+      appMain.scrollTop = appMainScrollTop;
+    }
+    window.scrollTo(windowScrollX, windowScrollY);
+  });
 }
 
 function reloadAppStateFromStorage() {

@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public final class WidgetAppBridge {
-    private static final long SILENT_HOME_DELAY_MS = 220L;
+    private static final long SILENT_HOME_DELAY_MS = 90L;
 
     private WidgetAppBridge() {}
 
@@ -85,10 +85,7 @@ public final class WidgetAppBridge {
             );
 
             Uri uri = Uri.parse(baseUrl).buildUpon()
-                    .appendQueryParameter(
-                            "catWidgetPayload",
-                            encoded
-                    )
+                    .fragment("catWidgetPayload=" + encoded)
                     .build();
 
             Intent intent = new Intent(Intent.ACTION_VIEW, uri)
