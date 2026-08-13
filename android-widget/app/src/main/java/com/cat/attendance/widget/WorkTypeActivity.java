@@ -198,7 +198,9 @@ public class WorkTypeActivity extends Activity {
             delete.setOnClickListener(v -> {
                 WidgetDataStore.setWorkType(this, dateKey, "");
                 CatCalendarWidgetProvider.refreshAll(this);
+                WidgetAppBridge.deliverPendingToRunningAppSilently(this);
                 finish();
+                overridePendingTransition(0, 0);
             });
             LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(44)
@@ -344,7 +346,9 @@ public class WorkTypeActivity extends Activity {
     private void saveWorkTypeAndFinish(String id) {
         WidgetDataStore.setWorkType(this, dateKey, id);
         CatCalendarWidgetProvider.refreshAll(this);
+        WidgetAppBridge.deliverPendingToRunningAppSilently(this);
         finish();
+        overridePendingTransition(0, 0);
     }
 
     private LinearLayout buildCustomEditor(String initialValue) {
@@ -434,7 +438,9 @@ public class WorkTypeActivity extends Activity {
 
         WidgetDataStore.setCustomWorkType(this, dateKey, label);
         CatCalendarWidgetProvider.refreshAll(this);
+        WidgetAppBridge.deliverPendingToRunningAppSilently(this);
         finish();
+        overridePendingTransition(0, 0);
     }
 
     private void updateWindowBounds() {
