@@ -5,6 +5,11 @@ import "./v121-overrides.css";
 import "./v122-overrides.css";
 import "./v123-overrides.css";
 import "./v126-overrides.css";
+import "./v128-overrides.css";
+import "./v129-overrides.css";
+import "./v130-overrides.css";
+import "./v131-overrides.css";
+import "./v132-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -569,7 +574,12 @@ app.innerHTML = `
 
       <h1 id="appPageTitle">근태관리</h1>
 
-      <div class="made-by" aria-label="Made by 제민">
+      <div
+        class="made-by"
+        role="button"
+        tabindex="0"
+        aria-label="Made by 제민 축하 효과"
+      >
         Made by 제민
       </div>
     </header>
@@ -1491,6 +1501,7 @@ app.innerHTML = `
   </div>
 `;
 
+const madeByCredit = document.querySelector(".made-by");
 const authGate = document.querySelector("#authGate");
 const guestLoginButton = document.querySelector("#guestLoginButton");
 const googleLoginButton = document.querySelector("#googleLoginButton");
@@ -1719,6 +1730,18 @@ const saveCustomWorkTypeButton = document.querySelector(
 
 const deleteRecordButton = document.querySelector(
   "#deleteRecordButton",
+);
+
+prepareRealFireworksAudio();
+
+madeByCredit?.addEventListener(
+  "click",
+  activateMadeByCelebration,
+);
+
+madeByCredit?.addEventListener(
+  "keydown",
+  activateMadeByCelebration,
 );
 
 menuButton.addEventListener("click", (event) => {
@@ -6700,6 +6723,902 @@ async function loadHolidays() {
   } catch (error) {
     console.error("공휴일 정보를 불러오지 못했습니다.", error);
   }
+}
+
+const REAL_FIREWORKS_AUDIO_URL =
+  "https://commons.wikimedia.org/wiki/Special:Redirect/file/Silvester_in_berlin_fireworks_1.ogg";
+
+let realFireworksAudio = null;
+let realFireworksStopTimer = null;
+let fireworksCanvasAnimationId = null;
+
+function prepareRealFireworksAudio() {
+  if (realFireworksAudio) {
+    return realFireworksAudio;
+  }
+
+  const audio = new Audio(
+    REAL_FIREWORKS_AUDIO_URL,
+  );
+
+  audio.preload = "auto";
+  audio.volume = 0.88;
+  audio.playsInline = true;
+
+  /*
+   * 클릭 전에 미리 로딩해 첫 실행 지연을 줄인다.
+   * 외부 공개 도메인 녹음 파일은 재생만 하므로
+   * Canvas/WebAudio CORS 처리가 필요하지 않다.
+   */
+  try {
+    audio.load();
+  } catch {
+    // 브라우저가 사전 로드를 막아도 클릭 시 재생을 다시 시도한다.
+  }
+
+  realFireworksAudio = audio;
+  return audio;
+}
+
+function playRealFireworksAudio() {
+  const audio = prepareRealFireworksAudio();
+
+  if (!audio) {
+    return;
+  }
+
+  if (realFireworksStopTimer) {
+    window.clearTimeout(
+      realFireworksStopTimer,
+    );
+    realFireworksStopTimer = null;
+  }
+
+  try {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.volume = 0.88;
+  } catch {
+    // 아직 metadata가 준비되지 않았다면 play()가 준비 후 시작한다.
+  }
+
+  const playPromise = audio.play();
+
+  if (playPromise?.catch) {
+    playPromise.catch(() => {});
+  }
+
+  realFireworksStopTimer =
+    window.setTimeout(() => {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch {
+        // 재생 종료 중 브라우저가 media 상태를 바꿔도 무시한다.
+      }
+
+      realFireworksStopTimer = null;
+    }, 2950);
+}
+
+function hexToRgb(hex) {
+  const normalized = hex.replace(
+    "#",
+    "",
+  );
+  const value = Number.parseInt(
+    normalized,
+    16,
+  );
+
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  };
+}
+
+function createRealFireworksCanvas() {
+  document
+    .querySelector(
+      ".real-fireworks-layer",
+    )
+    ?.remove();
+
+  if (fireworksCanvasAnimationId) {
+    window.cancelAnimationFrame(
+      fireworksCanvasAnimationId,
+    );
+    fireworksCanvasAnimationId = null;
+  }
+
+  const layer =
+    document.createElement("div");
+  layer.className =
+    "real-fireworks-layer";
+  layer.setAttribute(
+    "aria-hidden",
+    "true",
+  );
+
+  const canvas =
+    document.createElement("canvas");
+  canvas.className =
+    "real-fireworks-canvas";
+
+  layer.append(canvas);
+  document.body.append(layer);
+
+  const context =
+    canvas.getContext("2d");
+
+  if (!context) {
+    layer.remove();
+    return null;
+  }
+
+  const pixelRatio = Math.min(
+    window.devicePixelRatio || 1,
+    2,
+  );
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  canvas.width =
+    Math.round(width * pixelRatio);
+  canvas.height =
+    Math.round(height * pixelRatio);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  context.setTransform(
+    pixelRatio,
+    0,
+    0,
+    pixelRatio,
+    0,
+    0,
+  );
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  return {
+    layer,
+    canvas,
+    context,
+    width,
+    height,
+  };
+}
+
+function launchRealFireworksVisual() {
+  const setup =
+    createRealFireworksCanvas();
+
+  if (!setup) {
+    return;
+  }
+
+  const {
+    layer,
+    context,
+    width,
+    height,
+  } = setup;
+
+  const goldenPalette = [
+    "#fffdf2",
+    "#fff3c4",
+    "#ffe59a",
+    "#ffd166",
+    "#ffc04d",
+    "#ffad2f",
+  ];
+  const accentPalette = [
+    "#fffdf2",
+    "#ffd166",
+    "#ff6b6b",
+    "#60a5fa",
+    "#34d399",
+    "#c084fc",
+  ];
+
+  const particles = [];
+  const flashes = [];
+  const rockets = [];
+  const startTime =
+    performance.now();
+
+  let scheduledIndex = 0;
+
+  const burstSchedule = [
+    {
+      at: 520,
+      x: 0.50,
+      y: 0.42,
+      radius: 0.39,
+      count: 108,
+      gold: true,
+    },
+    {
+      at: 730,
+      x: 0.29,
+      y: 0.50,
+      radius: 0.30,
+      count: 82,
+      gold: true,
+    },
+    {
+      at: 790,
+      x: 0.71,
+      y: 0.50,
+      radius: 0.30,
+      count: 82,
+      gold: true,
+    },
+    {
+      at: 1000,
+      x: 0.40,
+      y: 0.29,
+      radius: 0.25,
+      count: 68,
+      gold: false,
+    },
+    {
+      at: 1080,
+      x: 0.61,
+      y: 0.30,
+      radius: 0.25,
+      count: 68,
+      gold: true,
+    },
+    {
+      at: 1280,
+      x: 0.50,
+      y: 0.58,
+      radius: 0.28,
+      count: 76,
+      gold: true,
+    },
+    {
+      at: 1490,
+      x: 0.34,
+      y: 0.39,
+      radius: 0.23,
+      count: 64,
+      gold: true,
+    },
+    {
+      at: 1570,
+      x: 0.66,
+      y: 0.39,
+      radius: 0.23,
+      count: 64,
+      gold: true,
+    },
+    {
+      at: 1760,
+      x: 0.48,
+      y: 0.46,
+      radius: 0.22,
+      count: 62,
+      gold: true,
+    },
+    {
+      at: 1840,
+      x: 0.57,
+      y: 0.43,
+      radius: 0.20,
+      count: 56,
+      gold: true,
+    },
+  ];
+
+  function addRocket() {
+    rockets.push({
+      startX: width * 0.50,
+      startY: height * 0.91,
+      endX: width * 0.50,
+      endY: height * 0.42,
+      startedAt: 0,
+      duration: 520,
+      trail: [],
+    });
+  }
+
+  function addFlash(
+    x,
+    y,
+    radius,
+  ) {
+    flashes.push({
+      x,
+      y,
+      radius,
+      age: 0,
+      life: 360,
+    });
+  }
+
+  function addBurst(config) {
+    const centerX =
+      width * config.x;
+    const centerY =
+      height * config.y;
+    const maxRadius =
+      Math.min(
+        width,
+        height * 0.72,
+      ) * config.radius;
+    const palette =
+      config.gold
+        ? goldenPalette
+        : accentPalette;
+
+    addFlash(
+      centerX,
+      centerY,
+      Math.min(
+        50,
+        maxRadius * 0.22,
+      ),
+    );
+
+    for (
+      let index = 0;
+      index < config.count;
+      index += 1
+    ) {
+      const angle =
+        (Math.PI * 2 * index) /
+          config.count +
+        (Math.random() - 0.5) *
+          0.055;
+      const speed =
+        maxRadius *
+        (
+          0.88 +
+          Math.random() * 0.34
+        );
+      const colorHex =
+        palette[
+          index % palette.length
+        ];
+      const color =
+        hexToRgb(colorHex);
+      const life =
+        1180 +
+        Math.random() * 420;
+
+      particles.push({
+        x: centerX,
+        y: centerY,
+        previousX: centerX,
+        previousY: centerY,
+        vx:
+          Math.cos(angle) *
+          speed,
+        vy:
+          Math.sin(angle) *
+          speed,
+        gravity:
+          48 +
+          Math.random() * 42,
+        drag:
+          0.50 +
+          Math.random() * 0.11,
+        age: 0,
+        life,
+        width:
+          1.15 +
+          Math.random() * 1.15,
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        sparkle:
+          Math.random() < 0.42,
+      });
+    }
+
+    const microSparkCount =
+      Math.round(
+        config.count * 0.72,
+      );
+
+    for (
+      let index = 0;
+      index < microSparkCount;
+      index += 1
+    ) {
+      const angle =
+        Math.random() *
+        Math.PI *
+        2;
+      const speed =
+        maxRadius *
+        (
+          0.42 +
+          Math.random() * 0.58
+        );
+      const color =
+        hexToRgb(
+          palette[
+            Math.floor(
+              Math.random() *
+                palette.length,
+            )
+          ],
+        );
+
+      particles.push({
+        x: centerX,
+        y: centerY,
+        previousX: centerX,
+        previousY: centerY,
+        vx:
+          Math.cos(angle) *
+          speed,
+        vy:
+          Math.sin(angle) *
+          speed,
+        gravity:
+          58 +
+          Math.random() * 54,
+        drag:
+          0.54 +
+          Math.random() * 0.10,
+        age: 0,
+        life:
+          820 +
+          Math.random() * 420,
+        width:
+          0.75 +
+          Math.random() * 0.85,
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        sparkle: true,
+      });
+    }
+  }
+
+  addRocket();
+
+  let previousTime =
+    startTime;
+
+  function drawRocket(
+    rocket,
+    elapsed,
+  ) {
+    const progress = Math.min(
+      1,
+      Math.max(
+        0,
+        (
+          elapsed -
+          rocket.startedAt
+        ) /
+          rocket.duration,
+      ),
+    );
+    const eased =
+      1 -
+      Math.pow(
+        1 - progress,
+        2.35,
+      );
+    const x =
+      rocket.startX +
+      (
+        rocket.endX -
+        rocket.startX
+      ) *
+        eased;
+    const y =
+      rocket.startY +
+      (
+        rocket.endY -
+        rocket.startY
+      ) *
+        eased;
+
+    rocket.trail.push({
+      x,
+      y,
+    });
+
+    if (
+      rocket.trail.length > 18
+    ) {
+      rocket.trail.shift();
+    }
+
+    for (
+      let index = 1;
+      index <
+      rocket.trail.length;
+      index += 1
+    ) {
+      const from =
+        rocket.trail[index - 1];
+      const to =
+        rocket.trail[index];
+      const alpha =
+        index /
+        rocket.trail.length;
+
+      context.beginPath();
+      context.moveTo(
+        from.x,
+        from.y,
+      );
+      context.lineTo(
+        to.x,
+        to.y,
+      );
+      context.strokeStyle =
+        `rgba(255,194,70,${
+          alpha * 0.80
+        })`;
+      context.lineWidth =
+        1.2 + alpha * 2.5;
+      context.stroke();
+    }
+
+    const glow =
+      context.createRadialGradient(
+        x,
+        y,
+        0,
+        x,
+        y,
+        15,
+      );
+    glow.addColorStop(
+      0,
+      "rgba(255,255,255,1)",
+    );
+    glow.addColorStop(
+      0.28,
+      "rgba(255,235,150,0.96)",
+    );
+    glow.addColorStop(
+      1,
+      "rgba(255,170,30,0)",
+    );
+
+    context.fillStyle = glow;
+    context.beginPath();
+    context.arc(
+      x,
+      y,
+      15,
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+
+    return progress >= 1;
+  }
+
+  function frame(now) {
+    const elapsed =
+      now - startTime;
+    const dt = Math.min(
+      0.032,
+      Math.max(
+        0.001,
+        (now - previousTime) /
+          1000,
+      ),
+    );
+    previousTime = now;
+
+    context.clearRect(
+      0,
+      0,
+      width,
+      height,
+    );
+
+    context.globalCompositeOperation =
+      "lighter";
+
+    for (
+      let index =
+        rockets.length - 1;
+      index >= 0;
+      index -= 1
+    ) {
+      if (
+        drawRocket(
+          rockets[index],
+          elapsed,
+        )
+      ) {
+        rockets.splice(
+          index,
+          1,
+        );
+      }
+    }
+
+    while (
+      scheduledIndex <
+        burstSchedule.length &&
+      elapsed >=
+        burstSchedule[
+          scheduledIndex
+        ].at
+    ) {
+      addBurst(
+        burstSchedule[
+          scheduledIndex
+        ],
+      );
+      scheduledIndex += 1;
+    }
+
+    for (
+      let index =
+        flashes.length - 1;
+      index >= 0;
+      index -= 1
+    ) {
+      const flash =
+        flashes[index];
+
+      flash.age += dt * 1000;
+      const progress =
+        flash.age /
+        flash.life;
+      const alpha =
+        Math.max(
+          0,
+          1 - progress,
+        );
+      const radius =
+        flash.radius *
+        (
+          0.45 +
+          progress * 1.8
+        );
+
+      const gradient =
+        context.createRadialGradient(
+          flash.x,
+          flash.y,
+          0,
+          flash.x,
+          flash.y,
+          radius,
+        );
+
+      gradient.addColorStop(
+        0,
+        `rgba(255,255,247,${
+          alpha * 0.96
+        })`,
+      );
+      gradient.addColorStop(
+        0.24,
+        `rgba(255,228,130,${
+          alpha * 0.62
+        })`,
+      );
+      gradient.addColorStop(
+        1,
+        "rgba(255,160,30,0)",
+      );
+
+      context.fillStyle =
+        gradient;
+      context.beginPath();
+      context.arc(
+        flash.x,
+        flash.y,
+        radius,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+
+      if (
+        flash.age >=
+        flash.life
+      ) {
+        flashes.splice(
+          index,
+          1,
+        );
+      }
+    }
+
+    for (
+      let index =
+        particles.length - 1;
+      index >= 0;
+      index -= 1
+    ) {
+      const particle =
+        particles[index];
+
+      particle.age +=
+        dt * 1000;
+      const lifeProgress =
+        particle.age /
+        particle.life;
+
+      if (lifeProgress >= 1) {
+        particles.splice(
+          index,
+          1,
+        );
+        continue;
+      }
+
+      particle.previousX =
+        particle.x;
+      particle.previousY =
+        particle.y;
+
+      const dragFactor =
+        Math.pow(
+          particle.drag,
+          dt,
+        );
+
+      particle.vx *=
+        dragFactor;
+      particle.vy *=
+        dragFactor;
+      particle.vy +=
+        particle.gravity *
+        dt;
+
+      particle.x +=
+        particle.vx *
+        dt;
+      particle.y +=
+        particle.vy *
+        dt;
+
+      const alphaBase =
+        lifeProgress < 0.68
+          ? 1
+          : Math.max(
+              0,
+              1 -
+                (
+                  lifeProgress -
+                  0.68
+                ) /
+                  0.32,
+            );
+      const sparklePulse =
+        particle.sparkle
+          ? (
+              0.62 +
+              Math.abs(
+                Math.sin(
+                  particle.age *
+                    0.038,
+                ),
+              ) *
+                0.38
+            )
+          : 1;
+      const alpha =
+        alphaBase *
+        sparklePulse;
+
+      const tailLength =
+        1.8 +
+        (
+          1 -
+          lifeProgress
+        ) *
+          3.6;
+      const tailX =
+        particle.x -
+        (
+          particle.x -
+          particle.previousX
+        ) *
+          tailLength;
+      const tailY =
+        particle.y -
+        (
+          particle.y -
+          particle.previousY
+        ) *
+          tailLength;
+
+      context.beginPath();
+      context.moveTo(
+        tailX,
+        tailY,
+      );
+      context.lineTo(
+        particle.x,
+        particle.y,
+      );
+      context.strokeStyle =
+        `rgba(${
+          particle.r
+        },${particle.g},${
+          particle.b
+        },${alpha})`;
+      context.lineWidth =
+        particle.width;
+      context.stroke();
+
+      context.fillStyle =
+        `rgba(255,255,244,${
+          alpha * 0.90
+        })`;
+      context.beginPath();
+      context.arc(
+        particle.x,
+        particle.y,
+        Math.max(
+          0.75,
+          particle.width *
+            0.52,
+        ),
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
+
+    context.globalCompositeOperation =
+      "source-over";
+
+    if (
+      elapsed < 2920 ||
+      particles.length > 0 ||
+      flashes.length > 0 ||
+      rockets.length > 0
+    ) {
+      fireworksCanvasAnimationId =
+        window.requestAnimationFrame(
+          frame,
+        );
+      return;
+    }
+
+    fireworksCanvasAnimationId =
+      null;
+    layer.remove();
+  }
+
+  fireworksCanvasAnimationId =
+    window.requestAnimationFrame(
+      frame,
+    );
+}
+
+function launchMadeByCelebration() {
+  playRealFireworksAudio();
+  launchRealFireworksVisual();
+}
+
+function activateMadeByCelebration(event) {
+  if (
+    event.type === "keydown" &&
+    event.key !== "Enter" &&
+    event.key !== " "
+  ) {
+    return;
+  }
+
+  if (event.type === "keydown") {
+    event.preventDefault();
+  }
+
+  launchMadeByCelebration();
 }
 
 function getInputNumber(input) {

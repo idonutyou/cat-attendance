@@ -1,0 +1,115 @@
+/* v130: 선명하고 풍성하게 촤악 퍼지는 폭죽 */
+
+.credit-firework-particle {
+  width: var(--particle-width) !important;
+  height: var(--particle-length) !important;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #ffffff 16%,
+      var(--particle-color) 38%,
+      var(--particle-color) 100%
+    ) !important;
+  box-shadow:
+    0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 5px var(--particle-color) !important;
+  filter: none !important;
+  opacity: 0;
+  animation:
+    credit-firework-streak 940ms
+    cubic-bezier(0.16, 0.78, 0.23, 1)
+    var(--burst-delay)
+    both !important;
+}
+
+.credit-firework-spark {
+  position: absolute;
+  display: block;
+  width: var(--spark-size);
+  height: var(--spark-size);
+  border-radius: 999px;
+  background: var(--particle-color);
+  box-shadow:
+    0 0 2px #ffffff,
+    0 0 4px var(--particle-color);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation:
+    credit-firework-spark 1080ms
+    cubic-bezier(0.15, 0.72, 0.26, 1)
+    var(--burst-delay)
+    both;
+}
+
+.credit-firework-flash {
+  width: 18px !important;
+  height: 18px !important;
+  background: #fff9c8 !important;
+  box-shadow:
+    0 0 6px #ffffff,
+    0 0 18px rgba(255, 221, 87, 0.98),
+    0 0 34px rgba(255, 165, 40, 0.62) !important;
+  filter: none !important;
+  animation-duration: 430ms !important;
+}
+
+@keyframes credit-firework-streak {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(0, 0)
+      rotate(var(--spark-angle))
+      scaleY(0.15)
+      scaleX(0.72);
+  }
+
+  8% { opacity: 1; }
+  68% { opacity: 1; }
+  84% { opacity: 0.96; }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(var(--tx), var(--ty))
+      rotate(var(--spark-angle))
+      scaleY(0.72)
+      scaleX(0.82);
+  }
+}
+
+@keyframes credit-firework-spark {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(0, 0)
+      scale(0.25);
+  }
+
+  10% { opacity: 1; }
+  72% { opacity: 1; }
+  88% { opacity: 0.95; }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(var(--tx), var(--ty))
+      scale(0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credit-firework-particle {
+    animation-duration: 520ms !important;
+  }
+
+  .credit-firework-spark {
+    animation-duration: 620ms;
+  }
+}

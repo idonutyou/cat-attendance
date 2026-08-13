@@ -1,0 +1,47 @@
+/* v129: 폭죽을 더 크고 넓게, 박수 음원은 public/applause.wav 사용 */
+
+.credit-firework-particle {
+  box-shadow:
+    0 0 7px rgba(255, 255, 255, 0.7),
+    0 0 12px color-mix(
+      in srgb,
+      var(--particle-color) 62%,
+      transparent
+    );
+  animation-duration: 900ms;
+}
+
+.credit-firework-flash {
+  width: 16px;
+  height: 16px;
+  box-shadow:
+    0 0 18px rgba(255, 220, 105, 0.95),
+    0 0 38px rgba(255, 165, 60, 0.5);
+  animation-duration: 480ms;
+}
+
+@keyframes credit-firework-particle {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(0, 0)
+      scale(0.25);
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  68% {
+    opacity: 0.98;
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(var(--tx), var(--ty))
+      scale(0.12);
+  }
+}

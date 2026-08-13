@@ -1,0 +1,168 @@
+/* v123: 승인된 급여 지급/공제 상세 UI */
+
+.salary-detail-compact .payment-panel.salary-net-panel {
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 15px;
+  background: #ffffff;
+}
+
+.salary-pay-deduction-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.salary-pay-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.salary-pay-side + .salary-pay-side {
+  border-left: 1px solid #e2e8f0;
+}
+
+.salary-pay-side-title {
+  flex: 0 0 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #e2e8f0;
+  color: #1f2937;
+  background: #f3f6fb;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.salary-pay-side-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 7px 10px;
+}
+
+.salary-payment-row,
+.salary-deduction-row {
+  min-height: 33px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  border-bottom: 1px dashed #edf1f6;
+  color: #526075;
+  font-size: 12px;
+}
+
+.salary-payment-row:last-child,
+.salary-deduction-row:last-child {
+  border-bottom: 0;
+}
+
+.salary-payment-row span,
+.salary-deduction-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.salary-payment-row strong,
+.salary-deduction-row strong {
+  color: #26364f;
+  font-size: 12.5px;
+  font-weight: 850;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.salary-deduction-row strong {
+  color: #b42335;
+}
+
+.salary-net-summary {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  padding: 8px 11px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fbfdff;
+}
+
+.salary-net-line {
+  min-height: 29px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #1f2937;
+  font-size: 12.5px;
+  font-weight: 900;
+}
+
+.salary-net-line strong {
+  color: #26364f;
+  font-size: 14px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.salary-net-line.salary-net-deduction strong {
+  color: #d24b5a;
+}
+
+.salary-net-receive {
+  min-height: 52px;
+  margin-top: 4px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #e8f3ff, #eefcf6);
+}
+
+.salary-net-receive span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.salary-net-receive strong {
+  color: #0f7a5c;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@media (max-width: 380px) {
+  .salary-pay-side-rows {
+    padding-inline: 6px;
+  }
+
+  .salary-payment-row,
+  .salary-deduction-row {
+    gap: 4px;
+    font-size: 10.5px;
+  }
+
+  .salary-payment-row strong,
+  .salary-deduction-row strong {
+    font-size: 10.8px;
+  }
+
+  .salary-net-receive strong {
+    font-size: 18px;
+  }
+}

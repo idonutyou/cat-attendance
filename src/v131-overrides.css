@@ -1,0 +1,302 @@
+/* v131: 피융 상승 + 선명한 대형 연속 불꽃놀이 */
+
+.credit-celebration-layer {
+  background: transparent;
+}
+
+.credit-firework-rocket {
+  position: absolute;
+  width: 5px;
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #fff9d5 28%,
+    #ffd166 62%,
+    #ff9f1c 100%
+  );
+  box-shadow:
+    0 0 4px #ffffff,
+    0 0 10px #ffd166,
+    0 0 16px rgba(255, 155, 30, 0.75);
+  transform:
+    translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  animation:
+    credit-firework-rocket-rise
+    var(--rocket-duration)
+    cubic-bezier(0.19, 0.72, 0.24, 1)
+    both;
+}
+
+.credit-firework-rocket-trail {
+  position: absolute;
+  width: 3px;
+  height: 4px;
+  border-radius: 999px;
+  background: #ffd166;
+  box-shadow:
+    0 0 2px #ffffff,
+    0 0 5px #ffb347;
+  pointer-events: none;
+  opacity: 0;
+  transform:
+    translate(-50%, -50%);
+  animation:
+    credit-firework-rocket-trail
+    560ms
+    ease-out
+    var(--trail-delay)
+    both;
+}
+
+.credit-firework-particle {
+  width:
+    var(--particle-width) !important;
+  height:
+    var(--particle-length) !important;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #fffef7 10%,
+      var(--particle-color) 34%,
+      var(--particle-color) 100%
+    ) !important;
+  box-shadow:
+    0 0 2px #ffffff,
+    0 0 4px var(--particle-color),
+    0 0 7px rgba(255, 190, 65, 0.35)
+    !important;
+  filter: none !important;
+  opacity: 0;
+  animation:
+    credit-firework-real-streak
+    1220ms
+    cubic-bezier(0.10, 0.70, 0.20, 1)
+    var(--burst-delay)
+    both !important;
+}
+
+.credit-firework-spark {
+  width:
+    var(--spark-size) !important;
+  height:
+    var(--spark-size) !important;
+  background:
+    var(--particle-color) !important;
+  box-shadow:
+    0 0 2px #ffffff,
+    0 0 4px var(--particle-color)
+    !important;
+  filter: none !important;
+  animation:
+    credit-firework-real-spark
+    1320ms
+    cubic-bezier(0.12, 0.68, 0.24, 1)
+    var(--burst-delay)
+    both !important;
+}
+
+.credit-firework-flash {
+  width: 24px !important;
+  height: 24px !important;
+  background: #fffff2 !important;
+  box-shadow:
+    0 0 6px #ffffff,
+    0 0 16px #ffe28a,
+    0 0 32px rgba(255, 170, 30, 0.70)
+    !important;
+  filter: none !important;
+  animation:
+    credit-firework-real-flash
+    480ms
+    ease-out
+    var(--burst-delay)
+    both !important;
+}
+
+@keyframes credit-firework-rocket-rise {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(0, 0)
+      scaleY(0.65);
+  }
+
+  7% {
+    opacity: 1;
+  }
+
+  78% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(
+        var(--rocket-end-x),
+        var(--rocket-end-y)
+      )
+      scaleY(1.15);
+  }
+}
+
+@keyframes credit-firework-rocket-trail {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(0, 0)
+      scale(0.3);
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(
+        var(--trail-end-x),
+        var(--trail-end-y)
+      )
+      scale(0.12);
+  }
+}
+
+@keyframes credit-firework-real-streak {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(0, 0)
+      rotate(
+        var(--spark-angle)
+      )
+      scaleY(0.12)
+      scaleX(0.82);
+  }
+
+  6% {
+    opacity: 1;
+  }
+
+  58% {
+    opacity: 1;
+    transform:
+      translate(-50%, -50%)
+      translate(
+        var(--tx),
+        var(--ty)
+      )
+      rotate(
+        var(--spark-angle)
+      )
+      scaleY(1)
+      scaleX(0.90);
+  }
+
+  80% {
+    opacity: 0.98;
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(
+        var(--tx),
+        calc(
+          var(--ty) +
+          var(--gravity-drop)
+        )
+      )
+      rotate(
+        var(--spark-angle)
+      )
+      scaleY(0.62)
+      scaleX(0.80);
+  }
+}
+
+@keyframes credit-firework-real-spark {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(0, 0)
+      scale(0.2);
+  }
+
+  8% {
+    opacity: 1;
+  }
+
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(
+        var(--tx),
+        calc(
+          var(--ty) +
+          var(--gravity-drop)
+        )
+      )
+      scale(0.3);
+  }
+}
+
+@keyframes credit-firework-real-flash {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      scale(0.1);
+  }
+
+  14% {
+    opacity: 1;
+    transform:
+      translate(-50%, -50%)
+      scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      scale(3.4);
+  }
+}
+
+@media (
+  prefers-reduced-motion: reduce
+) {
+  .credit-firework-rocket {
+    animation-duration: 330ms;
+  }
+
+  .credit-firework-particle {
+    animation-duration:
+      720ms !important;
+  }
+
+  .credit-firework-spark {
+    animation-duration:
+      780ms !important;
+  }
+}
