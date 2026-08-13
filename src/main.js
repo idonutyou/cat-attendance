@@ -11,6 +11,7 @@ import "./v130-overrides.css";
 import "./v131-overrides.css";
 import "./v132-overrides.css";
 import "./v137-overrides.css";
+import "./v140-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -3921,6 +3922,10 @@ function setAppPage(pageId) {
   }
 
   currentAppPage = pageId;
+  document.documentElement.classList.toggle(
+    "hours-leave-page-active",
+    pageId === "hours-leave",
+  );
   updateSalaryScrollSnapState();
   if (pageId === "hours-leave") {
     appPageTitle.innerHTML =
@@ -3985,12 +3990,36 @@ function setAppPage(pageId) {
   syncMobilePagerMode();
 
   if (pageId === "hours-leave") {
+    document.documentElement.classList.remove(
+      "mobile-pager-enabled",
+      "salary-mobile-pager-enabled",
+    );
+
+    [
+      "transform",
+      "top",
+      "inset",
+      "height",
+      "min-height",
+    ].forEach((propertyName) => {
+      targetPage.style.removeProperty(propertyName);
+    });
+
     targetPage.scrollTop = 0;
-    window.scrollTo({ top: 0, behavior: "auto" });
+
+    document.scrollingElement?.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
 
     requestAnimationFrame(() => {
       targetPage.scrollTop = 0;
-      window.scrollTo({ top: 0, behavior: "auto" });
+      document.scrollingElement?.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
     });
   } else {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -4968,7 +4997,9 @@ function isMobilePagerMode() {
 }
 
 function syncMobilePagerMode() {
-  const isMobile = isMobilePagerMode();
+  const isMobile =
+    isMobilePagerMode() &&
+    currentAppPage === "attendance";
 
   mobilePageAnimations.forEach((animation) => {
     animation.cancel();
@@ -6229,7 +6260,7 @@ function renderSalary() {
       const isSelected = monthIndex === salarySelectedMonth;
       const bonusMarkup = salary.bonusTotal > 0
         ? `<small class="salary-month-bonus">+${formatMoneyValue(salary.bonusTotal)}</small>`
-        : "";
+        : `<small class="salary-month-bonus salary-month-bonus-empty" aria-hidden="true">&nbsp;</small>`;
 
       annualTotalPay += salary.totalPay + salary.bonusTotal;
 

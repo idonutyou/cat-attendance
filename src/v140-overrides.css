@@ -1,0 +1,65 @@
+/* v140: 52h / 연차 상단 공백 제거 + 급여 월 카드 정렬 */
+
+@media (max-width: 620px) {
+  html.hours-leave-page-active,
+  html.hours-leave-page-active body {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: auto !important;
+  }
+
+  html.hours-leave-page-active .app-shell {
+    height: auto !important;
+    min-height: 100dvh !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  html.hours-leave-page-active .app-main {
+    position: relative !important;
+    width: min(100% - 16px, 1180px) !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 10px auto 60px !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  html.hours-leave-page-active
+    .app-page[data-app-page="hours-leave"] {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    transform: none !important;
+    overflow: visible !important;
+    animation: none !important;
+  }
+
+  html.hours-leave-page-active
+    .app-page[data-app-page="hours-leave"]
+    > .hours-leave-card {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    margin: 0 auto !important;
+    transform: none !important;
+  }
+}
+
+.salary-month-card .salary-month-bonus {
+  display: block;
+  min-height: 1.2em;
+  line-height: 1.2;
+}
+
+.salary-month-card .salary-month-bonus-empty {
+  visibility: hidden;
+  pointer-events: none;
+}
