@@ -56,9 +56,11 @@ const APP_PAGE_TITLES = {
 
 const FIXED_SAFETY_ALLOWANCE = 50000;
 
-function readNativeWidgetLaunchPayload() {
+function readNativeWidgetLaunchPayload(
+  sourceUrl = window.location.href,
+) {
   try {
-    const url = new URL(window.location.href);
+    const url = new URL(sourceUrl, window.location.href);
     const encodedPayload = url.searchParams.get("catWidgetPayload");
 
     if (!encodedPayload) {
@@ -88,8 +90,8 @@ function readNativeWidgetLaunchPayload() {
   }
 }
 
-const nativeWidgetLaunchPayload = readNativeWidgetLaunchPayload();
-let nativeWidgetLaunchPayloadConsumed = false;
+let nativeWidgetLaunchPayloadConsumedSignature = "";
+let nativeWidgetQueuedLaunchPayload = null;
 
 function encodeNativeWidgetPayload(payload) {
   try {
@@ -180,15 +182,34 @@ function clearNativeWidgetLaunchPayloadFromUrl() {
   }
 }
 
-function applyNativeWidgetLaunchPayload() {
-  if (
-    nativeWidgetLaunchPayloadConsumed ||
-    !nativeWidgetLaunchPayload
-  ) {
+function applyNativeWidgetLaunchPayload(
+  payload = readNativeWidgetLaunchPayload(),
+) {
+  if (!payload) {
     return false;
   }
 
-  nativeWidgetLaunchPayloadConsumed = true;
+  let payloadSignature = "";
+
+  try {
+    payloadSignature = JSON.stringify(payload);
+  } catch {
+    payloadSignature = String(payload?.syncedAt || "");
+  }
+
+  if (
+    payloadSignature &&
+    payloadSignature ===
+      nativeWidgetLaunchPayloadConsumedSignature
+  ) {
+    clearNativeWidgetLaunchPayloadFromUrl();
+    return false;
+  }
+
+  if (payloadSignature) {
+    nativeWidgetLaunchPayloadConsumedSignature =
+      payloadSignature;
+  }
 
   try {
     const appliedState = JSON.parse(
@@ -198,7 +219,7 @@ function applyNativeWidgetLaunchPayload() {
       ...(appliedState.records || {}),
     };
     const nextRecords = loadRecords();
-    const changes = nativeWidgetLaunchPayload.changes;
+    const changes = payload.changes;
     const validWorkTypes = new Set([
       "day",
       "night",
@@ -252,7 +273,7 @@ function applyNativeWidgetLaunchPayload() {
       });
     }
 
-    const weekStartChange = nativeWidgetLaunchPayload.weekStart;
+    const weekStartChange = payload.weekStart;
     const weekStartUpdatedAt = Number(
       weekStartChange?.updatedAt,
     ) || 0;
@@ -303,6 +324,98 @@ function applyNativeWidgetLaunchPayload() {
     return false;
   }
 }
+
+function applyNativeWidgetPayloadObjectWhileRunning(
+  payload,
+) {
+  if (!authMode || !payload) {
+    return false;
+  }
+
+  const applied =
+    applyNativeWidgetLaunchPayload(payload);
+
+  if (!applied) {
+    return false;
+  }
+
+  if (authMode === "guest") {
+    saveSnapshotToLocalKey(
+      GUEST_SNAPSHOT_KEY,
+      captureAppStorageSnapshot(),
+    );
+  } else if (
+    authMode === "google" &&
+    activeGoogleUser
+  ) {
+    scheduleCloudSync();
+  }
+
+  return true;
+}
+
+function applyNativeWidgetPayloadWhileRunning() {
+  return applyNativeWidgetPayloadObjectWhileRunning(
+    readNativeWidgetLaunchPayload(),
+  );
+}
+
+function applyQueuedNativeWidgetLaunchPayload() {
+  if (
+    !authMode ||
+    !nativeWidgetQueuedLaunchPayload
+  ) {
+    return false;
+  }
+
+  const payload = nativeWidgetQueuedLaunchPayload;
+  nativeWidgetQueuedLaunchPayload = null;
+
+  return applyNativeWidgetPayloadObjectWhileRunning(
+    payload,
+  );
+}
+
+function handleNativeWidgetPwaLaunch(targetUrl) {
+  const payload =
+    readNativeWidgetLaunchPayload(targetUrl);
+
+  if (!payload) {
+    return false;
+  }
+
+  if (!authMode) {
+    nativeWidgetQueuedLaunchPayload = payload;
+    return true;
+  }
+
+  return applyNativeWidgetPayloadObjectWhileRunning(
+    payload,
+  );
+}
+
+window.addEventListener(
+  "pageshow",
+  () => {
+    applyNativeWidgetPayloadWhileRunning();
+  },
+);
+
+window.addEventListener(
+  "focus",
+  () => {
+    applyNativeWidgetPayloadWhileRunning();
+  },
+);
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (document.visibilityState === "visible") {
+      applyNativeWidgetPayloadWhileRunning();
+    }
+  },
+);
 
 const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
@@ -506,6 +619,24 @@ let holidays = {};
 let authMode = null;
 let activeGoogleUser = null;
 
+if (
+  window.launchQueue &&
+  typeof window.launchQueue.setConsumer === "function"
+) {
+  window.launchQueue.setConsumer((launchParams) => {
+    const targetUrl =
+      typeof launchParams?.targetURL === "string"
+        ? launchParams.targetURL
+        : "";
+
+    if (targetUrl) {
+      handleNativeWidgetPwaLaunch(targetUrl);
+      return;
+    }
+
+    applyNativeWidgetPayloadWhileRunning();
+  });
+}
 let firebaseServices = null;
 let firebaseInitializationPromise = null;
 let cloudUnsubscribe = null;
@@ -8703,7 +8834,13 @@ async function enterGuestMode() {
   }
 
   restoreGuestSnapshot();
-  if (applyNativeWidgetLaunchPayload()) {
+  let widgetDataApplied = applyNativeWidgetLaunchPayload();
+
+  if (applyQueuedNativeWidgetLaunchPayload()) {
+    widgetDataApplied = true;
+  }
+
+  if (widgetDataApplied) {
     saveSnapshotToLocalKey(
       GUEST_SNAPSHOT_KEY,
       captureAppStorageSnapshot(),
@@ -8824,7 +8961,12 @@ async function enterGoogleMode(user) {
   activeGoogleUser = user;
   localStorage.setItem(AUTH_MODE_KEY, "google");
   localStorage.setItem(ACTIVE_GOOGLE_UID_KEY, user.uid);
-  const widgetDataApplied = applyNativeWidgetLaunchPayload();
+  let widgetDataApplied = applyNativeWidgetLaunchPayload();
+
+  if (applyQueuedNativeWidgetLaunchPayload()) {
+    widgetDataApplied = true;
+  }
+
   subscribeToCloudChanges();
 
   if (widgetDataApplied) {
@@ -9047,7 +9189,13 @@ async function restoreSavedLoginMode() {
     activeGoogleUser = null;
     restoreGuestSnapshot();
 
-    if (applyNativeWidgetLaunchPayload()) {
+    let widgetDataApplied = applyNativeWidgetLaunchPayload();
+
+    if (applyQueuedNativeWidgetLaunchPayload()) {
+      widgetDataApplied = true;
+    }
+
+    if (widgetDataApplied) {
       saveSnapshotToLocalKey(
         GUEST_SNAPSHOT_KEY,
         captureAppStorageSnapshot(),
