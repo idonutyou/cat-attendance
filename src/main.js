@@ -12,7 +12,6 @@ import "./v131-overrides.css";
 import "./v132-overrides.css";
 import "./v137-overrides.css";
 import "./v140-overrides.css";
-import "./v141-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -1077,7 +1076,6 @@ app.innerHTML = `
                 </div>
               </section>
             </div>
-          </section>
           </section>
         </div>
       </section>
