@@ -1,0 +1,15 @@
+/* v148: 52h / 연차 최상단 pull-to-refresh 비활성화 */
+
+@media (max-width: 620px) {
+  html.hours-leave-page-active,
+  html.hours-leave-page-active body {
+    overscroll-behavior-y: none !important;
+  }
+
+  html.hours-leave-page-active .app-shell,
+  html.hours-leave-page-active .app-main,
+  html.hours-leave-page-active
+    .app-page[data-app-page="hours-leave"] {
+    overscroll-behavior-y: none !important;
+  }
+}

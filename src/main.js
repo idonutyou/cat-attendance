@@ -12,6 +12,7 @@ import "./v131-overrides.css";
 import "./v132-overrides.css";
 import "./v137-overrides.css";
 import "./v140-overrides.css";
+import "./v148-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -538,6 +539,8 @@ currentMonth = new Date(
 );
 
 let currentAppPage = "attendance";
+let hoursLeavePullStartY = null;
+let hoursLeavePullStartedAtTop = false;
 let navigationCloseTimer = null;
 let navigationSwipeResetTimer = null;
 let navigationSwipePointerId = null;
@@ -623,9 +626,17 @@ if (
   typeof window.launchQueue.setConsumer === "function"
 ) {
   window.launchQueue.setConsumer((launchParams) => {
-    handleNativeWidgetPwaLaunch(
-      launchParams?.targetURL,
-    );
+    const targetUrl =
+      typeof launchParams?.targetURL === "string"
+        ? launchParams.targetURL
+        : "";
+
+    if (targetUrl) {
+      handleNativeWidgetPwaLaunch(targetUrl);
+      return;
+    }
+
+    applyNativeWidgetPayloadWhileRunning();
   });
 }
 let firebaseServices = null;
@@ -4034,6 +4045,93 @@ function handleNavigationSwipeCancel(event) {
 
   resetNavigationSwipeState();
 }
+
+function getHoursLeaveScrollTop() {
+  const hoursLeavePage = appPages.find(
+    (page) => page.dataset.appPage === "hours-leave",
+  );
+  const documentScrollTop =
+    document.scrollingElement?.scrollTop || 0;
+  const pageScrollTop =
+    hoursLeavePage?.scrollTop || 0;
+
+  return Math.max(
+    documentScrollTop,
+    pageScrollTop,
+  );
+}
+
+document.addEventListener(
+  "touchstart",
+  (event) => {
+    if (
+      currentAppPage !== "hours-leave" ||
+      event.touches.length !== 1 ||
+      !event.target.closest(
+        '.app-page[data-app-page="hours-leave"]',
+      )
+    ) {
+      hoursLeavePullStartY = null;
+      hoursLeavePullStartedAtTop = false;
+      return;
+    }
+
+    hoursLeavePullStartY =
+      event.touches[0]?.clientY ?? null;
+    hoursLeavePullStartedAtTop =
+      getHoursLeaveScrollTop() <= 1;
+  },
+  { passive: true },
+);
+
+document.addEventListener(
+  "touchmove",
+  (event) => {
+    if (
+      currentAppPage !== "hours-leave" ||
+      !hoursLeavePullStartedAtTop ||
+      hoursLeavePullStartY === null ||
+      event.touches.length !== 1 ||
+      !event.target.closest(
+        '.app-page[data-app-page="hours-leave"]',
+      )
+    ) {
+      return;
+    }
+
+    const currentY =
+      event.touches[0]?.clientY;
+
+    if (
+      typeof currentY !== "number" ||
+      currentY <= hoursLeavePullStartY ||
+      getHoursLeaveScrollTop() > 1
+    ) {
+      return;
+    }
+
+    /*
+     * 문서 최상단에서 아래로 끌 때만 브라우저/PWA의
+     * pull-to-refresh 기본 동작을 막는다.
+     * 위로 미는 정상 스크롤은 건드리지 않는다.
+     */
+    event.preventDefault();
+  },
+  { passive: false },
+);
+
+["touchend", "touchcancel"].forEach(
+  (eventName) => {
+    document.addEventListener(
+      eventName,
+      () => {
+        hoursLeavePullStartY = null;
+        hoursLeavePullStartedAtTop = false;
+      },
+      { passive: true },
+    );
+  },
+);
 
 function setAppPage(pageId) {
   const targetPage = appPages.find(
