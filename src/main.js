@@ -12,7 +12,7 @@ import "./v131-overrides.css";
 import "./v132-overrides.css";
 import "./v137-overrides.css";
 import "./v140-overrides.css";
-import "./v149-overrides.css";
+import "./v150-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -1514,6 +1514,7 @@ const guestLoginButton = document.querySelector("#guestLoginButton");
 const googleLoginButton = document.querySelector("#googleLoginButton");
 const authStatus = document.querySelector("#authStatus");
 const appShell = document.querySelector(".app-shell");
+const appMain = document.querySelector(".app-main");
 const accountPanel = document.querySelector("#accountPanel");
 const accountAvatar = document.querySelector("#accountAvatar");
 const accountName = document.querySelector("#accountName");
@@ -4007,6 +4008,9 @@ function setAppPage(pageId) {
     });
 
     targetPage.scrollTop = 0;
+    if (appMain) {
+      appMain.scrollTop = 0;
+    }
 
     document.scrollingElement?.scrollTo({
       top: 0,
@@ -4016,6 +4020,9 @@ function setAppPage(pageId) {
 
     requestAnimationFrame(() => {
       targetPage.scrollTop = 0;
+      if (appMain) {
+        appMain.scrollTop = 0;
+      }
       document.scrollingElement?.scrollTo({
         top: 0,
         left: 0,

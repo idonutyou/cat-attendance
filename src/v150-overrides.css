@@ -1,0 +1,104 @@
+/* v150: 52h / 연차 전용 스크롤 컨테이너
+ *
+ * 증상: 평소에는 52h / 연차 화면이 위아래로 움직이지 않지만
+ * 달력 모달을 연 뒤 backdrop 위에서 드래그하면 문서가 움직였다.
+ * 이는 문서 높이 자체가 아니라 현재 페이지의 터치/overflow 계층이
+ * 스크롤 제스처를 막고 있다는 뜻이다.
+ *
+ * 해결: 모바일 52h / 연차 화면에서는 viewport 스크롤에 의존하지 않고
+ * .app-main 하나만 실제 세로 스크롤러로 사용한다.
+ */
+
+@media (max-width: 620px) {
+  html.hours-leave-page-active,
+  html.hours-leave-page-active body,
+  html.hours-leave-page-active #app {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    overscroll-behavior-y: none !important;
+  }
+
+  html.hours-leave-page-active body {
+    position: relative !important;
+    touch-action: pan-y !important;
+  }
+
+  html.hours-leave-page-active .app-shell {
+    width: 100% !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  html.hours-leave-page-active .app-header {
+    flex: 0 0 auto !important;
+  }
+
+  html.hours-leave-page-active .app-main {
+    position: relative !important;
+    width: min(100% - 16px, 1180px) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: 1 1 0 !important;
+    display: block !important;
+    margin: 10px auto 0 !important;
+    padding: 0 0 max(60px, env(safe-area-inset-bottom)) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+    scroll-behavior: auto !important;
+  }
+
+  html.hours-leave-page-active
+    .app-page[data-app-page="hours-leave"] {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+    animation: none !important;
+    touch-action: pan-y !important;
+  }
+
+  html.hours-leave-page-active
+    .app-page[data-app-page="hours-leave"]
+    > .hours-leave-card {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    width: min(760px, 100%) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 auto !important;
+    transform: none !important;
+    touch-action: pan-y !important;
+  }
+
+  /* 세로 제스처가 카드 안의 일반 영역에서 시작해도 app-main까지 전달한다. */
+  html.hours-leave-page-active .weekly-calculator,
+  html.hours-leave-page-active .annual-leave-section,
+  html.hours-leave-page-active .annual-leave-card,
+  html.hours-leave-page-active .annual-leave-history,
+  html.hours-leave-page-active .annual-leave-history-table {
+    touch-action: pan-y !important;
+  }
+
+  /* 연도 선택 목록은 자체 세로 스크롤을 유지한다. */
+  html.hours-leave-page-active .year-scroll-picker {
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+  }
+}
