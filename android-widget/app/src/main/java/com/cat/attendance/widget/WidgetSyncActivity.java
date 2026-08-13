@@ -28,8 +28,10 @@ public class WidgetSyncActivity extends Activity {
                     );
                     JSONObject records = payload.optJSONObject("records");
                     JSONObject holidays = payload.optJSONObject("holidays");
+                    JSONObject firebaseBridge = payload.optJSONObject("firebaseBridge");
                     String weekStart = payload.optString("weekStart", "sunday");
                     WidgetDataStore.replaceFromWeb(this, records, weekStart);
+                    WidgetDataStore.saveCloudBridgeCredentials(this, firebaseBridge);
                     HolidayStore.replaceFromWeb(this, holidays);
                     CatCalendarWidgetProvider.refreshAll(this);
                 } catch (Exception ignored) {

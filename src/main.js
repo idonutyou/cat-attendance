@@ -141,6 +141,21 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
       return;
     }
 
+    const firebaseBridge =
+      authMode === "google" &&
+      activeGoogleUser?.uid &&
+      activeGoogleUser?.refreshToken &&
+      firebaseConfig?.apiKey &&
+      firebaseConfig?.projectId
+        ? {
+            mode: "google",
+            apiKey: firebaseConfig.apiKey,
+            projectId: firebaseConfig.projectId,
+            uid: activeGoogleUser.uid,
+            refreshToken: activeGoogleUser.refreshToken,
+          }
+        : { mode: authMode || "guest" };
+
     const encodedPayload = encodeNativeWidgetPayload({
       records: loadRecords(),
       holidays:
@@ -150,6 +165,7 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
       weekStart: loadWeekStartPreference()
         ? "monday"
         : "sunday",
+      firebaseBridge,
       syncedAt: Date.now(),
     });
 
@@ -8751,6 +8767,35 @@ function refreshVisibleAppValuesAfterWidgetSync() {
   });
 }
 
+function applyWidgetCloudStorageSnapshot(snapshot) {
+  if (!snapshot?.storage || typeof snapshot.storage !== "object") {
+    return false;
+  }
+
+  let changed = false;
+  const recordsValue = snapshot.storage[STORAGE_KEY];
+  const weekStartValue = snapshot.storage[WEEK_START_KEY];
+
+  if (typeof recordsValue === "string") {
+    localStorage.setItem(STORAGE_KEY, recordsValue);
+    changed = true;
+  }
+
+  if (
+    typeof weekStartValue === "string" &&
+    ["monday", "sunday"].includes(weekStartValue)
+  ) {
+    localStorage.setItem(WEEK_START_KEY, weekStartValue);
+    changed = true;
+  }
+
+  if (changed) {
+    refreshVisibleAppValuesAfterWidgetSync();
+  }
+
+  return changed;
+}
+
 function reloadAppStateFromStorage() {
   weekStartsOnMonday = loadWeekStartPreference();
   records = loadRecords();
@@ -9038,10 +9083,20 @@ function subscribeToCloudChanges() {
 
       const data = snapshot.data();
 
+      const sourceDeviceId =
+        typeof data.sourceDeviceId === "string"
+          ? data.sourceDeviceId
+          : "";
+      const isWidgetChange =
+        sourceDeviceId.startsWith("android-widget");
+
       if (
-        data.sourceDeviceId === deviceId ||
-        cloudWritePending ||
-        cloudSyncTimer
+        !isWidgetChange &&
+        (
+          sourceDeviceId === deviceId ||
+          cloudWritePending ||
+          cloudSyncTimer
+        )
       ) {
         return;
       }
@@ -9050,6 +9105,16 @@ function subscribeToCloudChanges() {
         schemaVersion: data.schemaVersion || 1,
         storage: data.storage || {},
       };
+
+      if (isWidgetChange) {
+        applyWidgetCloudStorageSnapshot(incomingSnapshot);
+        saveSnapshotToLocalKey(
+          getGoogleCacheKey(activeGoogleUser.uid),
+          captureAppStorageSnapshot(),
+        );
+        updateCloudSyncStatus("위젯 변경 반영", "success");
+        return;
+      }
 
       applyAppStorageSnapshot(incomingSnapshot);
       saveSnapshotToLocalKey(

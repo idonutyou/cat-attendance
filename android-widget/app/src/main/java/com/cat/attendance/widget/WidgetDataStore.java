@@ -17,6 +17,10 @@ public final class WidgetDataStore {
     private static final String KEY_PENDING = "pending";
     private static final String KEY_WEEK_START_MONDAY = "week_start_monday";
     private static final String KEY_WEEK_START_PENDING = "week_start_pending";
+    private static final String KEY_CLOUD_API_KEY = "cloud_api_key";
+    private static final String KEY_CLOUD_PROJECT_ID = "cloud_project_id";
+    private static final String KEY_CLOUD_UID = "cloud_uid";
+    private static final String KEY_CLOUD_REFRESH_TOKEN = "cloud_refresh_token";
 
     private WidgetDataStore() {}
 
@@ -189,6 +193,94 @@ public final class WidgetDataStore {
         } catch (JSONException ignored) {}
 
         return payload.toString();
+    }
+
+
+    public static JSONObject getRecordsSnapshot(Context context) {
+        JSONObject records = readObject(prefs(context).getString(KEY_RECORDS, "{}"));
+        try {
+            return new JSONObject(records.toString());
+        } catch (JSONException ignored) {
+            return new JSONObject();
+        }
+    }
+
+    public static String getWeekStartValue(Context context) {
+        return startsOnMonday(context) ? "monday" : "sunday";
+    }
+
+    public static void saveCloudBridgeCredentials(Context context, JSONObject bridge) {
+        SharedPreferences.Editor editor = prefs(context).edit();
+        String mode = bridge == null ? "" : bridge.optString("mode", "");
+
+        if (!"google".equals(mode)) {
+            editor.remove(KEY_CLOUD_API_KEY)
+                    .remove(KEY_CLOUD_PROJECT_ID)
+                    .remove(KEY_CLOUD_UID)
+                    .remove(KEY_CLOUD_REFRESH_TOKEN)
+                    .apply();
+            return;
+        }
+
+        String apiKey = bridge.optString("apiKey", "").trim();
+        String projectId = bridge.optString("projectId", "").trim();
+        String uid = bridge.optString("uid", "").trim();
+        String refreshToken = bridge.optString("refreshToken", "").trim();
+
+        if (apiKey.isEmpty() || projectId.isEmpty() || uid.isEmpty() || refreshToken.isEmpty()) {
+            return;
+        }
+
+        editor.putString(KEY_CLOUD_API_KEY, apiKey)
+                .putString(KEY_CLOUD_PROJECT_ID, projectId)
+                .putString(KEY_CLOUD_UID, uid)
+                .putString(KEY_CLOUD_REFRESH_TOKEN, refreshToken)
+                .apply();
+    }
+
+    public static CloudBridgeCredentials getCloudBridgeCredentials(Context context) {
+        SharedPreferences preferences = prefs(context);
+        String apiKey = preferences.getString(KEY_CLOUD_API_KEY, "");
+        String projectId = preferences.getString(KEY_CLOUD_PROJECT_ID, "");
+        String uid = preferences.getString(KEY_CLOUD_UID, "");
+        String refreshToken = preferences.getString(KEY_CLOUD_REFRESH_TOKEN, "");
+
+        if (apiKey == null || projectId == null || uid == null || refreshToken == null ||
+                apiKey.isEmpty() || projectId.isEmpty() || uid.isEmpty() || refreshToken.isEmpty()) {
+            return null;
+        }
+
+        return new CloudBridgeCredentials(apiKey, projectId, uid, refreshToken);
+    }
+
+    public static void updateCloudRefreshToken(Context context, String refreshToken) {
+        if (refreshToken == null || refreshToken.trim().isEmpty()) {
+            return;
+        }
+        prefs(context).edit()
+                .putString(KEY_CLOUD_REFRESH_TOKEN, refreshToken.trim())
+                .apply();
+    }
+
+    public static void clearPendingAfterCloudSync(Context context) {
+        prefs(context).edit()
+                .putString(KEY_PENDING, "{}")
+                .remove(KEY_WEEK_START_PENDING)
+                .apply();
+    }
+
+    public static final class CloudBridgeCredentials {
+        public final String apiKey;
+        public final String projectId;
+        public final String uid;
+        public final String refreshToken;
+
+        CloudBridgeCredentials(String apiKey, String projectId, String uid, String refreshToken) {
+            this.apiKey = apiKey;
+            this.projectId = projectId;
+            this.uid = uid;
+            this.refreshToken = refreshToken;
+        }
     }
 
     private static String normalizeCustomLabel(String value) {
