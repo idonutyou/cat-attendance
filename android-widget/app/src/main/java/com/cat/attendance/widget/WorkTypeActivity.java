@@ -3,6 +3,7 @@ package com.cat.attendance.widget;
 import android.app.Activity;
 import android.app.Dialog;
 import android.appwidget.AppWidgetManager;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
@@ -197,8 +198,7 @@ public class WorkTypeActivity extends Activity {
             delete.setBackground(roundRect(0xFFFFF7F7, 14, 1, 0xFFFECACA));
             delete.setOnClickListener(v -> {
                 WidgetDataStore.setWorkType(this, dateKey, "");
-                CatCalendarWidgetProvider.refreshAll(this);
-                finish();
+                syncToAppAndFinish();
             });
             LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(44)
@@ -343,8 +343,7 @@ public class WorkTypeActivity extends Activity {
 
     private void saveWorkTypeAndFinish(String id) {
         WidgetDataStore.setWorkType(this, dateKey, id);
-        CatCalendarWidgetProvider.refreshAll(this);
-        finish();
+        syncToAppAndFinish();
     }
 
     private LinearLayout buildCustomEditor(String initialValue) {
@@ -433,8 +432,29 @@ public class WorkTypeActivity extends Activity {
         }
 
         WidgetDataStore.setCustomWorkType(this, dateKey, label);
+        syncToAppAndFinish();
+    }
+
+    private void syncToAppAndFinish() {
         CatCalendarWidgetProvider.refreshAll(this);
+
+        Intent syncIntent = new Intent(
+                this,
+                OpenCatActivity.class
+        );
+        syncIntent.addFlags(
+                Intent.FLAG_ACTIVITY_NO_ANIMATION
+        );
+
+        try {
+            startActivity(syncIntent);
+        } catch (Exception ignored) {
+            // 위젯 자체 저장은 이미 끝났으므로 앱 열기 실패가
+            // 위젯 기록을 되돌리지는 않습니다.
+        }
+
         finish();
+        overridePendingTransition(0, 0);
     }
 
     private void updateWindowBounds() {

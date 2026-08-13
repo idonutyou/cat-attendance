@@ -87,8 +87,7 @@ function readNativeWidgetLaunchPayload() {
   }
 }
 
-const nativeWidgetLaunchPayload = readNativeWidgetLaunchPayload();
-let nativeWidgetLaunchPayloadConsumed = false;
+let nativeWidgetLaunchPayloadConsumedSignature = "";
 
 function encodeNativeWidgetPayload(payload) {
   try {
@@ -179,15 +178,34 @@ function clearNativeWidgetLaunchPayloadFromUrl() {
   }
 }
 
-function applyNativeWidgetLaunchPayload() {
-  if (
-    nativeWidgetLaunchPayloadConsumed ||
-    !nativeWidgetLaunchPayload
-  ) {
+function applyNativeWidgetLaunchPayload(
+  payload = readNativeWidgetLaunchPayload(),
+) {
+  if (!payload) {
     return false;
   }
 
-  nativeWidgetLaunchPayloadConsumed = true;
+  let payloadSignature = "";
+
+  try {
+    payloadSignature = JSON.stringify(payload);
+  } catch {
+    payloadSignature = String(payload?.syncedAt || "");
+  }
+
+  if (
+    payloadSignature &&
+    payloadSignature ===
+      nativeWidgetLaunchPayloadConsumedSignature
+  ) {
+    clearNativeWidgetLaunchPayloadFromUrl();
+    return false;
+  }
+
+  if (payloadSignature) {
+    nativeWidgetLaunchPayloadConsumedSignature =
+      payloadSignature;
+  }
 
   try {
     const appliedState = JSON.parse(
@@ -197,7 +215,7 @@ function applyNativeWidgetLaunchPayload() {
       ...(appliedState.records || {}),
     };
     const nextRecords = loadRecords();
-    const changes = nativeWidgetLaunchPayload.changes;
+    const changes = payload.changes;
     const validWorkTypes = new Set([
       "day",
       "night",
@@ -251,7 +269,7 @@ function applyNativeWidgetLaunchPayload() {
       });
     }
 
-    const weekStartChange = nativeWidgetLaunchPayload.weekStart;
+    const weekStartChange = payload.weekStart;
     const weekStartUpdatedAt = Number(
       weekStartChange?.updatedAt,
     ) || 0;
@@ -302,6 +320,62 @@ function applyNativeWidgetLaunchPayload() {
     return false;
   }
 }
+
+function applyNativeWidgetPayloadWhileRunning() {
+  if (!authMode) {
+    return false;
+  }
+
+  const payload = readNativeWidgetLaunchPayload();
+
+  if (!payload) {
+    return false;
+  }
+
+  const applied =
+    applyNativeWidgetLaunchPayload(payload);
+
+  if (!applied) {
+    return false;
+  }
+
+  if (authMode === "guest") {
+    saveSnapshotToLocalKey(
+      GUEST_SNAPSHOT_KEY,
+      captureAppStorageSnapshot(),
+    );
+  } else if (
+    authMode === "google" &&
+    activeGoogleUser
+  ) {
+    scheduleCloudSync();
+  }
+
+  return true;
+}
+
+window.addEventListener(
+  "pageshow",
+  () => {
+    applyNativeWidgetPayloadWhileRunning();
+  },
+);
+
+window.addEventListener(
+  "focus",
+  () => {
+    applyNativeWidgetPayloadWhileRunning();
+  },
+);
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (document.visibilityState === "visible") {
+      applyNativeWidgetPayloadWhileRunning();
+    }
+  },
+);
 
 const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
