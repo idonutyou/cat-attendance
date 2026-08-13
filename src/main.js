@@ -55,9 +55,11 @@ const APP_PAGE_TITLES = {
 
 const FIXED_SAFETY_ALLOWANCE = 50000;
 
-function readNativeWidgetLaunchPayload() {
+function readNativeWidgetLaunchPayload(
+  sourceUrl = window.location.href,
+) {
   try {
-    const url = new URL(window.location.href);
+    const url = new URL(sourceUrl, window.location.href);
     const encodedPayload = url.searchParams.get("catWidgetPayload");
 
     if (!encodedPayload) {
@@ -88,6 +90,7 @@ function readNativeWidgetLaunchPayload() {
 }
 
 let nativeWidgetLaunchPayloadConsumedSignature = "";
+let nativeWidgetQueuedLaunchPayload = null;
 
 function encodeNativeWidgetPayload(payload) {
   try {
@@ -321,14 +324,10 @@ function applyNativeWidgetLaunchPayload(
   }
 }
 
-function applyNativeWidgetPayloadWhileRunning() {
-  if (!authMode) {
-    return false;
-  }
-
-  const payload = readNativeWidgetLaunchPayload();
-
-  if (!payload) {
+function applyNativeWidgetPayloadObjectWhileRunning(
+  payload,
+) {
+  if (!authMode || !payload) {
     return false;
   }
 
@@ -352,6 +351,46 @@ function applyNativeWidgetPayloadWhileRunning() {
   }
 
   return true;
+}
+
+function applyNativeWidgetPayloadWhileRunning() {
+  return applyNativeWidgetPayloadObjectWhileRunning(
+    readNativeWidgetLaunchPayload(),
+  );
+}
+
+function applyQueuedNativeWidgetLaunchPayload() {
+  if (
+    !authMode ||
+    !nativeWidgetQueuedLaunchPayload
+  ) {
+    return false;
+  }
+
+  const payload = nativeWidgetQueuedLaunchPayload;
+  nativeWidgetQueuedLaunchPayload = null;
+
+  return applyNativeWidgetPayloadObjectWhileRunning(
+    payload,
+  );
+}
+
+function handleNativeWidgetPwaLaunch(targetUrl) {
+  const payload =
+    readNativeWidgetLaunchPayload(targetUrl);
+
+  if (!payload) {
+    return false;
+  }
+
+  if (!authMode) {
+    nativeWidgetQueuedLaunchPayload = payload;
+    return true;
+  }
+
+  return applyNativeWidgetPayloadObjectWhileRunning(
+    payload,
+  );
 }
 
 window.addEventListener(
@@ -578,6 +617,17 @@ let bonusEntriesByYear = loadBonusEntriesByYear();
 let holidays = {};
 let authMode = null;
 let activeGoogleUser = null;
+
+if (
+  window.launchQueue &&
+  typeof window.launchQueue.setConsumer === "function"
+) {
+  window.launchQueue.setConsumer((launchParams) => {
+    handleNativeWidgetPwaLaunch(
+      launchParams?.targetURL,
+    );
+  });
+}
 let firebaseServices = null;
 let firebaseInitializationPromise = null;
 let cloudUnsubscribe = null;
@@ -8889,7 +8939,13 @@ async function enterGoogleMode(user) {
   activeGoogleUser = user;
   localStorage.setItem(AUTH_MODE_KEY, "google");
   localStorage.setItem(ACTIVE_GOOGLE_UID_KEY, user.uid);
-  const widgetDataApplied = applyNativeWidgetLaunchPayload();
+  let widgetDataApplied =
+    applyNativeWidgetLaunchPayload();
+
+  if (applyQueuedNativeWidgetLaunchPayload()) {
+    widgetDataApplied = true;
+  }
+
   subscribeToCloudChanges();
 
   if (widgetDataApplied) {
@@ -9112,7 +9168,14 @@ async function restoreSavedLoginMode() {
     activeGoogleUser = null;
     restoreGuestSnapshot();
 
-    if (applyNativeWidgetLaunchPayload()) {
+    let widgetDataApplied =
+      applyNativeWidgetLaunchPayload();
+
+    if (applyQueuedNativeWidgetLaunchPayload()) {
+      widgetDataApplied = true;
+    }
+
+    if (widgetDataApplied) {
       saveSnapshotToLocalKey(
         GUEST_SNAPSHOT_KEY,
         captureAppStorageSnapshot(),

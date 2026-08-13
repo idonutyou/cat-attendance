@@ -50,7 +50,7 @@ public final class WidgetAppBridge {
                     .addCategory(Intent.CATEGORY_BROWSABLE)
                     .addFlags(
                             Intent.FLAG_ACTIVITY_NEW_TASK |
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
                             Intent.FLAG_ACTIVITY_SINGLE_TOP |
                             Intent.FLAG_ACTIVITY_NO_ANIMATION
                     );
@@ -87,6 +87,56 @@ public final class WidgetAppBridge {
             return true;
         } catch (ActivityNotFoundException ignored) {
             return false;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    public static boolean openOrResumeCat(Activity activity) {
+        if (activity == null) {
+            return false;
+        }
+
+        String baseUrl = BuildConfig.CAT_APP_URL;
+        if (
+                baseUrl == null ||
+                baseUrl.isEmpty() ||
+                baseUrl.contains("YOUR_GITHUB_USERNAME")
+        ) {
+            return false;
+        }
+
+        try {
+            String payload = WidgetDataStore.buildPendingPayload(activity, 80);
+            String encoded = Base64.encodeToString(
+                    payload.getBytes(StandardCharsets.UTF_8),
+                    Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING
+            );
+
+            Uri uri = Uri.parse(baseUrl).buildUpon()
+                    .appendQueryParameter("catWidgetPayload", encoded)
+                    .build();
+
+            Intent appIntent = new Intent(Intent.ACTION_VIEW, uri)
+                    .addCategory(Intent.CATEGORY_BROWSABLE)
+                    .addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK |
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP |
+                            Intent.FLAG_ACTIVITY_NO_ANIMATION
+                    );
+
+            String webApkPackage =
+                    findInstalledWebApk(activity, appIntent);
+
+            if (webApkPackage == null) {
+                return false;
+            }
+
+            appIntent.setPackage(webApkPackage);
+            activity.startActivity(appIntent);
+            activity.overridePendingTransition(0, 0);
+            return true;
         } catch (Exception ignored) {
             return false;
         }
