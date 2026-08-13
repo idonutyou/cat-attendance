@@ -445,6 +445,10 @@ let salaryMonthPointerStartY = null;
 let salaryMonthPointerButton = null;
 let salaryMonthPointerMoved = false;
 let salaryYearAnimating = false;
+let salaryDetailMonthAnimating = false;
+let salaryDetailMonthPointerId = null;
+let salaryDetailMonthPointerStartX = null;
+let salaryDetailMonthPointerStartY = null;
 let salaryBonusOpen = false;
 let salaryBonusGestureStartY = null;
 let salaryBonusGestureHandled = false;
@@ -1857,6 +1861,193 @@ salaryYearScroller.addEventListener("click", (event) => {
   closeSalaryYearPicker();
 });
 
+async function changeSalaryDetailMonth(
+  direction,
+  { animate = true } = {},
+) {
+  if (
+    salaryDetailMonthAnimating ||
+    salaryMobilePageTransitioning ||
+    salarySettingsOpen ||
+    !Number.isFinite(direction) ||
+    direction === 0
+  ) {
+    return;
+  }
+
+  const normalizedDirection =
+    direction > 0 ? 1 : -1;
+
+  let nextYear = salarySelectedYear;
+  let nextMonth =
+    salarySelectedMonth +
+    normalizedDirection;
+
+  if (nextMonth > 11) {
+    if (salarySelectedYear >= YEAR_MAX) {
+      return;
+    }
+
+    nextYear += 1;
+    nextMonth = 0;
+  } else if (nextMonth < 0) {
+    if (salarySelectedYear <= YEAR_MIN) {
+      return;
+    }
+
+    nextYear -= 1;
+    nextMonth = 11;
+  }
+
+  const yearChanged =
+    nextYear !== salarySelectedYear;
+
+  const updateMonth = () => {
+    salarySelectedYear = nextYear;
+    salarySelectedMonth = nextMonth;
+
+    syncSalaryInputs();
+
+    if (yearChanged) {
+      renderBonusEditor();
+    }
+
+    /*
+     * renderSalary()가 상단 1~12월 선택 상태와
+     * 연도 표시, 아래 급여 상세를 한 번에 동기화한다.
+     */
+    renderSalary();
+  };
+
+  salaryDetailMonthAnimating = true;
+
+  try {
+    const surfaces = [
+      salaryDetailCard.querySelector(
+        ".salary-heading",
+      ),
+      salaryDetailCard.querySelector(
+        ".salary-layout",
+      ),
+    ].filter(Boolean);
+
+    const reduceMotion =
+      window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+    const canAnimate =
+      surfaces.length > 0 &&
+      surfaces.every(
+        (surface) =>
+          typeof surface.animate === "function",
+      );
+
+    if (
+      !animate ||
+      reduceMotion ||
+      !canAnimate
+    ) {
+      updateMonth();
+      return;
+    }
+
+    /*
+     * 위 연도 스와이프와 같은 거리/시간/이징을 그대로 사용한다.
+     */
+    const exitDistance =
+      normalizedDirection > 0
+        ? "-32%"
+        : "32%";
+    const enterDistance =
+      normalizedDirection > 0
+        ? "32%"
+        : "-32%";
+
+    const exitAnimations =
+      surfaces.map((surface) =>
+        surface.animate(
+          [
+            {
+              transform: "translateX(0)",
+              opacity: 1,
+            },
+            {
+              transform:
+                `translateX(${exitDistance})`,
+              opacity: 0,
+            },
+          ],
+          {
+            duration: 130,
+            easing: "ease-in",
+            fill: "forwards",
+          },
+        ),
+      );
+
+    await Promise.all(
+      exitAnimations.map(
+        (animation) =>
+          animation.finished.catch(
+            () => {},
+          ),
+      ),
+    );
+
+    exitAnimations.forEach(
+      (animation) => animation.cancel(),
+    );
+
+    updateMonth();
+
+    const enterAnimations =
+      surfaces.map((surface) =>
+        surface.animate(
+          [
+            {
+              transform:
+                `translateX(${enterDistance})`,
+              opacity: 0,
+            },
+            {
+              transform: "translateX(0)",
+              opacity: 1,
+            },
+          ],
+          {
+            duration: 190,
+            easing:
+              "cubic-bezier(0.22, 1, 0.36, 1)",
+          },
+        ),
+      );
+
+    await Promise.all(
+      enterAnimations.map(
+        (animation) =>
+          animation.finished.catch(
+            () => {},
+          ),
+      ),
+    );
+
+    enterAnimations.forEach(
+      (animation) => animation.cancel(),
+    );
+
+    surfaces.forEach((surface) => {
+      surface.style.removeProperty(
+        "transform",
+      );
+      surface.style.removeProperty(
+        "opacity",
+      );
+    });
+  } finally {
+    salaryDetailMonthAnimating = false;
+  }
+}
+
 function selectSalaryMonth(monthButton) {
   salarySelectedMonth = Number(
     monthButton.dataset.salaryMonth,
@@ -2335,6 +2526,104 @@ salaryBonusToggle.addEventListener("click", () => {
  * 상여/보너스는 화면 전환이 끝난 뒤 보이지 않는 위치에서 접으므로
  * 레이아웃 재계산으로 인한 마지막 튐이 발생하지 않는다.
  */
+salaryDetailCard.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (
+      !isSalaryMobilePager() ||
+      currentAppPage !== "salary" ||
+      salaryMobilePageIndex !== 2 ||
+      salarySettingsOpen ||
+      salaryMobilePageTransitioning ||
+      salaryDetailMonthAnimating ||
+      (
+        event.pointerType !== "touch" &&
+        event.pointerType !== "pen"
+      )
+    ) {
+      salaryDetailMonthPointerId = null;
+      salaryDetailMonthPointerStartX = null;
+      salaryDetailMonthPointerStartY = null;
+      return;
+    }
+
+    salaryDetailMonthPointerId =
+      event.pointerId;
+    salaryDetailMonthPointerStartX =
+      event.clientX;
+    salaryDetailMonthPointerStartY =
+      event.clientY;
+  },
+);
+
+salaryDetailCard.addEventListener(
+  "pointerup",
+  (event) => {
+    if (
+      event.pointerId !==
+        salaryDetailMonthPointerId ||
+      salaryDetailMonthPointerStartX ===
+        null ||
+      salaryDetailMonthPointerStartY ===
+        null
+    ) {
+      return;
+    }
+
+    const deltaX =
+      salaryDetailMonthPointerStartX -
+      event.clientX;
+    const deltaY =
+      salaryDetailMonthPointerStartY -
+      event.clientY;
+
+    salaryDetailMonthPointerId = null;
+    salaryDetailMonthPointerStartX = null;
+    salaryDetailMonthPointerStartY = null;
+
+    const isHorizontalMonthSwipe =
+      Math.abs(deltaX) >= 52 &&
+      Math.abs(deltaX) >
+        Math.abs(deltaY) * 1.15;
+
+    if (!isHorizontalMonthSwipe) {
+      /*
+       * 세로 동작은 stopPropagation 하지 않아
+       * 기존 급여 페이지 위/아래 전환이 그대로 동작한다.
+       */
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    changeSalaryDetailMonth(
+      deltaX > 0 ? 1 : -1,
+    );
+  },
+);
+
+[
+  "pointercancel",
+  "lostpointercapture",
+].forEach((eventName) => {
+  salaryDetailCard.addEventListener(
+    eventName,
+    (event) => {
+      if (
+        event.pointerId !==
+        salaryDetailMonthPointerId
+      ) {
+        return;
+      }
+
+      salaryDetailMonthPointerId = null;
+      salaryDetailMonthPointerStartX = null;
+      salaryDetailMonthPointerStartY = null;
+    },
+  );
+});
+
 salaryPageLayout.addEventListener(
   "wheel",
   (event) => {
@@ -5851,24 +6140,48 @@ function calculatePayrollDeductions(year, month, totalPay) {
   } = getVerifiedPayrollInsuranceForMonth(year, month);
 
   const annualizedPay = totalPay * 12;
-  let incomeTaxConstant;
+  let rawIncomeTax;
 
-  if (annualizedPay <= 55000000) {
-    incomeTaxConstant = 345625;
-  } else if (annualizedPay >= 55060000) {
-    incomeTaxConstant = 343125;
+  /*
+   * 2026년 2월 실제 급여명세서로 검증한 구간.
+   * 연환산 총급여가 3,000만원 초과~4,500만원 이하이면
+   * 4,500만원 초과 구간과 다른 공제식을 사용한다.
+   */
+  if (
+    annualizedPay > 30000000 &&
+    annualizedPay <= 45000000
+  ) {
+    rawIncomeTax =
+      totalPay * 0.129 -
+      pension * 0.15 -
+      308125;
   } else {
-    const transitionRatio =
-      (annualizedPay - 55000000) / 60000;
+    let incomeTaxConstant;
 
-    incomeTaxConstant =
-      345625 - transitionRatio * 2500;
+    /*
+     * 기존에 실제 명세서로 검증된 4,500만원 초과 구간은
+     * 계산식을 그대로 유지한다.
+     */
+    if (annualizedPay <= 55000000) {
+      incomeTaxConstant = 345625;
+    } else if (annualizedPay >= 55060000) {
+      incomeTaxConstant = 343125;
+    } else {
+      const transitionRatio =
+        (annualizedPay - 55000000) / 60000;
+
+      incomeTaxConstant =
+        345625 - transitionRatio * 2500;
+    }
+
+    rawIncomeTax =
+      totalPay * 0.1395 -
+      pension * 0.15 -
+      incomeTaxConstant;
   }
 
   const incomeTax = truncatePayrollToTen(
-    totalPay * 0.1395 -
-      pension * 0.15 -
-      incomeTaxConstant,
+    rawIncomeTax,
   );
 
   const localIncomeTax = truncatePayrollToTen(
