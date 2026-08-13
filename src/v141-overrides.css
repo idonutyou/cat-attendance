@@ -1,0 +1,82 @@
+/* v141: 52h / 연차 모바일 본문이 헤더 아래에서 사라지는 회귀 수정 */
+
+@media (max-width: 620px) {
+  html.hours-leave-page-active,
+  html.hours-leave-page-active body,
+  html.hours-leave-page-active #app {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  html.hours-leave-page-active .app-shell {
+    width: 100% !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  html.hours-leave-page-active .app-header {
+    flex: 0 0 auto !important;
+  }
+
+  html.hours-leave-page-active .app-main {
+    position: relative !important;
+    inset: auto !important;
+    width: min(100% - 16px, 1180px) !important;
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 10px auto max(8px, env(safe-area-inset-bottom)) !important;
+    padding: 0 !important;
+    display: block !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  html.hours-leave-page-active
+    .app-page[data-app-page="hours-leave"] {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch;
+    transform: none !important;
+    animation: none !important;
+    pointer-events: auto !important;
+  }
+
+  html.hours-leave-page-active
+    .app-page[data-app-page="hours-leave"]
+    > .hours-leave-card {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    width: min(760px, 100%) !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 auto !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+  }
+}
