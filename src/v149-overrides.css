@@ -1,0 +1,13 @@
+/* v149: 52h / 연차 정상 스크롤 유지 + pull-to-refresh만 차단 */
+
+@media (max-width: 620px) {
+  html.hours-leave-page-active,
+  html.hours-leave-page-active body {
+    overscroll-behavior-y: contain !important;
+  }
+
+  html.hours-leave-page-active
+    .app-page[data-app-page="hours-leave"] {
+    touch-action: pan-y !important;
+  }
+}

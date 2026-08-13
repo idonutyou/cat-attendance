@@ -12,7 +12,7 @@ import "./v131-overrides.css";
 import "./v132-overrides.css";
 import "./v137-overrides.css";
 import "./v140-overrides.css";
-import "./v148-overrides.css";
+import "./v149-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -56,11 +56,9 @@ const APP_PAGE_TITLES = {
 
 const FIXED_SAFETY_ALLOWANCE = 50000;
 
-function readNativeWidgetLaunchPayload(
-  sourceUrl = window.location.href,
-) {
+function readNativeWidgetLaunchPayload() {
   try {
-    const url = new URL(sourceUrl, window.location.href);
+    const url = new URL(window.location.href);
     const encodedPayload = url.searchParams.get("catWidgetPayload");
 
     if (!encodedPayload) {
@@ -90,8 +88,8 @@ function readNativeWidgetLaunchPayload(
   }
 }
 
-let nativeWidgetLaunchPayloadConsumedSignature = "";
-let nativeWidgetQueuedLaunchPayload = null;
+const nativeWidgetLaunchPayload = readNativeWidgetLaunchPayload();
+let nativeWidgetLaunchPayloadConsumed = false;
 
 function encodeNativeWidgetPayload(payload) {
   try {
@@ -182,34 +180,15 @@ function clearNativeWidgetLaunchPayloadFromUrl() {
   }
 }
 
-function applyNativeWidgetLaunchPayload(
-  payload = readNativeWidgetLaunchPayload(),
-) {
-  if (!payload) {
-    return false;
-  }
-
-  let payloadSignature = "";
-
-  try {
-    payloadSignature = JSON.stringify(payload);
-  } catch {
-    payloadSignature = String(payload?.syncedAt || "");
-  }
-
+function applyNativeWidgetLaunchPayload() {
   if (
-    payloadSignature &&
-    payloadSignature ===
-      nativeWidgetLaunchPayloadConsumedSignature
+    nativeWidgetLaunchPayloadConsumed ||
+    !nativeWidgetLaunchPayload
   ) {
-    clearNativeWidgetLaunchPayloadFromUrl();
     return false;
   }
 
-  if (payloadSignature) {
-    nativeWidgetLaunchPayloadConsumedSignature =
-      payloadSignature;
-  }
+  nativeWidgetLaunchPayloadConsumed = true;
 
   try {
     const appliedState = JSON.parse(
@@ -219,7 +198,7 @@ function applyNativeWidgetLaunchPayload(
       ...(appliedState.records || {}),
     };
     const nextRecords = loadRecords();
-    const changes = payload.changes;
+    const changes = nativeWidgetLaunchPayload.changes;
     const validWorkTypes = new Set([
       "day",
       "night",
@@ -273,7 +252,7 @@ function applyNativeWidgetLaunchPayload(
       });
     }
 
-    const weekStartChange = payload.weekStart;
+    const weekStartChange = nativeWidgetLaunchPayload.weekStart;
     const weekStartUpdatedAt = Number(
       weekStartChange?.updatedAt,
     ) || 0;
@@ -324,98 +303,6 @@ function applyNativeWidgetLaunchPayload(
     return false;
   }
 }
-
-function applyNativeWidgetPayloadObjectWhileRunning(
-  payload,
-) {
-  if (!authMode || !payload) {
-    return false;
-  }
-
-  const applied =
-    applyNativeWidgetLaunchPayload(payload);
-
-  if (!applied) {
-    return false;
-  }
-
-  if (authMode === "guest") {
-    saveSnapshotToLocalKey(
-      GUEST_SNAPSHOT_KEY,
-      captureAppStorageSnapshot(),
-    );
-  } else if (
-    authMode === "google" &&
-    activeGoogleUser
-  ) {
-    scheduleCloudSync();
-  }
-
-  return true;
-}
-
-function applyNativeWidgetPayloadWhileRunning() {
-  return applyNativeWidgetPayloadObjectWhileRunning(
-    readNativeWidgetLaunchPayload(),
-  );
-}
-
-function applyQueuedNativeWidgetLaunchPayload() {
-  if (
-    !authMode ||
-    !nativeWidgetQueuedLaunchPayload
-  ) {
-    return false;
-  }
-
-  const payload = nativeWidgetQueuedLaunchPayload;
-  nativeWidgetQueuedLaunchPayload = null;
-
-  return applyNativeWidgetPayloadObjectWhileRunning(
-    payload,
-  );
-}
-
-function handleNativeWidgetPwaLaunch(targetUrl) {
-  const payload =
-    readNativeWidgetLaunchPayload(targetUrl);
-
-  if (!payload) {
-    return false;
-  }
-
-  if (!authMode) {
-    nativeWidgetQueuedLaunchPayload = payload;
-    return true;
-  }
-
-  return applyNativeWidgetPayloadObjectWhileRunning(
-    payload,
-  );
-}
-
-window.addEventListener(
-  "pageshow",
-  () => {
-    applyNativeWidgetPayloadWhileRunning();
-  },
-);
-
-window.addEventListener(
-  "focus",
-  () => {
-    applyNativeWidgetPayloadWhileRunning();
-  },
-);
-
-document.addEventListener(
-  "visibilitychange",
-  () => {
-    if (document.visibilityState === "visible") {
-      applyNativeWidgetPayloadWhileRunning();
-    }
-  },
-);
 
 const DEFAULT_SETTINGS = {
   baseHourlyWage: 0,
@@ -539,8 +426,6 @@ currentMonth = new Date(
 );
 
 let currentAppPage = "attendance";
-let hoursLeavePullStartY = null;
-let hoursLeavePullStartedAtTop = false;
 let navigationCloseTimer = null;
 let navigationSwipeResetTimer = null;
 let navigationSwipePointerId = null;
@@ -621,24 +506,6 @@ let holidays = {};
 let authMode = null;
 let activeGoogleUser = null;
 
-if (
-  window.launchQueue &&
-  typeof window.launchQueue.setConsumer === "function"
-) {
-  window.launchQueue.setConsumer((launchParams) => {
-    const targetUrl =
-      typeof launchParams?.targetURL === "string"
-        ? launchParams.targetURL
-        : "";
-
-    if (targetUrl) {
-      handleNativeWidgetPwaLaunch(targetUrl);
-      return;
-    }
-
-    applyNativeWidgetPayloadWhileRunning();
-  });
-}
 let firebaseServices = null;
 let firebaseInitializationPromise = null;
 let cloudUnsubscribe = null;
@@ -4045,93 +3912,6 @@ function handleNavigationSwipeCancel(event) {
 
   resetNavigationSwipeState();
 }
-
-function getHoursLeaveScrollTop() {
-  const hoursLeavePage = appPages.find(
-    (page) => page.dataset.appPage === "hours-leave",
-  );
-  const documentScrollTop =
-    document.scrollingElement?.scrollTop || 0;
-  const pageScrollTop =
-    hoursLeavePage?.scrollTop || 0;
-
-  return Math.max(
-    documentScrollTop,
-    pageScrollTop,
-  );
-}
-
-document.addEventListener(
-  "touchstart",
-  (event) => {
-    if (
-      currentAppPage !== "hours-leave" ||
-      event.touches.length !== 1 ||
-      !event.target.closest(
-        '.app-page[data-app-page="hours-leave"]',
-      )
-    ) {
-      hoursLeavePullStartY = null;
-      hoursLeavePullStartedAtTop = false;
-      return;
-    }
-
-    hoursLeavePullStartY =
-      event.touches[0]?.clientY ?? null;
-    hoursLeavePullStartedAtTop =
-      getHoursLeaveScrollTop() <= 1;
-  },
-  { passive: true },
-);
-
-document.addEventListener(
-  "touchmove",
-  (event) => {
-    if (
-      currentAppPage !== "hours-leave" ||
-      !hoursLeavePullStartedAtTop ||
-      hoursLeavePullStartY === null ||
-      event.touches.length !== 1 ||
-      !event.target.closest(
-        '.app-page[data-app-page="hours-leave"]',
-      )
-    ) {
-      return;
-    }
-
-    const currentY =
-      event.touches[0]?.clientY;
-
-    if (
-      typeof currentY !== "number" ||
-      currentY <= hoursLeavePullStartY ||
-      getHoursLeaveScrollTop() > 1
-    ) {
-      return;
-    }
-
-    /*
-     * 문서 최상단에서 아래로 끌 때만 브라우저/PWA의
-     * pull-to-refresh 기본 동작을 막는다.
-     * 위로 미는 정상 스크롤은 건드리지 않는다.
-     */
-    event.preventDefault();
-  },
-  { passive: false },
-);
-
-["touchend", "touchcancel"].forEach(
-  (eventName) => {
-    document.addEventListener(
-      eventName,
-      () => {
-        hoursLeavePullStartY = null;
-        hoursLeavePullStartedAtTop = false;
-      },
-      { passive: true },
-    );
-  },
-);
 
 function setAppPage(pageId) {
   const targetPage = appPages.find(
@@ -9037,13 +8817,7 @@ async function enterGoogleMode(user) {
   activeGoogleUser = user;
   localStorage.setItem(AUTH_MODE_KEY, "google");
   localStorage.setItem(ACTIVE_GOOGLE_UID_KEY, user.uid);
-  let widgetDataApplied =
-    applyNativeWidgetLaunchPayload();
-
-  if (applyQueuedNativeWidgetLaunchPayload()) {
-    widgetDataApplied = true;
-  }
-
+  const widgetDataApplied = applyNativeWidgetLaunchPayload();
   subscribeToCloudChanges();
 
   if (widgetDataApplied) {
@@ -9266,14 +9040,7 @@ async function restoreSavedLoginMode() {
     activeGoogleUser = null;
     restoreGuestSnapshot();
 
-    let widgetDataApplied =
-      applyNativeWidgetLaunchPayload();
-
-    if (applyQueuedNativeWidgetLaunchPayload()) {
-      widgetDataApplied = true;
-    }
-
-    if (widgetDataApplied) {
+    if (applyNativeWidgetLaunchPayload()) {
       saveSnapshotToLocalKey(
         GUEST_SNAPSHOT_KEY,
         captureAppStorageSnapshot(),
