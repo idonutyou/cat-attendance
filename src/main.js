@@ -9164,8 +9164,19 @@ function subscribeToCloudChanges() {
 }
 
 function scheduleCloudSync() {
+  if (cloudSyncSuspended) {
+    return;
+  }
+
+  if (authMode === "guest") {
+    saveSnapshotToLocalKey(
+      GUEST_SNAPSHOT_KEY,
+      captureAppStorageSnapshot(),
+    );
+    return;
+  }
+
   if (
-    cloudSyncSuspended ||
     authMode !== "google" ||
     !activeGoogleUser ||
     !firebaseServices
