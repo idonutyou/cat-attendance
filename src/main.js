@@ -3817,6 +3817,7 @@ function saveWeekStartPreference() {
       weekStartsOnMonday ? "monday" : "sunday",
     );
     scheduleCloudSync();
+    persistGuestSnapshotIfNeeded();
   } catch (error) {
     console.error(
       "달력 시작 요일 설정을 저장하지 못했습니다.",
@@ -6852,6 +6853,7 @@ function saveBonusEntriesByYear() {
       JSON.stringify(bonusEntriesByYear),
     );
     scheduleCloudSync();
+    persistGuestSnapshotIfNeeded();
   } catch (error) {
     console.error("상여 및 보너스 내역을 저장하지 못했습니다.", error);
   }
@@ -8243,6 +8245,7 @@ function saveRecords() {
     JSON.stringify(records),
   );
   scheduleCloudSync();
+  persistGuestSnapshotIfNeeded();
 }
 
 function loadWeeklyDateRange() {
@@ -8294,6 +8297,7 @@ function saveWeeklyDateRangeFromInputs() {
     JSON.stringify(weeklyDateRange),
   );
   scheduleCloudSync();
+  persistGuestSnapshotIfNeeded();
 }
 
 function syncWeeklyDateRangeInputs() {
@@ -8338,6 +8342,7 @@ function saveAnnualLeaveByYear() {
     JSON.stringify(annualLeaveByYear),
   );
   scheduleCloudSync();
+  persistGuestSnapshotIfNeeded();
 }
 
 function loadAnnualLeaveReasons() {
@@ -8367,6 +8372,7 @@ function saveAnnualLeaveReasons() {
     JSON.stringify(annualLeaveReasons),
   );
   scheduleCloudSync();
+  persistGuestSnapshotIfNeeded();
 }
 
 function getMonthKey(date) {
@@ -8576,6 +8582,7 @@ function saveSettingsByMonth() {
     JSON.stringify(settingsByMonth),
   );
   scheduleCloudSync();
+  persistGuestSnapshotIfNeeded();
 }
 
 function loadFiscalSettingsByYear() {
@@ -8610,6 +8617,7 @@ function saveFiscalSettingsByYear() {
     JSON.stringify(fiscalSettingsByYear),
   );
   scheduleCloudSync();
+  persistGuestSnapshotIfNeeded();
 }
 
 
@@ -9163,20 +9171,20 @@ function subscribeToCloudChanges() {
   );
 }
 
+function persistGuestSnapshotIfNeeded() {
+  if (authMode !== "guest" || cloudSyncSuspended) {
+    return;
+  }
+
+  saveSnapshotToLocalKey(
+    GUEST_SNAPSHOT_KEY,
+    captureAppStorageSnapshot(),
+  );
+}
+
 function scheduleCloudSync() {
-  if (cloudSyncSuspended) {
-    return;
-  }
-
-  if (authMode === "guest") {
-    saveSnapshotToLocalKey(
-      GUEST_SNAPSHOT_KEY,
-      captureAppStorageSnapshot(),
-    );
-    return;
-  }
-
   if (
+    cloudSyncSuspended ||
     authMode !== "google" ||
     !activeGoogleUser ||
     !firebaseServices
