@@ -3817,7 +3817,6 @@ function saveWeekStartPreference() {
       weekStartsOnMonday ? "monday" : "sunday",
     );
     scheduleCloudSync();
-    sendCurrentStateBackToNativeWidget({ userInitiated: true });
   } catch (error) {
     console.error(
       "달력 시작 요일 설정을 저장하지 못했습니다.",
@@ -8244,7 +8243,6 @@ function saveRecords() {
     JSON.stringify(records),
   );
   scheduleCloudSync();
-  sendCurrentStateBackToNativeWidget({ userInitiated: true });
 }
 
 function loadWeeklyDateRange() {
