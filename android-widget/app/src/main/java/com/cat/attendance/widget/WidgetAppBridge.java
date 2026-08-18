@@ -60,7 +60,50 @@ public final class WidgetAppBridge {
             return false;
         }
 
+        String installedWebAppPackage = catIntent.getPackage();
+
+        if (
+                installedWebAppPackage != null &&
+                installedWebAppPackage.startsWith(
+                        "org.chromium.webapk."
+                ) &&
+                launchInstalledWebAppLikeLauncher(
+                        activity,
+                        installedWebAppPackage
+                )
+        ) {
+            return true;
+        }
+
         return startCatIntentWithFallback(activity, catIntent);
+    }
+
+    private static boolean launchInstalledWebAppLikeLauncher(
+            Activity activity,
+            String packageName
+    ) {
+        try {
+            Intent launchIntent =
+                    activity.getPackageManager()
+                            .getLaunchIntentForPackage(packageName);
+
+            if (launchIntent == null) {
+                return false;
+            }
+
+            launchIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK |
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP |
+                    Intent.FLAG_ACTIVITY_NO_ANIMATION
+            );
+
+            activity.startActivity(launchIntent);
+            activity.overridePendingTransition(0, 0);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static Intent buildCatIntent(Activity activity) {
