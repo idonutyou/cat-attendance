@@ -2,6 +2,7 @@ package com.cat.attendance.widget;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.LauncherActivityInfo;
@@ -59,28 +60,103 @@ public final class WidgetAppBridge {
             return false;
         }
 
-        Intent catIntent = buildCatIntent(activity);
-
-        if (catIntent == null) {
-            return false;
-        }
-
-        String installedWebAppPackage = catIntent.getPackage();
-
+        // Do not discover CAT through its https URL here.  An installed PWA
+        // can have a perfectly valid launcher entry without being selected as
+        // the handler for an external ACTION_VIEW URL.  Find the same
+        // ACTION_MAIN + CATEGORY_LAUNCHER component that the home screen uses
+        // and launch that exact component first.
+        ComponentName catLauncher = findCatLauncherComponent(activity);
         if (
-                installedWebAppPackage != null &&
-                installedWebAppPackage.startsWith(
-                        "org.chromium.webapk."
-                ) &&
-                launchInstalledWebAppLikeLauncher(
-                        activity,
-                        installedWebAppPackage
-                )
+                catLauncher != null &&
+                launchExactLauncherComponent(activity, catLauncher)
         ) {
             return true;
         }
 
+        // Only fall back to the URL path when CAT is not installed as a
+        // launcher app/PWA on this device.
+        Intent catIntent = buildCatIntent(activity);
+        if (catIntent == null) {
+            return false;
+        }
+
         return startCatIntentWithFallback(activity, catIntent);
+    }
+
+    private static ComponentName findCatLauncherComponent(Activity activity) {
+        try {
+            Intent launcherQuery = new Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_LAUNCHER);
+
+            List<ResolveInfo> launchers =
+                    activity.getPackageManager()
+                            .queryIntentActivities(launcherQuery, 0);
+
+            for (ResolveInfo launcher : launchers) {
+                if (
+                        launcher == null ||
+                        launcher.activityInfo == null
+                ) {
+                    continue;
+                }
+
+                String packageName = launcher.activityInfo.packageName;
+                String className = launcher.activityInfo.name;
+
+                if (
+                        packageName == null ||
+                        className == null ||
+                        packageName.equals(activity.getPackageName())
+                ) {
+                    continue;
+                }
+
+                CharSequence rawLabel =
+                        launcher.loadLabel(activity.getPackageManager());
+                String label = rawLabel == null
+                        ? ""
+                        : rawLabel.toString().trim();
+
+                // The installed CAT PWA currently publishes short_name
+                // "CAT 근태" and name "CAT 근태관리".  Match the launcher
+                // label rather than a browser-specific WebAPK package name so
+                // this also works when a different Chromium-based installer is
+                // used on another Android phone.
+                boolean isCatLauncher =
+                        "CAT 근태".equals(label) ||
+                        "CAT 근태관리".equals(label) ||
+                        (label.startsWith("CAT") && label.contains("근태"));
+
+                if (isCatLauncher) {
+                    return new ComponentName(packageName, className);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return null;
+    }
+
+    private static boolean launchExactLauncherComponent(
+            Activity activity,
+            ComponentName component
+    ) {
+        try {
+            // Intent.makeMainActivity() is the framework API specifically for
+            // launching an application's front door the same way as Home.
+            Intent launchIntent = Intent.makeMainActivity(component)
+                    .addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK |
+                            Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED |
+                            Intent.FLAG_ACTIVITY_NO_ANIMATION
+                    );
+
+            activity.startActivity(launchIntent);
+            activity.overridePendingTransition(0, 0);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static boolean launchInstalledWebAppLikeLauncher(
