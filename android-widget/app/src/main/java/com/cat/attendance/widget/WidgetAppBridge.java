@@ -2,11 +2,16 @@ package com.cat.attendance.widget;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.LauncherActivityInfo;
+import android.content.pm.LauncherApps;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Process;
+import android.os.UserHandle;
 import android.util.Base64;
 
 import java.nio.charset.StandardCharsets;
@@ -82,6 +87,37 @@ public final class WidgetAppBridge {
             Activity activity,
             String packageName
     ) {
+        // Match the real home-screen launcher path first.  WebAPK/PWA tasks
+        // are resumed correctly by LauncherApps.startMainActivity(), whereas
+        // re-opening their URL can create/reload a fresh PWA launch.
+        try {
+            LauncherApps launcherApps =
+                    (LauncherApps) activity.getSystemService(
+                            Context.LAUNCHER_APPS_SERVICE
+                    );
+            UserHandle user = Process.myUserHandle();
+
+            if (launcherApps != null) {
+                List<LauncherActivityInfo> activities =
+                        launcherApps.getActivityList(packageName, user);
+
+                if (activities != null && !activities.isEmpty()) {
+                    launcherApps.startMainActivity(
+                            activities.get(0).getComponentName(),
+                            user,
+                            null,
+                            null
+                    );
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        // Fallback: reproduce a normal launcher tap as closely as possible.
+        // Do not use REORDER_TO_FRONT/SINGLE_TOP here; the launcher-style
+        // NEW_TASK + RESET_TASK_IF_NEEDED flags let Android reuse the app's
+        // existing task when one is already running.
         try {
             Intent launchIntent =
                     activity.getPackageManager()
@@ -91,10 +127,9 @@ public final class WidgetAppBridge {
                 return false;
             }
 
-            launchIntent.addFlags(
+            launchIntent.setFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK |
-                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT |
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP |
+                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED |
                     Intent.FLAG_ACTIVITY_NO_ANIMATION
             );
 
