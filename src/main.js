@@ -56,6 +56,22 @@ const APP_PAGE_TITLES = {
 
 const FIXED_SAFETY_ALLOWANCE = 50000;
 
+const CAT_BROWSER_ENV = (() => {
+  const userAgent = navigator.userAgent || "";
+  const isIOS =
+    /iPad|iPhone|iPod/i.test(userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  return {
+    isAndroid: /Android/i.test(userAgent),
+    isIOS,
+    isNaverInApp: /NAVER\(inapp;/i.test(userAgent),
+    isStandalone:
+      window.matchMedia?.("(display-mode: standalone)")?.matches === true ||
+      window.navigator.standalone === true,
+  };
+})();
+
 function readNativeWidgetLaunchPayload(
   sourceUrl = window.location.href,
 ) {
@@ -141,6 +157,13 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
       return;
     }
 
+    // Android 네이티브 위젯 전용 브리지는 Android에서만 시도합니다.
+    // iOS/Safari와 NAVER 인앱 브라우저에서는 custom intent를 호출하지
+    // 않아 페이지 없음/외부 앱 호출 오류 없이 웹앱 자체 기능만 사용합니다.
+    if (!CAT_BROWSER_ENV.isAndroid || CAT_BROWSER_ENV.isNaverInApp) {
+      return;
+    }
+
     const firebaseBridge =
       authMode === "google" &&
       activeGoogleUser?.uid &&
@@ -173,10 +196,22 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
       return;
     }
 
+    const fallbackUrl = new URL(window.location.href);
+    fallbackUrl.searchParams.delete("catWidgetReturn");
+    fallbackUrl.searchParams.delete("catWidgetPayload");
+    const fallbackHashParams = new URLSearchParams(
+      fallbackUrl.hash.startsWith("#")
+        ? fallbackUrl.hash.slice(1)
+        : fallbackUrl.hash,
+    );
+    fallbackHashParams.delete("catWidgetPayload");
+    fallbackUrl.hash = fallbackHashParams.toString();
+
     const intentUrl =
       `intent://sync?payload=${encodedPayload}` +
       `#Intent;scheme=catattendancewidget;` +
-      `package=com.cat.attendance.widget;end`;
+      `package=com.cat.attendance.widget;` +
+      `S.browser_fallback_url=${encodeURIComponent(fallbackUrl.href)};end`;
 
     window.location.href = intentUrl;
   } catch (error) {
