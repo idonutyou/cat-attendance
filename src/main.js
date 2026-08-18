@@ -56,6 +56,24 @@ const APP_PAGE_TITLES = {
 
 const FIXED_SAFETY_ALLOWANCE = 50000;
 
+const CAT_BROWSER_ENV = (() => {
+  const userAgent = navigator.userAgent || "";
+  const isIOS =
+    /iPad|iPhone|iPod/i.test(userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  return {
+    isAndroid: /Android/i.test(userAgent),
+    isIOS,
+    isNaverInApp: /NAVER\(inapp;/i.test(userAgent),
+    isStandalone:
+      window.matchMedia?.("(display-mode: standalone)")?.matches === true ||
+      window.navigator.standalone === true,
+  };
+})();
+
+const NATIVE_WIDGET_FALLBACK_HASH_KEY = "catWidgetNoHandler";
+
 function readNativeWidgetLaunchPayload(
   sourceUrl = window.location.href,
 ) {
@@ -141,6 +159,12 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
       return;
     }
 
+    // Android 네이티브 위젯 브리지는 Android에서만 시도합니다.
+    // iOS/Safari와 NAVER 인앱 브라우저에서는 웹/PWA 기능만 유지합니다.
+    if (!CAT_BROWSER_ENV.isAndroid || CAT_BROWSER_ENV.isNaverInApp) {
+      return;
+    }
+
     const firebaseBridge =
       authMode === "google" &&
       activeGoogleUser?.uid &&
@@ -154,7 +178,21 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
             uid: activeGoogleUser.uid,
             refreshToken: activeGoogleUser.refreshToken,
           }
-        : { mode: authMode || "guest" };
+        : authMode === "guest" &&
+            activeGuestUser?.uid &&
+            activeGuestUser?.refreshToken &&
+            firebaseConfig?.apiKey &&
+            firebaseConfig?.projectId
+          ? {
+              // Android v155 브리지는 mode=google 형식의 Firebase 자격정보를
+              // 그대로 사용합니다. 실제 앱 로그인 모드는 계속 Guest입니다.
+              mode: "google",
+              apiKey: firebaseConfig.apiKey,
+              projectId: firebaseConfig.projectId,
+              uid: activeGuestUser.uid,
+              refreshToken: activeGuestUser.refreshToken,
+            }
+          : { mode: authMode || "guest" };
 
     const encodedPayload = encodeNativeWidgetPayload({
       records: loadRecords(),
@@ -173,16 +211,55 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
       return;
     }
 
+    const fallbackUrl = new URL(window.location.href);
+    fallbackUrl.searchParams.delete("catWidgetReturn");
+    fallbackUrl.searchParams.delete("catWidgetPayload");
+    const fallbackHashParams = new URLSearchParams(
+      fallbackUrl.hash.startsWith("#")
+        ? fallbackUrl.hash.slice(1)
+        : fallbackUrl.hash,
+    );
+    fallbackHashParams.delete("catWidgetPayload");
+    fallbackHashParams.set(NATIVE_WIDGET_FALLBACK_HASH_KEY, "1");
+    fallbackUrl.hash = fallbackHashParams.toString();
+
     const intentUrl =
       `intent://sync?payload=${encodedPayload}` +
       `#Intent;scheme=catattendancewidget;` +
-      `package=com.cat.attendance.widget;end`;
+      `package=com.cat.attendance.widget;` +
+      `S.browser_fallback_url=${encodeURIComponent(fallbackUrl.href)};end`;
 
     window.location.href = intentUrl;
   } catch (error) {
     console.error("앱 데이터를 위젯으로 보내지 못했습니다.", error);
   }
 }
+
+function clearNativeWidgetFallbackMarker() {
+  try {
+    const url = new URL(window.location.href);
+    const hashParams = new URLSearchParams(
+      url.hash.startsWith("#") ? url.hash.slice(1) : url.hash,
+    );
+
+    if (!hashParams.has(NATIVE_WIDGET_FALLBACK_HASH_KEY)) {
+      return;
+    }
+
+    hashParams.delete(NATIVE_WIDGET_FALLBACK_HASH_KEY);
+    const nextHash = hashParams.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${nextHash ? `#${nextHash}` : ""}`,
+    );
+  } catch (error) {
+    console.warn("위젯 미설치 복귀 URL 정리 실패:", error);
+  }
+}
+
+window.addEventListener("hashchange", clearNativeWidgetFallbackMarker);
+clearNativeWidgetFallbackMarker();
 
 function clearNativeWidgetLaunchPayloadFromUrl() {
   try {
@@ -647,6 +724,7 @@ let bonusEntriesByYear = loadBonusEntriesByYear();
 let holidays = {};
 let authMode = null;
 let activeGoogleUser = null;
+let activeGuestUser = null;
 
 if (
   window.launchQueue &&
@@ -672,6 +750,9 @@ let cloudUnsubscribe = null;
 let cloudSyncTimer = null;
 let cloudSyncSuspended = false;
 let cloudWritePending = false;
+let guestCloudUnsubscribe = null;
+let guestCloudSyncTimer = null;
+let guestCloudWritePending = false;
 let splashFinished = false;
 let authRedirectInProgress = false;
 const deviceId = getOrCreateDeviceId();
@@ -8903,6 +8984,193 @@ function getCloudDocumentReference(services, uid) {
   return services.doc(services.db, "users", uid, "appData", "main");
 }
 
+function stopGuestCloudBridge() {
+  if (guestCloudSyncTimer) {
+    window.clearTimeout(guestCloudSyncTimer);
+    guestCloudSyncTimer = null;
+  }
+
+  guestCloudUnsubscribe?.();
+  guestCloudUnsubscribe = null;
+  guestCloudWritePending = false;
+  activeGuestUser = null;
+}
+
+async function initializeGuestCloudBridge() {
+  if (authMode !== "guest" || !isFirebaseConfigured()) {
+    return false;
+  }
+
+  try {
+    const services = await initializeFirebaseServices();
+    let user = services.auth.currentUser;
+
+    if (user && !user.isAnonymous) {
+      await services.signOut(services.auth);
+      user = null;
+    }
+
+    if (!user) {
+      const result = await services.signInAnonymously(services.auth);
+      user = result.user;
+    }
+
+    if (!user?.isAnonymous) {
+      return false;
+    }
+
+    activeGuestUser = user;
+    const documentReference = getCloudDocumentReference(services, user.uid);
+    const remoteSnapshot = await services.getDoc(documentReference);
+
+    if (remoteSnapshot.exists()) {
+      const remoteData = remoteSnapshot.data();
+      const remoteAppSnapshot = {
+        schemaVersion: remoteData.schemaVersion || 1,
+        storage: remoteData.storage || {},
+      };
+
+      applyAppStorageSnapshot(remoteAppSnapshot);
+      saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, remoteAppSnapshot);
+    } else {
+      const localSnapshot = captureAppStorageSnapshot();
+      await services.setDoc(documentReference, {
+        schemaVersion: 1,
+        storage: localSnapshot.storage || {},
+        sourceDeviceId: deviceId,
+        updatedAt: services.serverTimestamp(),
+      });
+      saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, localSnapshot);
+    }
+
+    subscribeToGuestCloudChanges();
+    return true;
+  } catch (error) {
+    // Guest 자체 저장은 로컬로 계속 정상 동작합니다. Firebase 익명 인증이
+    // 준비되지 않은 경우에만 위젯의 무음 양방향 동기화가 보류됩니다.
+    console.warn("Guest 위젯 동기화 연결 실패:", error);
+    activeGuestUser = null;
+    guestCloudUnsubscribe?.();
+    guestCloudUnsubscribe = null;
+    return false;
+  }
+}
+
+function subscribeToGuestCloudChanges() {
+  guestCloudUnsubscribe?.();
+
+  if (authMode !== "guest" || !firebaseServices || !activeGuestUser) {
+    guestCloudUnsubscribe = null;
+    return;
+  }
+
+  const documentReference = getCloudDocumentReference(
+    firebaseServices,
+    activeGuestUser.uid,
+  );
+
+  guestCloudUnsubscribe = firebaseServices.onSnapshot(
+    documentReference,
+    (snapshot) => {
+      if (!snapshot.exists() || snapshot.metadata.hasPendingWrites) {
+        return;
+      }
+
+      const data = snapshot.data();
+      const sourceDeviceId =
+        typeof data.sourceDeviceId === "string"
+          ? data.sourceDeviceId
+          : "";
+      const isWidgetChange =
+        sourceDeviceId.startsWith("android-widget");
+
+      if (
+        !isWidgetChange &&
+        (
+          sourceDeviceId === deviceId ||
+          guestCloudWritePending ||
+          guestCloudSyncTimer
+        )
+      ) {
+        return;
+      }
+
+      const incomingSnapshot = {
+        schemaVersion: data.schemaVersion || 1,
+        storage: data.storage || {},
+      };
+
+      if (isWidgetChange) {
+        applyWidgetCloudStorageSnapshot(incomingSnapshot);
+        saveSnapshotToLocalKey(
+          GUEST_SNAPSHOT_KEY,
+          captureAppStorageSnapshot(),
+        );
+        updateCloudSyncStatus("Guest · 위젯 변경 반영", "success");
+        return;
+      }
+
+      applyAppStorageSnapshot(incomingSnapshot);
+      saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, incomingSnapshot);
+    },
+    (error) => {
+      console.warn("Guest 실시간 위젯 동기화 오류:", error);
+    },
+  );
+}
+
+function scheduleGuestCloudSync() {
+  if (
+    authMode !== "guest" ||
+    !activeGuestUser ||
+    !firebaseServices
+  ) {
+    return;
+  }
+
+  guestCloudWritePending = true;
+
+  if (guestCloudSyncTimer) {
+    window.clearTimeout(guestCloudSyncTimer);
+  }
+
+  guestCloudSyncTimer = window.setTimeout(() => {
+    guestCloudSyncTimer = null;
+    flushGuestCloudSync();
+  }, CLOUD_SYNC_DEBOUNCE_MS);
+}
+
+async function flushGuestCloudSync() {
+  if (
+    authMode !== "guest" ||
+    !activeGuestUser ||
+    !firebaseServices
+  ) {
+    guestCloudWritePending = false;
+    return;
+  }
+
+  const snapshot = captureAppStorageSnapshot();
+  const documentReference = getCloudDocumentReference(
+    firebaseServices,
+    activeGuestUser.uid,
+  );
+
+  try {
+    await firebaseServices.setDoc(documentReference, {
+      schemaVersion: 1,
+      storage: snapshot.storage,
+      sourceDeviceId: deviceId,
+      updatedAt: firebaseServices.serverTimestamp(),
+    });
+    saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, snapshot);
+  } catch (error) {
+    console.warn("Guest 위젯 동기화 저장 실패:", error);
+  } finally {
+    guestCloudWritePending = false;
+  }
+}
+
 async function enterGuestMode() {
   setAuthBusy(true, "Guest 모드로 여는 중입니다…");
   preserveCurrentModeSnapshot();
@@ -8914,6 +9182,7 @@ async function enterGuestMode() {
 
   cloudUnsubscribe?.();
   cloudUnsubscribe = null;
+  stopGuestCloudBridge();
   activeGoogleUser = null;
   authMode = "guest";
 
@@ -8940,7 +9209,11 @@ async function enterGuestMode() {
   }
   localStorage.setItem(AUTH_MODE_KEY, "guest");
   localStorage.removeItem(ACTIVE_GOOGLE_UID_KEY);
-  setAuthStatus("");
+
+  const guestWidgetSyncReady = await initializeGuestCloudBridge();
+  setAuthStatus(
+    guestWidgetSyncReady ? "" : "Guest 로컬 저장 모드",
+  );
   showAppShell();
 }
 
@@ -9147,6 +9420,7 @@ function persistGuestSnapshotIfNeeded() {
     GUEST_SNAPSHOT_KEY,
     captureAppStorageSnapshot(),
   );
+  scheduleGuestCloudSync();
 }
 
 function scheduleCloudSync() {
@@ -9243,12 +9517,17 @@ async function returnToLoginChooser() {
   closeNavigationDrawer();
   preserveCurrentModeSnapshot();
 
+  if (authMode === "guest") {
+    await flushGuestCloudSync();
+  }
+
   if (authMode === "google") {
     await flushCloudSync();
   }
 
   cloudUnsubscribe?.();
   cloudUnsubscribe = null;
+  stopGuestCloudBridge();
   authMode = null;
   activeGoogleUser = null;
 
@@ -9325,6 +9604,7 @@ async function restoreSavedLoginMode() {
       );
     }
 
+    await initializeGuestCloudBridge();
     return;
   }
 
