@@ -211,23 +211,14 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
       return;
     }
 
-    const fallbackUrl = new URL(window.location.href);
-    fallbackUrl.searchParams.delete("catWidgetReturn");
-    fallbackUrl.searchParams.delete("catWidgetPayload");
-    const fallbackHashParams = new URLSearchParams(
-      fallbackUrl.hash.startsWith("#")
-        ? fallbackUrl.hash.slice(1)
-        : fallbackUrl.hash,
-    );
-    fallbackHashParams.delete("catWidgetPayload");
-    fallbackHashParams.set(NATIVE_WIDGET_FALLBACK_HASH_KEY, "1");
-    fallbackUrl.hash = fallbackHashParams.toString();
-
+    // 위젯 APK가 설치되어 있지 않거나 현재 브라우저가 위젯 Activity를
+    // 처리하지 못해도 CAT 웹/PWA 자체를 다시 열지 않습니다.
+    // 처리 가능한 위젯이 있을 때만 외부 Activity가 열리고, 없으면
+    // 현재 화면/저장 상태를 그대로 유지합니다.
     const intentUrl =
       `intent://sync?payload=${encodedPayload}` +
       `#Intent;scheme=catattendancewidget;` +
-      `package=com.cat.attendance.widget;` +
-      `S.browser_fallback_url=${encodeURIComponent(fallbackUrl.href)};end`;
+      `package=com.cat.attendance.widget;end`;
 
     window.location.href = intentUrl;
   } catch (error) {
@@ -3862,9 +3853,9 @@ function saveWeekStartPreference() {
       WEEK_START_KEY,
       weekStartsOnMonday ? "monday" : "sunday",
     );
+    persistGuestSnapshotIfNeeded();
     scheduleCloudSync();
     sendCurrentStateBackToNativeWidget({ userInitiated: true });
-    persistGuestSnapshotIfNeeded();
   } catch (error) {
     console.error(
       "달력 시작 요일 설정을 저장하지 못했습니다.",
@@ -8291,9 +8282,11 @@ function saveRecords() {
     STORAGE_KEY,
     JSON.stringify(records),
   );
+  // 로컬/Guest 영구 저장을 네이티브 위젯 호출보다 먼저 끝냅니다.
+  // 외부 Activity 전환이 발생해도 방금 선택한 근무형태가 사라지지 않습니다.
+  persistGuestSnapshotIfNeeded();
   scheduleCloudSync();
   sendCurrentStateBackToNativeWidget({ userInitiated: true });
-  persistGuestSnapshotIfNeeded();
 }
 
 function loadWeeklyDateRange() {
