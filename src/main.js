@@ -211,14 +211,25 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
       return;
     }
 
-    // 위젯 APK가 설치되어 있지 않거나 현재 브라우저가 위젯 Activity를
-    // 처리하지 못해도 CAT 웹/PWA 자체를 다시 열지 않습니다.
-    // 처리 가능한 위젯이 있을 때만 외부 Activity가 열리고, 없으면
-    // 현재 화면/저장 상태를 그대로 유지합니다.
+    // 앱 -> 위젯 전송 방식 자체는 v155 브리지를 그대로 사용합니다.
+    // 다만 위젯 APK가 없는 기기에서 브라우저가 오류 페이지로 이동하거나
+    // CAT을 새로 여는 일을 막기 위해 fallback은 현재 문서의 hash만 바꿉니다.
+    // 같은 pathname/query에서 hash만 바뀌는 same-document navigation이므로
+    // 앱/PWA는 재실행되지 않고 아래 hashchange 처리에서 즉시 정리됩니다.
+    const fallbackUrl = new URL(window.location.href);
+    const fallbackHashParams = new URLSearchParams(
+      fallbackUrl.hash.startsWith("#")
+        ? fallbackUrl.hash.slice(1)
+        : fallbackUrl.hash,
+    );
+    fallbackHashParams.set(NATIVE_WIDGET_FALLBACK_HASH_KEY, "1");
+    fallbackUrl.hash = fallbackHashParams.toString();
+
     const intentUrl =
       `intent://sync?payload=${encodedPayload}` +
       `#Intent;scheme=catattendancewidget;` +
-      `package=com.cat.attendance.widget;end`;
+      `package=com.cat.attendance.widget;` +
+      `S.browser_fallback_url=${encodeURIComponent(fallbackUrl.toString())};end`;
 
     window.location.href = intentUrl;
   } catch (error) {
