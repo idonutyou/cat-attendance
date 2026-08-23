@@ -211,27 +211,37 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
       return;
     }
 
-    // 앱 -> 위젯 전송 방식 자체는 v155 브리지를 그대로 사용합니다.
-    // 다만 위젯 APK가 없는 기기에서 브라우저가 오류 페이지로 이동하거나
-    // CAT을 새로 여는 일을 막기 위해 fallback은 현재 문서의 hash만 바꿉니다.
-    // 같은 pathname/query에서 hash만 바뀌는 same-document navigation이므로
-    // 앱/PWA는 재실행되지 않고 아래 hashchange 처리에서 즉시 정리됩니다.
-    const fallbackUrl = new URL(window.location.href);
-    const fallbackHashParams = new URLSearchParams(
-      fallbackUrl.hash.startsWith("#")
-        ? fallbackUrl.hash.slice(1)
-        : fallbackUrl.hash,
-    );
-    fallbackHashParams.set(NATIVE_WIDGET_FALLBACK_HASH_KEY, "1");
-    fallbackUrl.hash = fallbackHashParams.toString();
-
+    // 앱 -> 위젯 payload/브리지 형식은 그대로 유지합니다.
+    // 단, 현재 CAT 문서 자체를 intent:// 로 이동시키지 않습니다.
+    // 숨겨진 subframe에서만 intent를 dispatch해 근무형태 선택 시
+    // 앱/PWA 재실행이나 현재 페이지 새로고침이 발생하지 않게 합니다.
     const intentUrl =
       `intent://sync?payload=${encodedPayload}` +
       `#Intent;scheme=catattendancewidget;` +
-      `package=com.cat.attendance.widget;` +
-      `S.browser_fallback_url=${encodeURIComponent(fallbackUrl.toString())};end`;
+      `package=com.cat.attendance.widget;end`;
 
-    window.location.href = intentUrl;
+    let transportFrame = document.getElementById(
+      "cat-native-widget-sync-transport",
+    );
+
+    if (!transportFrame) {
+      transportFrame = document.createElement("iframe");
+      transportFrame.id = "cat-native-widget-sync-transport";
+      transportFrame.name = "cat-native-widget-sync-transport";
+      transportFrame.setAttribute("aria-hidden", "true");
+      transportFrame.tabIndex = -1;
+      transportFrame.style.display = "none";
+      document.body.appendChild(transportFrame);
+    }
+
+    const intentLink = document.createElement("a");
+    intentLink.href = intentUrl;
+    intentLink.target = transportFrame.name;
+    intentLink.rel = "noopener";
+    intentLink.style.display = "none";
+    document.body.appendChild(intentLink);
+    intentLink.click();
+    intentLink.remove();
   } catch (error) {
     console.error("앱 데이터를 위젯으로 보내지 못했습니다.", error);
   }
