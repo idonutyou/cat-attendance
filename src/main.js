@@ -2421,6 +2421,13 @@ salaryYearGrid.addEventListener("pointerup", (event) => {
 
     salaryMonthTouchClickBlocked = true;
 
+    /*
+     * Android에서는 가로 스와이프 직후 첫 native click이 누락될 수 있다.
+     * 기존 달력/급여 페이지 전환에서 이미 검증된 첫 탭 복구 장치를
+     * 급여 연도 스와이프에도 동일하게 활성화한다.
+     */
+    armCalendarSwipeTapRecovery();
+
     changeSalaryYear(
       deltaX > 0 ? 1 : -1,
     );
