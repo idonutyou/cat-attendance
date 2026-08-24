@@ -6105,7 +6105,7 @@ function render52HourCalculator() {
         </div>
 
         <div class="weekly-result-item">
-          <span>평균 근무시간</span>
+          <span>주 평균 근무시간</span>
           <strong>${formatUnit(formatAverageHours(averageHours), "시간")}</strong>
         </div>
       </div>
