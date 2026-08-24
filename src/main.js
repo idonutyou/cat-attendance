@@ -31,6 +31,7 @@ const GUEST_SNAPSHOT_KEY = "cat-attendance-guest-snapshot-v1";
 const GOOGLE_CACHE_PREFIX = "cat-attendance-google-cache-v1";
 const DEVICE_ID_KEY = "cat-attendance-device-id-v1";
 const WIDGET_SYNC_APPLIED_KEY = "cat-attendance-widget-sync-applied-v1";
+const NATIVE_WIDGET_PAIRED_KEY = "cat-attendance-native-widget-paired-v1";
 const FIREBASE_SDK_VERSION = "12.16.0";
 const CLOUD_SYNC_DEBOUNCE_MS = 550;
 const SYNCED_STORAGE_KEYS = [
@@ -73,6 +74,33 @@ const CAT_BROWSER_ENV = (() => {
 })();
 
 const NATIVE_WIDGET_FALLBACK_HASH_KEY = "catWidgetNoHandler";
+
+function markNativeWidgetPaired() {
+  try {
+    localStorage.setItem(NATIVE_WIDGET_PAIRED_KEY, "1");
+  } catch {
+    // localStorage unavailable: keep web/PWA behavior unchanged.
+  }
+}
+
+function hasNativeWidgetPairing() {
+  try {
+    if (localStorage.getItem(NATIVE_WIDGET_PAIRED_KEY) === "1") {
+      return true;
+    }
+
+    // Migrate phones that already exchanged native widget payloads before v170.
+    const applied = localStorage.getItem(WIDGET_SYNC_APPLIED_KEY);
+    if (applied && applied !== "{}") {
+      localStorage.setItem(NATIVE_WIDGET_PAIRED_KEY, "1");
+      return true;
+    }
+  } catch {
+    // Treat unknown/unavailable storage as an unpaired web-only phone.
+  }
+
+  return false;
+}
 
 function readNativeWidgetLaunchPayload(
   sourceUrl = window.location.href,
@@ -162,6 +190,14 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
     // Android 네이티브 위젯 브리지는 Android에서만 시도합니다.
     // iOS/Safari와 NAVER 인앱 브라우저에서는 웹/PWA 기능만 유지합니다.
     if (!CAT_BROWSER_ENV.isAndroid || CAT_BROWSER_ENV.isNaverInApp) {
+      return;
+    }
+
+    // Never launch an Android widget intent on ordinary Galaxy phones that
+    // have never been connected to the CAT widget. This prevents Chrome/PWA
+    // from relaunching or showing an app/store error when no widget exists.
+    // Paired widget phones continue through the exact existing sync path.
+    if (!hasNativeWidgetPairing()) {
       return;
     }
 
@@ -312,6 +348,8 @@ function applyNativeWidgetLaunchPayload(
   if (!payload) {
     return false;
   }
+
+  markNativeWidgetPaired();
 
   let payloadSignature = "";
 
@@ -9121,6 +9159,7 @@ function subscribeToGuestCloudChanges() {
       };
 
       if (isWidgetChange) {
+        markNativeWidgetPaired();
         applyWidgetCloudStorageSnapshot(incomingSnapshot);
         saveSnapshotToLocalKey(
           GUEST_SNAPSHOT_KEY,
@@ -9408,6 +9447,7 @@ function subscribeToCloudChanges() {
       };
 
       if (isWidgetChange) {
+        markNativeWidgetPaired();
         applyWidgetCloudStorageSnapshot(incomingSnapshot);
         saveSnapshotToLocalKey(
           getGoogleCacheKey(activeGoogleUser.uid),
