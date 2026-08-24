@@ -215,10 +215,16 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
     // 단, 현재 CAT 문서 자체를 intent:// 로 이동시키지 않습니다.
     // 숨겨진 subframe에서만 intent를 dispatch해 근무형태 선택 시
     // 앱/PWA 재실행이나 현재 페이지 새로고침이 발생하지 않게 합니다.
+    const widgetNoopUrl = new URL(
+      "widget-noop.html",
+      window.location.href,
+    ).href;
+
     const intentUrl =
       `intent://sync?payload=${encodedPayload}` +
       `#Intent;scheme=catattendancewidget;` +
-      `package=com.cat.attendance.widget;end`;
+      `package=com.cat.attendance.widget;` +
+      `S.browser_fallback_url=${encodeURIComponent(widgetNoopUrl)};end`;
 
     let transportFrame = document.getElementById(
       "cat-native-widget-sync-transport",
