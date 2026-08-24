@@ -6369,10 +6369,13 @@ function calculate52HourAverage(startDate, endDate) {
 function get52HourWorkHours(workRecord) {
   const workType = getWorkType(workRecord);
 
+  if (workType?.id === "halfAnnualLeave") {
+    return 4;
+  }
+
   if (
     !workType ||
     workType.id === "annualLeave" ||
-    workType.id === "halfAnnualLeave" ||
     workType.id === CUSTOM_WORK_TYPE.id
   ) {
     return 0;
