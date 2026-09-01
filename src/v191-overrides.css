@@ -1,0 +1,77 @@
+/* v191 - salary settings must fit the mobile pager with no nested scrollbar */
+@media (max-width: 620px) {
+  /*
+   * The salary mobile pager already owns the viewport height and all vertical
+   * page gestures.  None of its nested settings containers should become a
+   * second scrolling surface.  Keep the panel in the exact remaining flex
+   * height below the shared title row and clip only sub-pixel overflow.
+   */
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-section,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel
+    > .settings-panel {
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow-x: clip !important;
+    overflow-y: clip !important;
+    overscroll-behavior: none !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-section {
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel {
+    flex: 1 1 0 !important;
+    height: 0 !important;
+    max-height: none !important;
+    box-sizing: border-box !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel
+    > .settings-panel {
+    flex: 1 1 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Samsung Internet / Chromium can still paint a thin nested scrollbar even
+     when overflow is later clipped.  Explicitly suppress that decoration on
+     every container used by the settings page. */
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page::-webkit-scrollbar,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-section::-webkit-scrollbar,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel::-webkit-scrollbar,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel
+    > .settings-panel::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
+  }
+}
