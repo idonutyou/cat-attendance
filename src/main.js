@@ -19,6 +19,7 @@ import "./v178-overrides.css";
 import "./v179-overrides.css";
 import "./v180-overrides.css";
 import "./v181-overrides.css";
+import "./v184-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -2739,46 +2740,45 @@ async function closeSalarySettingsToPayment() {
     return;
   }
 
-  salaryMobilePageTransitioning = true;
-  armCalendarSwipeTapRecovery();
+  const salaryLayout = salaryDetailCard.querySelector(".salary-layout");
 
-  try {
-    const exitAnimation = salaryDetailCard.animate(
-      [
-        { transform: "translateY(0)", opacity: 1 },
-        { transform: "translateY(-34px)", opacity: 0.92 },
-      ],
-      {
-        duration: 230,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      },
-    );
-
-    await exitAnimation.finished.catch(() => {});
-    exitAnimation.cancel();
-
+  if (!salaryLayout) {
     salarySettingsOpen = false;
     salaryDetailCard.scrollTop = 0;
     updateSalarySettingsVisibility();
-
-    const enterAnimation = salaryDetailCard.animate(
-      [
-        { transform: "translateY(34px)", opacity: 0.92 },
-        { transform: "translateY(0)", opacity: 1 },
-      ],
-      {
-        duration: 270,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      },
-    );
-
-    await enterAnimation.finished.catch(() => {});
-    enterAnimation.cancel();
-  } finally {
-    salaryDetailCard.style.removeProperty("transform");
-    salaryDetailCard.style.removeProperty("opacity");
-    salaryMobilePageTransitioning = false;
+    return;
   }
+
+  salaryMobilePageTransitioning = true;
+  armCalendarSwipeTapRecovery();
+
+  /*
+   * 월별 급여 화면 전환과 완전히 같은 방식으로 처리한다.
+   * 두 화면을 위·아래로 겹쳐 놓고 translate3d를 한 번에 바꾸며,
+   * 시간(270ms)과 easing도 salary-page-layout의 모바일 페이지 전환과 같다.
+   */
+  salaryLayout.classList.add("salary-settings-inner-pager");
+  salaryLayout.dataset.salarySettingsPage = "settings";
+
+  // 첫 상태를 실제 프레임에 확정한 다음 같은 pager transition으로 이동한다.
+  void salaryLayout.offsetHeight;
+
+  await new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        salaryLayout.dataset.salarySettingsPage = "payment";
+        window.setTimeout(resolve, 300);
+      });
+    });
+  });
+
+  salarySettingsOpen = false;
+  salaryDetailCard.scrollTop = 0;
+  updateSalarySettingsVisibility();
+
+  salaryLayout.classList.remove("salary-settings-inner-pager");
+  salaryLayout.removeAttribute("data-salary-settings-page");
+  salaryMobilePageTransitioning = false;
 }
 
 function moveSalaryMobilePage(direction) {
