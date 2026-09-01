@@ -393,6 +393,7 @@ function applyNativeWidgetLaunchPayload(
       "nightHolidayOvertime",
       "annualLeave",
       "halfAnnualLeave",
+      "earlyLeave",
     ]);
     let recordsChanged = false;
     let weekStartChanged = false;
@@ -656,6 +657,13 @@ const WORK_TYPES = [
   {
     id: "halfAnnualLeave",
     label: "반차",
+    totals: {
+      regularDays: 0.5,
+    },
+  },
+  {
+    id: "earlyLeave",
+    label: "조퇴",
     totals: {
       regularDays: 0.5,
     },
@@ -1597,6 +1605,12 @@ app.innerHTML = `
           data-annual-leave-choice="annualLeave"
         >
           연차
+        </button>
+        <button
+          type="button"
+          data-annual-leave-choice="earlyLeave"
+        >
+          조퇴
         </button>
       </div>
 
@@ -3526,7 +3540,7 @@ annualLeaveChoice.addEventListener("click", (event) => {
 
   const workTypeId = button.dataset.annualLeaveChoice;
 
-  if (!["halfAnnualLeave", "annualLeave"].includes(workTypeId)) {
+  if (!["halfAnnualLeave", "annualLeave", "earlyLeave"].includes(workTypeId)) {
     return;
   }
 
@@ -6376,7 +6390,10 @@ function calculate52HourAverage(startDate, endDate) {
 function get52HourWorkHours(workRecord) {
   const workType = getWorkType(workRecord);
 
-  if (workType?.id === "halfAnnualLeave") {
+  if (
+    workType?.id === "halfAnnualLeave" ||
+    workType?.id === "earlyLeave"
+  ) {
     return 4;
   }
 
@@ -6992,10 +7009,18 @@ function calculateSalaryForMonth(year, month) {
   const sundayCount = countSundaysInMonth(year, month);
   const basePayDays = daysInMonth - sundayCount;
   const basePayHours = basePayDays * 8;
+  const earlyLeaveDeductionHours = Math.max(
+    0,
+    Number(stats.counts?.earlyLeave || 0) * 4,
+  );
+  const payableBasePayHours = Math.max(
+    0,
+    basePayHours - earlyLeaveDeductionHours,
+  );
 
   const payments = {
     basePay: hasAttendanceRecords
-      ? basePayHours * baseHourlyWage
+      ? payableBasePayHours * baseHourlyWage
       : 0,
     weeklyAllowance: hasAttendanceRecords
       ? sundayCount * 8 * baseHourlyWage
@@ -7060,7 +7085,9 @@ function calculateSalaryForMonth(year, month) {
     longevityAllowance: payableLongevityAllowance,
     otherAllowance: payableOtherAllowance,
     basePayDays: hasAttendanceRecords ? basePayDays : 0,
-    basePayHours: hasAttendanceRecords ? basePayHours : 0,
+    basePayHours: hasAttendanceRecords ? payableBasePayHours : 0,
+    earlyLeaveDeductionHours:
+      hasAttendanceRecords ? earlyLeaveDeductionHours : 0,
     sundayCount: hasAttendanceRecords ? sundayCount : 0,
   };
 }
@@ -7154,7 +7181,7 @@ function openModal(dateKey, year, month, dayNumber) {
   const selectedWorkType = getWorkType(selectedWorkRecord);
   const selectedWorkTypeId = selectedWorkType?.id || "";
   const leaveChoiceSelected =
-    ["halfAnnualLeave", "annualLeave"].includes(selectedWorkTypeId);
+    ["halfAnnualLeave", "annualLeave", "earlyLeave"].includes(selectedWorkTypeId);
 
   annualLeaveChoice.hidden = true;
   workTypeList.hidden = false;
@@ -7167,7 +7194,7 @@ function openModal(dateKey, year, month, dayNumber) {
         ? leaveChoiceSelected
         : selectedWorkTypeId === workType.id;
       const pickerLabel = workType.id === "annualLeave"
-        ? "반차 / 연차"
+        ? "연차 / 조퇴"
         : workType.label;
 
       return `

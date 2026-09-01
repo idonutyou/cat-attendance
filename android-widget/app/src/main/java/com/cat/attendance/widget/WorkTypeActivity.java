@@ -143,7 +143,7 @@ public class WorkTypeActivity extends Activity {
                 "night", "nightOvertime", "nightHoliday", "nightHolidayOvertime", WorkTypes.CUSTOM_ID
         };
         String[] labels = {
-                "주간", "주간잔업", "주간특근", "주간특근잔업", "반차 / 연차",
+                "주간", "주간잔업", "주간특근", "주간특근잔업", "연차 / 조퇴",
                 "야간", "야간잔업", "야간특근", "야간특근잔업", "직접 입력"
         };
 
@@ -170,7 +170,8 @@ public class WorkTypeActivity extends Activity {
                 boolean selected =
                         id.equals(currentType) ||
                         ("annualLeave".equals(id) &&
-                                WorkTypes.HALF_ANNUAL_LEAVE_ID.equals(currentType));
+                                (WorkTypes.HALF_ANNUAL_LEAVE_ID.equals(currentType) ||
+                                 WorkTypes.EARLY_LEAVE_ID.equals(currentType)));
                 View tile = createWorkTypeTile(id, label, selected);
                 LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
                         0, dp(88), 1f
@@ -280,16 +281,26 @@ public class WorkTypeActivity extends Activity {
                 "연차",
                 "annualLeave".equals(currentType)
         );
+        TextView earlyLeave = createLeaveChoiceButton(
+                "조퇴",
+                WorkTypes.EARLY_LEAVE_ID.equals(currentType)
+        );
 
         LinearLayout.LayoutParams halfParams =
                 new LinearLayout.LayoutParams(0, dp(62), 1f);
-        halfParams.rightMargin = dp(6);
+        halfParams.rightMargin = dp(4);
         panel.addView(halfDay, halfParams);
 
         LinearLayout.LayoutParams fullParams =
                 new LinearLayout.LayoutParams(0, dp(62), 1f);
-        fullParams.leftMargin = dp(6);
+        fullParams.leftMargin = dp(4);
+        fullParams.rightMargin = dp(4);
         panel.addView(fullDay, fullParams);
+
+        LinearLayout.LayoutParams earlyParams =
+                new LinearLayout.LayoutParams(0, dp(62), 1f);
+        earlyParams.leftMargin = dp(4);
+        panel.addView(earlyLeave, earlyParams);
 
         halfDay.setOnClickListener(v -> {
             dialog.dismiss();
@@ -299,6 +310,11 @@ public class WorkTypeActivity extends Activity {
         fullDay.setOnClickListener(v -> {
             dialog.dismiss();
             saveWorkTypeAndFinish("annualLeave");
+        });
+
+        earlyLeave.setOnClickListener(v -> {
+            dialog.dismiss();
+            saveWorkTypeAndFinish(WorkTypes.EARLY_LEAVE_ID);
         });
 
         dialog.setContentView(panel);

@@ -5,6 +5,17 @@
   background: var(--annual-leave, #10b981) !important;
 }
 
+.type-earlyLeave .work-badge,
+.type-earlyLeave .work-type-color,
+.summary-dot.type-earlyLeave {
+  background: #f59e0b !important;
+}
+
+.date-picker-work-name.type-earlyLeave {
+  color: #b45309 !important;
+  background: #fef3c7 !important;
+}
+
 .date-picker-work-name.type-halfAnnualLeave {
   color: #047857 !important;
   background: #d1fae5 !important;
@@ -16,7 +27,7 @@
 
 .annual-leave-choice {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin: 4px 0 2px;
 }
