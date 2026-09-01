@@ -1409,6 +1409,10 @@ app.innerHTML = `
                     </div>
                   </label>
 
+                  <p class="formula-note salary-deduction-period-note">
+                    국민연금: 매년 7월부터 다음 해 6월까지 기준소득월액 적용
+                  </p>
+
                   <label class="salary-input-row">
                     <span>건강보험</span>
 
@@ -1427,7 +1431,7 @@ app.innerHTML = `
                   </label>
 
                   <p class="formula-note salary-deduction-period-note">
-                    매년 7월부터 다음 해 6월까지 기준소득월액 적용
+                    건강보험: 매년 4월부터 다음 해 3월까지 보수월액 적용
                   </p>
                 </div>
               </section>
@@ -4257,12 +4261,18 @@ dependentFamilyCountInput.addEventListener("change", () => {
 [pensionDeductionSettingInput, healthDeductionSettingInput].forEach(
   (input) => {
     input.addEventListener("input", () => {
-      const cycleKey = getInsuranceCycleStartMonthKey(
-        salarySelectedYear,
-        salarySelectedMonth,
-      );
+      const isPension = input === pensionDeductionSettingInput;
+      const cycleKey = isPension
+        ? getPensionCycleStartMonthKey(
+            salarySelectedYear,
+            salarySelectedMonth,
+          )
+        : getHealthCycleStartMonthKey(
+            salarySelectedYear,
+            salarySelectedMonth,
+          );
       const existingCycleSettings = settingsByMonth[cycleKey] || {};
-      const fieldName = input === pensionDeductionSettingInput
+      const fieldName = isPension
         ? "pensionDeduction"
         : "healthDeduction";
       const rawValue = input.value.trim();
@@ -6859,6 +6869,7 @@ function getVerifiedPayrollInsuranceForMonth(year, month) {
   /*
    * 실제 급여명세서로 검증한 개인 기준값.
    * 사용자가 공제내역 설정에서 직접 입력하면 해당 값을 우선한다.
+   * 국민연금과 건강보험의 적용 주기는 서로 다르게 관리한다.
    */
   if (year <= 2025) {
     return {
@@ -6867,10 +6878,10 @@ function getVerifiedPayrollInsuranceForMonth(year, month) {
     };
   }
 
-  if (year === 2026 && month <= 5) {
+  if (year === 2026) {
     return {
-      pension: 213750,
-      health: 183020,
+      pension: month <= 5 ? 213750 : 231180,
+      health: month <= 2 ? 183020 : 202090,
     };
   }
 
@@ -6880,14 +6891,27 @@ function getVerifiedPayrollInsuranceForMonth(year, month) {
   };
 }
 
-function getInsuranceCycleStartParts(year, month) {
+function getPensionCycleStartParts(year, month) {
+  // 국민연금 기준소득월액: 매년 7월 ~ 다음 해 6월
   return month >= 6
     ? { year, month: 6 }
     : { year: year - 1, month: 6 };
 }
 
-function getInsuranceCycleStartMonthKey(year, month) {
-  const cycleStart = getInsuranceCycleStartParts(year, month);
+function getPensionCycleStartMonthKey(year, month) {
+  const cycleStart = getPensionCycleStartParts(year, month);
+  return getMonthKeyFromParts(cycleStart.year, cycleStart.month);
+}
+
+function getHealthCycleStartParts(year, month) {
+  // 건강보험 보수월액: 매년 4월 ~ 다음 해 3월
+  return month >= 3
+    ? { year, month: 3 }
+    : { year: year - 1, month: 3 };
+}
+
+function getHealthCycleStartMonthKey(year, month) {
+  const cycleStart = getHealthCycleStartParts(year, month);
   return getMonthKeyFromParts(cycleStart.year, cycleStart.month);
 }
 
@@ -6914,15 +6938,48 @@ function getDeductionSettingsForMonth(year, month) {
       )
     : 1;
 
-  const cycleKey = getInsuranceCycleStartMonthKey(year, month);
-  const cycleSettings = settingsByMonth[cycleKey] || {};
+  const pensionCycleKey = getPensionCycleStartMonthKey(year, month);
+  const healthCycleKey = getHealthCycleStartMonthKey(year, month);
+  const pensionCycleSettings = settingsByMonth[pensionCycleKey] || {};
+  const healthCycleSettings = settingsByMonth[healthCycleKey] || {};
   const verifiedInsurance = getVerifiedPayrollInsuranceForMonth(
     year,
     month,
   );
 
-  const savedPension = Number(cycleSettings.pensionDeduction);
-  const savedHealth = Number(cycleSettings.healthDeduction);
+  const savedPension = Number(
+    pensionCycleSettings.pensionDeduction,
+  );
+  let savedHealth = Number(healthCycleSettings.healthDeduction);
+
+  // v176~v191에서는 건강보험도 7월 주기로 저장했다.
+  // 기존 사용자가 입력한 값을 잃지 않도록, 같은 건강보험 적용기간 안의
+  // 7월 키에 저장된 값이 있으면 새 4월 주기로 자동 승계한다.
+  if (!(Number.isFinite(savedHealth) && savedHealth > 0)) {
+    const legacyHealthCycleKey = getPensionCycleStartMonthKey(
+      year,
+      month,
+    );
+    const legacyHealthCycleSettings =
+      settingsByMonth[legacyHealthCycleKey] || {};
+    const legacySavedHealth = Number(
+      legacyHealthCycleSettings.healthDeduction,
+    );
+
+    const healthCycleStart = getHealthCycleStartParts(year, month);
+    const legacyCycleStart = getPensionCycleStartParts(year, month);
+    const legacyFallsInsideHealthCycle =
+      legacyCycleStart.year === healthCycleStart.year &&
+      legacyCycleStart.month >= healthCycleStart.month;
+
+    if (
+      legacyFallsInsideHealthCycle &&
+      Number.isFinite(legacySavedHealth) &&
+      legacySavedHealth > 0
+    ) {
+      savedHealth = legacySavedHealth;
+    }
+  }
 
   return {
     dependentFamilyCount,
