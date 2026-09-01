@@ -17,6 +17,7 @@ import "./v176-overrides.css";
 import "./v177-overrides.css";
 import "./v178-overrides.css";
 import "./v179-overrides.css";
+import "./v180-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -1353,7 +1354,10 @@ app.innerHTML = `
                   <h4>공제 내역 설정</h4>
 
                   <label class="salary-input-row">
-                    <span>공제대상 가족 수 (본인 포함)</span>
+                    <span class="salary-dependent-family-label">
+                      <span>공제대상 가족 수</span>
+                      <span class="salary-dependent-family-sublabel">(본인 포함)</span>
+                    </span>
 
                     <div class="input-with-unit">
                       <input
@@ -3259,8 +3263,14 @@ salaryDetailCard.addEventListener(
     event.preventDefault();
     salarySettingsSwipeHandled = true;
     salarySettingsSwipeStartY = null;
-    salarySettingsOpen = false;
-    updateSalarySettingsVisibility();
+
+    /*
+     * 설정 패널만 즉시 숨기지 않고 급여 모바일 페이지 자체를
+     * 전환한 뒤 transition 종료 시 설정을 접는다.
+     * 위/아래 어느 방향으로 스와이프해도 기존 급여 요약 화면으로
+     * 자연스럽게 넘어가면서 닫힌다.
+     */
+    moveSalaryMobilePage(distance < 0 ? 1 : -1);
   },
   { passive: false },
 );
@@ -3289,8 +3299,7 @@ salaryDetailCard.addEventListener(
     salarySettingsSwipeHandled = false;
 
     if (shouldCloseSettings) {
-      salarySettingsOpen = false;
-      updateSalarySettingsVisibility();
+      moveSalaryMobilePage(distance < 0 ? 1 : -1);
     }
   },
   { passive: true },
