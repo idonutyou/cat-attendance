@@ -21,6 +21,7 @@ import "./v180-overrides.css";
 import "./v181-overrides.css";
 import "./v184-overrides.css";
 import "./v185-overrides.css";
+import "./v186-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -1362,17 +1363,33 @@ app.innerHTML = `
                       <span class="salary-dependent-family-sublabel">(본인 포함)</span>
                     </span>
 
-                    <div class="input-with-unit">
-                      <input
+                    <div class="input-with-unit salary-family-select-control">
+                      <select
                         id="dependentFamilyCount"
-                        type="number"
-                        inputmode="numeric"
-                        min="1"
-                        max="20"
-                        step="1"
-                        placeholder="1"
-                        value=""
-                      />
+                        class="salary-number-select"
+                        aria-label="공제대상 가족 수 선택"
+                      >
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                        <option value="13">13</option>
+                        <option value="14">14</option>
+                        <option value="15">15</option>
+                        <option value="16">16</option>
+                        <option value="17">17</option>
+                        <option value="18">18</option>
+                        <option value="19">19</option>
+                        <option value="20">20</option>
+                      </select>
                       <span>명</span>
                     </div>
                   </label>
@@ -3288,13 +3305,82 @@ salaryBonusRows.addEventListener("input", (event) => {
   updateBonusEntryFromControl(control);
 });
 
-function toggleSalarySettings() {
-  salarySettingsOpen = !salarySettingsOpen;
-  updateSalarySettingsVisibility();
+async function transitionSalarySettingsLikeBonus(nextOpen) {
+  if (
+    !isSalaryMobilePager() ||
+    currentAppPage !== "salary" ||
+    salaryMobilePageIndex !== 2
+  ) {
+    salarySettingsOpen = nextOpen;
+    updateSalarySettingsVisibility();
 
-  if (salarySettingsOpen) {
-    salaryDetailCard.scrollTop = 0;
+    if (salarySettingsOpen) {
+      salaryDetailCard.scrollTop = 0;
+    }
+    return;
   }
+
+  if (
+    salaryMobilePageTransitioning ||
+    nextOpen === salarySettingsOpen
+  ) {
+    return;
+  }
+
+  const salaryLayout = salarySettingsPanel.parentElement;
+
+  if (!salaryLayout) {
+    salarySettingsOpen = nextOpen;
+    updateSalarySettingsVisibility();
+    return;
+  }
+
+  salaryMobilePageTransitioning = true;
+  armCalendarSwipeTapRecovery();
+  salaryDetailCard.scrollTop = 0;
+
+  /*
+   * v186:
+   * 모바일 급여 설정 버튼도 상여/보너스 페이지와 같은 방식으로 움직인다.
+   * 현재 화면은 -100%, 다음 화면은 +100%에서 0으로 이동하며,
+   * 실제 급여 모바일 pager와 동일한 270ms/easing을 CSS에서 사용한다.
+   */
+  salaryLayout.classList.add("salary-settings-bonus-pager");
+
+  if (nextOpen) {
+    salarySettingsOpen = true;
+    updateSalarySettingsVisibility();
+    salaryLayout.dataset.salarySettingsTogglePage = "payment";
+  } else {
+    salaryLayout.dataset.salarySettingsTogglePage = "settings";
+  }
+
+  // 시작 위치를 실제 한 프레임 렌더링한 뒤 상여/보너스와 같은 한 번의 slide를 실행한다.
+  void salaryLayout.offsetHeight;
+
+  await new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        salaryLayout.dataset.salarySettingsTogglePage = nextOpen
+          ? "settings"
+          : "payment";
+        window.setTimeout(resolve, 300);
+      });
+    });
+  });
+
+  if (!nextOpen) {
+    salarySettingsOpen = false;
+    updateSalarySettingsVisibility();
+  }
+
+  salaryLayout.classList.remove("salary-settings-bonus-pager");
+  salaryLayout.removeAttribute("data-salary-settings-toggle-page");
+  salaryMobilePageTransitioning = false;
+}
+
+function toggleSalarySettings() {
+  void transitionSalarySettingsLikeBonus(!salarySettingsOpen);
 }
 
 /*
@@ -4074,7 +4160,7 @@ otherAllowanceInput.addEventListener("input", () => {
   renderSalary();
 });
 
-dependentFamilyCountInput.addEventListener("input", () => {
+dependentFamilyCountInput.addEventListener("change", () => {
   const monthKey = getMonthKeyFromParts(
     salarySelectedYear,
     salarySelectedMonth,

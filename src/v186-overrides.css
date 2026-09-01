@@ -1,0 +1,123 @@
+/* v186 - salary settings toggle uses the same vertical pager motion as bonus */
+@media (max-width: 620px) {
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    contain: layout paint;
+  }
+
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager
+    > .settings-panel,
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager
+    > .payment-panel {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    backface-visibility: hidden;
+    transition: transform 270ms cubic-bezier(0.22, 0.61, 0.36, 1) !important;
+    will-change: transform;
+  }
+
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager
+    > .settings-panel {
+    display: block !important;
+    overflow: hidden !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager
+    > .payment-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager
+    > .payment-panel
+    .pay-breakdown {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager
+    > .payment-panel
+    .total-pay-row {
+    flex: 0 0 auto !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Same direction as overview -> bonus: current page goes up, next page enters from below. */
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager[data-salary-settings-toggle-page="payment"]
+    > .payment-panel {
+    transform: translate3d(0, 0, 0) !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager[data-salary-settings-toggle-page="payment"]
+    > .settings-panel {
+    transform: translate3d(0, 100%, 0) !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager[data-salary-settings-toggle-page="settings"]
+    > .payment-panel {
+    transform: translate3d(0, -100%, 0) !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    #salaryDetailCard
+    .salary-layout.salary-settings-bonus-pager[data-salary-settings-toggle-page="settings"]
+    > .settings-panel {
+    transform: translate3d(0, 0, 0) !important;
+  }
+}
+
+/* Family count is selected, not typed: keep the same visual language as other payroll fields. */
+.salary-family-select-control {
+  position: relative;
+}
+
+.salary-family-select-control .salary-number-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px 0 10px;
+  border: 0;
+  outline: 0;
+  color: #27354c;
+  background: transparent;
+  text-align: right;
+  text-align-last: right;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.salary-family-select-control .salary-number-select:focus-visible {
+  outline: none;
+}
