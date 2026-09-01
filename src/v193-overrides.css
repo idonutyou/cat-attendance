@@ -1,0 +1,27 @@
+/* v193 - family count selector uses the exact same field box size as payroll inputs */
+.salary-input-row .salary-family-select-control {
+  flex: 0 0 145px;
+  width: 145px;
+  min-width: 145px;
+  height: 38px;
+  min-height: 38px;
+  box-sizing: border-box;
+}
+
+.salary-family-select-control .salary-number-select {
+  height: 100%;
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 36px;
+}
+
+@media (max-width: 620px) {
+  .settings-panel .salary-input-row .salary-family-select-control {
+    justify-self: end;
+    width: 145px;
+    min-width: 145px;
+    height: 38px;
+    min-height: 38px;
+  }
+}
