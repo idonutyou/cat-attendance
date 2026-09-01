@@ -18,6 +18,7 @@ import "./v177-overrides.css";
 import "./v178-overrides.css";
 import "./v179-overrides.css";
 import "./v180-overrides.css";
+import "./v181-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -2727,6 +2728,59 @@ function setSalaryMobilePage(
   window.setTimeout(finishSalaryMobileTransition, 300);
 }
 
+async function closeSalarySettingsToPayment() {
+  if (
+    !isSalaryMobilePager() ||
+    currentAppPage !== "salary" ||
+    salaryMobilePageIndex !== 2 ||
+    !salarySettingsOpen ||
+    salaryMobilePageTransitioning
+  ) {
+    return;
+  }
+
+  salaryMobilePageTransitioning = true;
+  armCalendarSwipeTapRecovery();
+
+  try {
+    const exitAnimation = salaryDetailCard.animate(
+      [
+        { transform: "translateY(0)", opacity: 1 },
+        { transform: "translateY(-34px)", opacity: 0.92 },
+      ],
+      {
+        duration: 125,
+        easing: "cubic-bezier(0.4, 0, 1, 1)",
+      },
+    );
+
+    await exitAnimation.finished.catch(() => {});
+    exitAnimation.cancel();
+
+    salarySettingsOpen = false;
+    salaryDetailCard.scrollTop = 0;
+    updateSalarySettingsVisibility();
+
+    const enterAnimation = salaryDetailCard.animate(
+      [
+        { transform: "translateY(34px)", opacity: 0.92 },
+        { transform: "translateY(0)", opacity: 1 },
+      ],
+      {
+        duration: 175,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+    );
+
+    await enterAnimation.finished.catch(() => {});
+    enterAnimation.cancel();
+  } finally {
+    salaryDetailCard.style.removeProperty("transform");
+    salaryDetailCard.style.removeProperty("opacity");
+    salaryMobilePageTransitioning = false;
+  }
+}
+
 function moveSalaryMobilePage(direction) {
   if (
     !isSalaryMobilePager() ||
@@ -2755,9 +2809,13 @@ function moveSalaryMobilePage(direction) {
     salarySettingsOpen &&
     direction !== 0
   ) {
-    setSalaryMobilePage(0, {
-      collapseSettingsAfter: true,
-    });
+    if (direction > 0) {
+      setSalaryMobilePage(0, {
+        collapseSettingsAfter: true,
+      });
+    } else {
+      void closeSalarySettingsToPayment();
+    }
     return;
   }
 
