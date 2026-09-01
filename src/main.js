@@ -13,6 +13,7 @@ import "./v132-overrides.css";
 import "./v137-overrides.css";
 import "./v140-overrides.css";
 import "./v150-overrides.css";
+import "./v176-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -1344,6 +1345,66 @@ app.innerHTML = `
                 <p class="formula-note">
                   통상시급 = 기본시급 + (안전수당 + 근속수당) ÷ 243
                 </p>
+
+                <div class="salary-deduction-settings-block">
+                  <h4>공제 내역 설정</h4>
+
+                  <label class="salary-input-row">
+                    <span>공제대상 가족 수</span>
+
+                    <div class="input-with-unit">
+                      <input
+                        id="dependentFamilyCount"
+                        type="number"
+                        inputmode="numeric"
+                        min="1"
+                        max="20"
+                        step="1"
+                        placeholder="1"
+                        value=""
+                      />
+                      <span>명</span>
+                    </div>
+                  </label>
+
+                  <label class="salary-input-row">
+                    <span>국민연금</span>
+
+                    <div class="input-with-unit">
+                      <input
+                        id="pensionDeductionSetting"
+                        type="number"
+                        inputmode="numeric"
+                        min="0"
+                        step="10"
+                        placeholder="0"
+                        value=""
+                      />
+                      <span>원</span>
+                    </div>
+                  </label>
+
+                  <label class="salary-input-row">
+                    <span>건강보험</span>
+
+                    <div class="input-with-unit">
+                      <input
+                        id="healthDeductionSetting"
+                        type="number"
+                        inputmode="numeric"
+                        min="0"
+                        step="10"
+                        placeholder="0"
+                        value=""
+                      />
+                      <span>원</span>
+                    </div>
+                  </label>
+
+                  <p class="formula-note salary-deduction-period-note">
+                    매년 7월부터 다음 해 6월까지 기준소득월액 적용
+                  </p>
+                </div>
               </section>
 
               <section class="salary-panel payment-panel salary-net-panel">
@@ -2026,6 +2087,16 @@ const longevityAllowanceInput = document.querySelector(
 
 const otherAllowanceInput = document.querySelector(
   "#otherAllowance",
+);
+
+const dependentFamilyCountInput = document.querySelector(
+  "#dependentFamilyCount",
+);
+const pensionDeductionSettingInput = document.querySelector(
+  "#pensionDeductionSetting",
+);
+const healthDeductionSettingInput = document.querySelector(
+  "#healthDeductionSetting",
 );
 
 const workModal = document.querySelector("#workModal");
@@ -3892,6 +3963,74 @@ otherAllowanceInput.addEventListener("input", () => {
   saveSettingsByMonth();
   renderSalary();
 });
+
+dependentFamilyCountInput.addEventListener("input", () => {
+  const monthKey = getMonthKeyFromParts(
+    salarySelectedYear,
+    salarySelectedMonth,
+  );
+  const existingMonthlySettings = settingsByMonth[monthKey] || {};
+  const rawValue = dependentFamilyCountInput.value.trim();
+
+  if (rawValue === "") {
+    const nextSettings = { ...existingMonthlySettings };
+    delete nextSettings.dependentFamilyCount;
+
+    if (Object.keys(nextSettings).length > 0) {
+      settingsByMonth[monthKey] = nextSettings;
+    } else {
+      delete settingsByMonth[monthKey];
+    }
+  } else {
+    const familyCount = Math.max(
+      1,
+      Math.min(20, Math.trunc(Number(rawValue) || 1)),
+    );
+
+    settingsByMonth[monthKey] = {
+      ...existingMonthlySettings,
+      dependentFamilyCount: familyCount,
+    };
+  }
+
+  saveSettingsByMonth();
+  renderSalary();
+});
+
+[pensionDeductionSettingInput, healthDeductionSettingInput].forEach(
+  (input) => {
+    input.addEventListener("input", () => {
+      const cycleKey = getInsuranceCycleStartMonthKey(
+        salarySelectedYear,
+        salarySelectedMonth,
+      );
+      const existingCycleSettings = settingsByMonth[cycleKey] || {};
+      const fieldName = input === pensionDeductionSettingInput
+        ? "pensionDeduction"
+        : "healthDeduction";
+      const rawValue = input.value.trim();
+      const nextSettings = { ...existingCycleSettings };
+
+      if (rawValue === "") {
+        delete nextSettings[fieldName];
+      } else {
+        nextSettings[fieldName] = Math.max(
+          0,
+          Math.trunc(Number(rawValue) || 0),
+        );
+      }
+
+      if (Object.keys(nextSettings).length > 0) {
+        settingsByMonth[cycleKey] = nextSettings;
+      } else {
+        delete settingsByMonth[cycleKey];
+      }
+
+      saveSettingsByMonth();
+      renderSalary();
+    });
+  },
+);
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") {
@@ -6462,7 +6601,7 @@ function truncatePayrollToTen(value) {
 function getVerifiedPayrollInsuranceForMonth(year, month) {
   /*
    * 실제 급여명세서로 검증한 개인 기준값.
-   * 새 기준소득월액/보수월액이 확인되기 전까지 가장 최근 확정값을 유지한다.
+   * 사용자가 공제내역 설정에서 직접 입력하면 해당 값을 우선한다.
    */
   if (year <= 2025) {
     return {
@@ -6484,6 +6623,241 @@ function getVerifiedPayrollInsuranceForMonth(year, month) {
   };
 }
 
+function getInsuranceCycleStartParts(year, month) {
+  return month >= 6
+    ? { year, month: 6 }
+    : { year: year - 1, month: 6 };
+}
+
+function getInsuranceCycleStartMonthKey(year, month) {
+  const cycleStart = getInsuranceCycleStartParts(year, month);
+  return getMonthKeyFromParts(cycleStart.year, cycleStart.month);
+}
+
+function getDeductionSettingsForMonth(year, month) {
+  const targetMonthKey = getMonthKeyFromParts(year, month);
+  const familyEntries = Object.entries(settingsByMonth)
+    .filter(([monthKey, value]) => (
+      monthKey <= targetMonthKey &&
+      value &&
+      Number.isFinite(Number(value.dependentFamilyCount)) &&
+      Number(value.dependentFamilyCount) >= 1
+    ))
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+
+  const dependentFamilyCount = familyEntries.length > 0
+    ? Math.max(
+        1,
+        Math.min(
+          20,
+          Math.trunc(
+            Number(familyEntries.at(-1)[1].dependentFamilyCount),
+          ),
+        ),
+      )
+    : 1;
+
+  const cycleKey = getInsuranceCycleStartMonthKey(year, month);
+  const cycleSettings = settingsByMonth[cycleKey] || {};
+  const verifiedInsurance = getVerifiedPayrollInsuranceForMonth(
+    year,
+    month,
+  );
+
+  const savedPension = Number(cycleSettings.pensionDeduction);
+  const savedHealth = Number(cycleSettings.healthDeduction);
+
+  return {
+    dependentFamilyCount,
+    pension:
+      Number.isFinite(savedPension) && savedPension > 0
+        ? Math.trunc(savedPension)
+        : verifiedInsurance.pension,
+    health:
+      Number.isFinite(savedHealth) && savedHealth > 0
+        ? Math.trunc(savedHealth)
+        : verifiedInsurance.health,
+  };
+}
+
+function calculateAnnualEarnedIncomeDeduction(annualPay) {
+  if (annualPay <= 5000000) {
+    return annualPay * 0.7;
+  }
+  if (annualPay <= 15000000) {
+    return 3500000 + (annualPay - 5000000) * 0.4;
+  }
+  if (annualPay <= 45000000) {
+    return 7500000 + (annualPay - 15000000) * 0.15;
+  }
+  if (annualPay <= 100000000) {
+    return 12000000 + (annualPay - 45000000) * 0.05;
+  }
+
+  return Math.min(
+    20000000,
+    14750000 + (annualPay - 100000000) * 0.02,
+  );
+}
+
+function calculateSimplifiedSpecialDeduction(annualPay, familyCount) {
+  const count = Math.max(1, Math.trunc(familyCount || 1));
+  const excessOver30m = Math.max(0, annualPay - 30000000);
+  const excessOver40m = Math.max(0, annualPay - 40000000);
+
+  if (annualPay <= 30000000) {
+    if (count === 1) return 3100000 + annualPay * 0.04;
+    if (count === 2) return 3600000 + annualPay * 0.04;
+    return 5000000 + annualPay * 0.07;
+  }
+
+  if (annualPay <= 45000000) {
+    if (count === 1) {
+      return 3100000 + annualPay * 0.04 - excessOver30m * 0.05;
+    }
+    if (count === 2) {
+      return 3600000 + annualPay * 0.04 - excessOver30m * 0.05;
+    }
+    return (
+      5000000 +
+      annualPay * 0.07 -
+      excessOver30m * 0.05 +
+      excessOver40m * 0.04
+    );
+  }
+
+  if (annualPay <= 70000000) {
+    if (count === 1) return 3100000 + annualPay * 0.015;
+    if (count === 2) return 3600000 + annualPay * 0.02;
+    return 5000000 + annualPay * 0.05 + excessOver40m * 0.04;
+  }
+
+  if (count === 1) return 3100000 + annualPay * 0.005;
+  if (count === 2) return 3600000 + annualPay * 0.01;
+  return 5000000 + annualPay * 0.03 + excessOver40m * 0.04;
+}
+
+function calculateAnnualIncomeTaxFromTaxBase(taxBase) {
+  const base = Math.max(0, taxBase);
+
+  if (base <= 14000000) return base * 0.06;
+  if (base <= 50000000) {
+    return 840000 + (base - 14000000) * 0.15;
+  }
+  if (base <= 88000000) {
+    return 6240000 + (base - 50000000) * 0.24;
+  }
+  if (base <= 150000000) {
+    return 15360000 + (base - 88000000) * 0.35;
+  }
+  if (base <= 300000000) {
+    return 37060000 + (base - 150000000) * 0.38;
+  }
+  if (base <= 500000000) {
+    return 94060000 + (base - 300000000) * 0.4;
+  }
+  if (base <= 1000000000) {
+    return 174060000 + (base - 500000000) * 0.42;
+  }
+
+  return 384060000 + (base - 1000000000) * 0.45;
+}
+
+function calculateEarnedIncomeTaxCredit(annualCalculatedTax, annualPay) {
+  let credit = annualCalculatedTax <= 1300000
+    ? annualCalculatedTax * 0.55
+    : 715000 + (annualCalculatedTax - 1300000) * 0.3;
+  let creditLimit;
+
+  if (annualPay <= 33000000) {
+    creditLimit = 740000;
+  } else if (annualPay <= 70000000) {
+    creditLimit = Math.max(
+      660000,
+      740000 - (annualPay - 33000000) * 0.008,
+    );
+  } else if (annualPay <= 120000000) {
+    creditLimit = Math.max(
+      500000,
+      660000 - (annualPay - 70000000) * 0.5,
+    );
+  } else {
+    creditLimit = Math.max(
+      200000,
+      500000 - (annualPay - 120000000) * 0.5,
+    );
+  }
+
+  credit = Math.min(credit, creditLimit);
+  return Math.max(0, credit);
+}
+
+function estimateSimplifiedMonthlyIncomeTax(
+  totalPay,
+  pension,
+  familyCount,
+) {
+  const annualPay = Math.max(0, totalPay) * 12;
+  const annualPension = Math.max(0, pension) * 12;
+  const earnedIncome = Math.max(
+    0,
+    annualPay - calculateAnnualEarnedIncomeDeduction(annualPay),
+  );
+  const personalDeduction =
+    Math.max(1, Math.trunc(familyCount || 1)) * 1500000;
+  const specialDeduction = calculateSimplifiedSpecialDeduction(
+    annualPay,
+    familyCount,
+  );
+  const taxBase = Math.max(
+    0,
+    earnedIncome -
+      personalDeduction -
+      annualPension -
+      specialDeduction,
+  );
+  const calculatedTax = calculateAnnualIncomeTaxFromTaxBase(taxBase);
+  const taxCredit = calculateEarnedIncomeTaxCredit(
+    calculatedTax,
+    annualPay,
+  );
+  const annualDeterminedTax = Math.max(0, calculatedTax - taxCredit);
+
+  return truncatePayrollToTen(annualDeterminedTax / 12);
+}
+
+function applyDependentFamilyCountToIncomeTax(
+  verifiedFamilyOneTax,
+  totalPay,
+  pension,
+  familyCount,
+) {
+  const count = Math.max(1, Math.trunc(familyCount || 1));
+
+  if (count <= 1) {
+    return verifiedFamilyOneTax;
+  }
+
+  const officialFamilyOneEstimate = estimateSimplifiedMonthlyIncomeTax(
+    totalPay,
+    pension,
+    1,
+  );
+  const officialSelectedFamilyEstimate = estimateSimplifiedMonthlyIncomeTax(
+    totalPay,
+    pension,
+    count,
+  );
+  const familyReduction = Math.max(
+    0,
+    officialFamilyOneEstimate - officialSelectedFamilyEstimate,
+  );
+
+  return truncatePayrollToTen(
+    Math.max(0, verifiedFamilyOneTax - familyReduction),
+  );
+}
+
 function calculatePayrollDeductions(year, month, totalPay) {
   if (!Number.isFinite(totalPay) || totalPay <= 0) {
     return {
@@ -6499,9 +6873,10 @@ function calculatePayrollDeductions(year, month, totalPay) {
   }
 
   const {
+    dependentFamilyCount,
     pension,
     health,
-  } = getVerifiedPayrollInsuranceForMonth(year, month);
+  } = getDeductionSettingsForMonth(year, month);
 
   const annualizedPay = totalPay * 12;
   let rawIncomeTax;
@@ -6544,8 +6919,14 @@ function calculatePayrollDeductions(year, month, totalPay) {
       incomeTaxConstant;
   }
 
-  const incomeTax = truncatePayrollToTen(
+  const verifiedFamilyOneIncomeTax = truncatePayrollToTen(
     rawIncomeTax,
+  );
+  const incomeTax = applyDependentFamilyCountToIncomeTax(
+    verifiedFamilyOneIncomeTax,
+    totalPay,
+    pension,
+    dependentFamilyCount,
   );
 
   const localIncomeTax = truncatePayrollToTen(
@@ -8646,6 +9027,18 @@ function syncSalaryInputs() {
   baseHourlyWageInput.value = settings.baseHourlyWage || "";
   longevityAllowanceInput.value = settings.longevityAllowance || "";
   otherAllowanceInput.value = settings.otherAllowance || "";
+
+  const deductionSettings = getDeductionSettingsForMonth(
+    salarySelectedYear,
+    salarySelectedMonth,
+  );
+  dependentFamilyCountInput.value =
+    deductionSettings.dependentFamilyCount || 1;
+  pensionDeductionSettingInput.value =
+    deductionSettings.pension || "";
+  healthDeductionSettingInput.value =
+    deductionSettings.health || "";
+
   safetyAllowanceOutput.textContent = formatMoneyValue(
     FIXED_SAFETY_ALLOWANCE,
   );
