@@ -2749,8 +2749,8 @@ async function closeSalarySettingsToPayment() {
         { transform: "translateY(-34px)", opacity: 0.92 },
       ],
       {
-        duration: 125,
-        easing: "cubic-bezier(0.4, 0, 1, 1)",
+        duration: 230,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
       },
     );
 
@@ -2767,7 +2767,7 @@ async function closeSalarySettingsToPayment() {
         { transform: "translateY(0)", opacity: 1 },
       ],
       {
-        duration: 175,
+        duration: 270,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)",
       },
     );
