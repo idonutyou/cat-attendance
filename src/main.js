@@ -3328,7 +3328,7 @@ salaryDetailCard.addEventListener(
      * 위/아래 어느 방향으로 스와이프해도 기존 급여 요약 화면으로
      * 자연스럽게 넘어가면서 닫힌다.
      */
-    moveSalaryMobilePage(distance < 0 ? 1 : -1);
+    moveSalaryMobilePage(distance < 0 ? -1 : 1);
   },
   { passive: false },
 );
@@ -3357,7 +3357,7 @@ salaryDetailCard.addEventListener(
     salarySettingsSwipeHandled = false;
 
     if (shouldCloseSettings) {
-      moveSalaryMobilePage(distance < 0 ? 1 : -1);
+      moveSalaryMobilePage(distance < 0 ? -1 : 1);
     }
   },
   { passive: true },
