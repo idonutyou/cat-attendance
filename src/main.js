@@ -15,6 +15,7 @@ import "./v140-overrides.css";
 import "./v150-overrides.css";
 import "./v176-overrides.css";
 import "./v177-overrides.css";
+import "./v178-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";

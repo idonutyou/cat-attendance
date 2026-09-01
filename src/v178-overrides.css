@@ -1,0 +1,128 @@
+/* v178 - fit the entire salary + deduction settings panel in one mobile screen */
+@media (max-width: 640px) {
+  .salary-settings-expanded .settings-panel {
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 12px 14px 12px !important;
+    overflow: hidden !important;
+  }
+
+  .salary-settings-expanded .settings-panel h3 {
+    margin: 0 0 6px !important;
+    font-size: 20px !important;
+    line-height: 1.2 !important;
+  }
+
+  .salary-settings-expanded .salary-input-row {
+    min-height: 38px !important;
+    gap: 8px !important;
+    margin: 0 !important;
+    font-size: 15px !important;
+    line-height: 1.15 !important;
+  }
+
+  .salary-settings-expanded .salary-input-row + .salary-input-row {
+    margin-top: 2px !important;
+  }
+
+  .salary-settings-expanded .salary-input-row > span:first-child {
+    font-size: 15px !important;
+    line-height: 1.15 !important;
+  }
+
+  .salary-settings-expanded .input-with-unit {
+    min-height: 36px !important;
+    height: 36px !important;
+    padding: 0 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .salary-settings-expanded .input-with-unit input {
+    min-height: 0 !important;
+    height: 34px !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+  }
+
+  .salary-settings-expanded .input-with-unit > span,
+  .salary-settings-expanded .salary-inline-output,
+  .salary-settings-expanded .salary-inline-output output,
+  .salary-settings-expanded .salary-inline-output > span {
+    font-size: 15px !important;
+    line-height: 1.1 !important;
+  }
+
+  .salary-settings-expanded .formula-note {
+    margin: 4px 0 0 !important;
+    padding: 6px 9px !important;
+    min-height: 0 !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    border-radius: 10px !important;
+  }
+
+  .salary-settings-expanded .salary-deduction-settings-block {
+    margin-top: 7px !important;
+    padding-top: 7px !important;
+  }
+
+  .salary-settings-expanded .salary-deduction-settings-block h4 {
+    margin: 0 0 5px !important;
+    font-size: 19px !important;
+    line-height: 1.2 !important;
+  }
+
+  .salary-settings-expanded .salary-deduction-settings-block .salary-input-row + .salary-input-row {
+    margin-top: 2px !important;
+  }
+
+  .salary-settings-expanded .salary-dependent-family-note {
+    margin: 0 0 2px !important;
+    padding-left: 1px !important;
+    font-size: 10.5px !important;
+    line-height: 1.15 !important;
+  }
+
+  .salary-settings-expanded .salary-deduction-period-note {
+    margin-top: 4px !important;
+    padding: 6px 8px !important;
+    font-size: 10.5px !important;
+    line-height: 1.2 !important;
+  }
+}
+
+/* Short Galaxy-sized viewports get one extra compact step. */
+@media (max-width: 640px) and (max-height: 760px) {
+  .salary-settings-expanded .settings-panel {
+    padding-top: 9px !important;
+    padding-bottom: 9px !important;
+  }
+
+  .salary-settings-expanded .settings-panel h3 {
+    font-size: 18px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .salary-settings-expanded .salary-input-row {
+    min-height: 34px !important;
+    font-size: 14px !important;
+  }
+
+  .salary-settings-expanded .salary-input-row > span:first-child {
+    font-size: 14px !important;
+  }
+
+  .salary-settings-expanded .input-with-unit {
+    height: 32px !important;
+    min-height: 32px !important;
+  }
+
+  .salary-settings-expanded .input-with-unit input {
+    height: 30px !important;
+    font-size: 15px !important;
+  }
+
+  .salary-settings-expanded .salary-deduction-settings-block h4 {
+    font-size: 17px !important;
+  }
+}
