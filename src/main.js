@@ -753,6 +753,8 @@ let salaryMobileCollapseAfterTransition = false;
 let salaryMobileCollapseSettingsAfterTransition = false;
 let salaryMobilePendingBonusOpen = false;
 let salaryMobilePendingDetailOpen = false;
+let salaryMobileBonusContentMode = "bonus";
+let salaryMobileRestoreSettingsAfterTransition = false;
 let salaryMobilePointerStartX = null;
 let salaryMobilePointerStartY = null;
 let salaryMobilePointerId = null;
@@ -1379,16 +1381,6 @@ app.innerHTML = `
                         <option value="8">8</option>
                         <option value="9">9</option>
                         <option value="10">10</option>
-                        <option value="11">11</option>
-                        <option value="12">12</option>
-                        <option value="13">13</option>
-                        <option value="14">14</option>
-                        <option value="15">15</option>
-                        <option value="16">16</option>
-                        <option value="17">17</option>
-                        <option value="18">18</option>
-                        <option value="19">19</option>
-                        <option value="20">20</option>
                       </select>
                       <span>명</span>
                     </div>
@@ -2011,12 +2003,17 @@ const salaryBonusSection = document.querySelector(
 const salaryBonusToggle = document.querySelector(
   "#salaryBonusToggle",
 );
+const salaryBonusTitle = document.querySelector(
+  "#salaryBonusTitle",
+);
 const salaryBonusPanel = document.querySelector(
   "#salaryBonusPanel",
 );
 const salaryBonusRows = document.querySelector(
   "#salaryBonusRows",
 );
+const salarySettingsOriginalParent = salarySettingsPanel.parentElement;
+const salarySettingsOriginalNextSibling = salarySettingsPanel.nextSibling;
 const exitToast = document.querySelector("#exitToast");
 const summaryCard = document.querySelector("#summaryCard");
 const summaryCarousel = document.querySelector("#summaryCarousel");
@@ -2668,6 +2665,11 @@ function finishSalaryMobileTransition() {
     salaryMobileCollapseAfterTransition = false;
     salaryBonusOpen = false;
     updateSalaryBonusVisibility({ skipPagerSync: true });
+
+    if (salaryMobileRestoreSettingsAfterTransition) {
+      salaryMobileRestoreSettingsAfterTransition = false;
+      restoreSalarySettingsFromBonusCard();
+    }
   }
 
   if (salaryMobileCollapseSettingsAfterTransition) {
@@ -2867,6 +2869,10 @@ function moveSalaryMobilePage(direction) {
   }
 
   if (salaryMobilePageIndex === 1) {
+    if (salaryMobileBonusContentMode === "settings") {
+      salaryMobileRestoreSettingsAfterTransition = true;
+    }
+
     setSalaryMobilePage(direction > 0 ? 2 : 0, {
       collapseBonusAfter: true,
     });
@@ -2893,7 +2899,106 @@ function moveSalaryMobilePage(direction) {
   }
 }
 
+function restoreSalarySettingsFromBonusCard() {
+  if (salaryMobileBonusContentMode !== "settings") {
+    return;
+  }
+
+  salaryMobileBonusContentMode = "bonus";
+  salarySettingsOpen = false;
+
+  if (salarySettingsOriginalParent) {
+    if (
+      salarySettingsOriginalNextSibling &&
+      salarySettingsOriginalNextSibling.parentNode === salarySettingsOriginalParent
+    ) {
+      salarySettingsOriginalParent.insertBefore(
+        salarySettingsPanel,
+        salarySettingsOriginalNextSibling,
+      );
+    } else {
+      salarySettingsOriginalParent.appendChild(salarySettingsPanel);
+    }
+  }
+
+  salarySettingsPanel.removeAttribute("style");
+  salaryBonusRows.hidden = false;
+  salaryBonusTitle.textContent = "상여 및 보너스";
+  salaryBonusCard.classList.remove("salary-settings-in-bonus-page");
+  salaryBonusPanel.classList.remove("salary-settings-host-panel");
+
+  applySalarySettingsLocalState();
+}
+
+function prepareSalaryBonusCardForSettings() {
+  salaryMobileBonusContentMode = "settings";
+  salarySettingsOpen = true;
+  salaryBonusOpen = true;
+
+  salaryBonusTitle.textContent = "급여 및 공제 내역 설정";
+  salaryBonusRows.hidden = true;
+  salaryBonusCard.classList.add("salary-settings-in-bonus-page");
+  salaryBonusPanel.classList.add("salary-settings-host-panel");
+
+  salaryBonusPanel.appendChild(salarySettingsPanel);
+  salarySettingsPanel.hidden = false;
+  Object.assign(salarySettingsPanel.style, {
+    width: "100%",
+    height: "100%",
+    minHeight: "0",
+    margin: "0",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+  });
+
+  applySalarySettingsLocalState();
+  updateSalaryBonusVisibility({ skipPagerSync: true });
+}
+
+function openSalarySettingsMobilePage() {
+  if (!isSalaryMobilePager() || currentAppPage !== "salary") {
+    return;
+  }
+
+  if (
+    salaryMobileBonusContentMode === "settings" &&
+    salaryMobilePageIndex === 1 &&
+    !salaryMobilePageTransitioning
+  ) {
+    return;
+  }
+
+  if (salaryMobilePageTransitioning) {
+    return;
+  }
+
+  prepareSalaryBonusCardForSettings();
+
+  if (salaryMobilePageIndex === 1) {
+    applySalaryMobilePageState({ immediate: true });
+    return;
+  }
+
+  /*
+   * 별도 급여설정 전환을 만들지 않는다.
+   * 상여/보너스가 실제로 사용하는 같은 setSalaryMobilePage()를 그대로 사용한다.
+   */
+  setSalaryMobilePage(1);
+}
+
+function prepareSalaryBonusCardForBonus() {
+  if (salaryMobileBonusContentMode === "settings") {
+    restoreSalarySettingsFromBonusCard();
+  }
+
+  salaryMobileBonusContentMode = "bonus";
+  salaryBonusRows.hidden = false;
+  salaryBonusTitle.textContent = "상여 및 보너스";
+}
+
 function openSalaryBonusMobilePage() {
+  prepareSalaryBonusCardForBonus();
+
   if (!isSalaryMobilePager() || currentAppPage !== "salary") {
     return;
   }
@@ -3030,7 +3135,12 @@ salaryBonusLauncher.addEventListener("click", openSalaryBonusMobilePage);
 salaryBonusToggle.addEventListener("click", () => {
   if (isSalaryMobilePager()) {
     if (salaryMobilePageIndex === 1) {
-      setSalaryMobilePage(0, { collapseBonusAfter: true });
+      if (salaryMobileBonusContentMode === "settings") {
+        salaryMobileRestoreSettingsAfterTransition = true;
+        setSalaryMobilePage(2, { collapseBonusAfter: true });
+      } else {
+        setSalaryMobilePage(0, { collapseBonusAfter: true });
+      }
     }
     return;
   }
@@ -3306,6 +3416,10 @@ salaryBonusRows.addEventListener("input", (event) => {
 });
 
 function applySalarySettingsLocalState() {
+  const settingsHostedOnBonusPage =
+    isSalaryMobilePager() &&
+    salaryMobileBonusContentMode === "settings";
+
   salarySettingsPanel.hidden = !salarySettingsOpen;
   salarySettingsToggle.setAttribute(
     "aria-expanded",
@@ -3313,98 +3427,26 @@ function applySalarySettingsLocalState() {
   );
   salaryPageLayout.classList.toggle(
     "salary-settings-expanded",
-    salarySettingsOpen,
+    salarySettingsOpen && !settingsHostedOnBonusPage,
   );
   salaryDetailCard.classList.toggle(
     "salary-detail-compact",
-    !salarySettingsOpen,
+    !salarySettingsOpen || settingsHostedOnBonusPage,
   );
 }
 
-async function transitionSalarySettingsLikeBonus(nextOpen) {
-  if (
-    !isSalaryMobilePager() ||
-    currentAppPage !== "salary" ||
-    salaryMobilePageIndex !== 2
-  ) {
-    salarySettingsOpen = nextOpen;
-    updateSalarySettingsVisibility();
-
-    if (salarySettingsOpen) {
-      salaryDetailCard.scrollTop = 0;
-    }
-    return;
-  }
-
-  if (
-    salaryMobilePageTransitioning ||
-    nextOpen === salarySettingsOpen
-  ) {
-    return;
-  }
-
-  const salaryLayout = salarySettingsPanel.parentElement;
-
-  if (!salaryLayout) {
-    salarySettingsOpen = nextOpen;
-    updateSalarySettingsVisibility();
-    return;
-  }
-
-  salaryMobilePageTransitioning = true;
-  armCalendarSwipeTapRecovery();
-  salaryDetailCard.scrollTop = 0;
-
-  /*
-   * v187:
-   * 상여/보너스 페이지와 같은 순서로 전환한다.
-   * 1) 다음 화면을 화면 밖 위치에서 먼저 준비하고
-   * 2) 한 번의 transform 전환만 실행한 뒤
-   * 3) 전환이 끝난 후 실제 open/close 상태를 확정한다.
-   *
-   * v186처럼 상태 변경 중 updateSalaryScrollSnapState()가 즉시 실행되면
-   * outer pager가 한 프레임 transition:none으로 재적용되어 깜박일 수 있다.
-   * 그래서 전환 중에는 급여 설정의 로컬 상태만 바꾸고 outer pager는 건드리지 않는다.
-   */
-  salaryLayout.classList.add("salary-settings-bonus-pager");
-  salaryLayout.dataset.salarySettingsTogglePage = nextOpen
-    ? "payment"
-    : "settings";
-
-  if (nextOpen) {
-    salarySettingsOpen = true;
-    applySalarySettingsLocalState();
-  }
-
-  // 상여/보너스와 동일하게 시작 위치를 먼저 확정한다.
-  void salaryLayout.offsetHeight;
-
-  await new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        salaryLayout.dataset.salarySettingsTogglePage = nextOpen
-          ? "settings"
-          : "payment";
-        window.setTimeout(resolve, 300);
-      });
-    });
-  });
-
-  if (!nextOpen) {
-    // payment가 완전히 들어온 뒤 보이지 않는 settings를 접는다.
-    salarySettingsOpen = false;
-    applySalarySettingsLocalState();
-  }
-
-  // 실제 최종 상태를 한 프레임 확정한 다음 임시 pager 껍데기만 제거한다.
-  await new Promise((resolve) => requestAnimationFrame(resolve));
-  salaryLayout.classList.remove("salary-settings-bonus-pager");
-  salaryLayout.removeAttribute("data-salary-settings-toggle-page");
-  salaryMobilePageTransitioning = false;
-}
-
 function toggleSalarySettings() {
-  void transitionSalarySettingsLikeBonus(!salarySettingsOpen);
+  if (isSalaryMobilePager()) {
+    openSalarySettingsMobilePage();
+    return;
+  }
+
+  salarySettingsOpen = !salarySettingsOpen;
+  updateSalarySettingsVisibility();
+
+  if (salarySettingsOpen) {
+    salaryDetailCard.scrollTop = 0;
+  }
 }
 
 /*
@@ -4196,7 +4238,7 @@ dependentFamilyCountInput.addEventListener("change", () => {
   } else {
     const familyCount = Math.max(
       1,
-      Math.min(20, Math.trunc(Number(rawValue) || 1)),
+      Math.min(10, Math.trunc(Number(rawValue) || 1)),
     );
 
     settingsByMonth[monthKey] = {
@@ -6861,7 +6903,7 @@ function getDeductionSettingsForMonth(year, month) {
     ? Math.max(
         1,
         Math.min(
-          20,
+          10,
           Math.trunc(
             Number(familyEntries.at(-1)[1].dependentFamilyCount),
           ),
