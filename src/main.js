@@ -22,6 +22,7 @@ import "./v181-overrides.css";
 import "./v184-overrides.css";
 import "./v185-overrides.css";
 import "./v186-overrides.css";
+import "./v190-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -2944,11 +2945,12 @@ function prepareSalaryBonusCardForSettings() {
   salarySettingsPanel.hidden = false;
   Object.assign(salarySettingsPanel.style, {
     width: "100%",
-    height: "100%",
+    height: "auto",
     minHeight: "0",
     margin: "0",
-    overflowY: "auto",
-    overscrollBehavior: "contain",
+    flex: "1 1 auto",
+    overflow: "hidden",
+    overscrollBehavior: "none",
   });
 
   applySalarySettingsLocalState();

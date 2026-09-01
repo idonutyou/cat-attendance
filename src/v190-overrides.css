@@ -1,0 +1,58 @@
+/* v190 - fit hosted salary settings to one mobile page and restore swipe close */
+@media (max-width: 620px) {
+  /*
+   * The settings panel now lives inside the same page that is used by
+   * "상여 및 보너스".  Do not give the inner panel another 100% height or
+   * its own scroll container: header + 100% panel was what created the
+   * extra scrollbar seen in v189.
+   */
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page {
+    overflow: hidden !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-section {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-toggle {
+    flex: 0 0 auto !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    /* Let the existing salary pager own vertical swipes instead of native scrolling. */
+    touch-action: pan-x !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel
+    > .settings-panel {
+    display: block !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    box-sizing: border-box !important;
+  }
+}
