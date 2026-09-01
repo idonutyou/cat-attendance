@@ -1,0 +1,40 @@
+/* v185 - keep salary payment view at its final size during settings swipe */
+@media (max-width: 620px) {
+  .salary-payment-transition-snapshot {
+    overflow: hidden !important;
+    transform: translate3d(0, 100%, 0);
+    transition: transform 270ms cubic-bezier(0.22, 0.61, 0.36, 1) !important;
+    backface-visibility: hidden;
+    will-change: transform;
+    contain: layout paint;
+  }
+
+  .salary-payment-transition-snapshot.is-entering {
+    transform: translate3d(0, 0, 0);
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-settings-transition-source
+    > .salary-heading,
+  html.salary-mobile-pager-enabled
+    .salary-settings-transition-source
+    .settings-panel {
+    transition: transform 270ms cubic-bezier(0.22, 0.61, 0.36, 1) !important;
+    backface-visibility: hidden;
+    will-change: transform;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-settings-transition-source.is-settings-leaving
+    > .salary-heading,
+  html.salary-mobile-pager-enabled
+    .salary-settings-transition-source.is-settings-leaving
+    .settings-panel {
+    transform: translate3d(0, -100vh, 0) !important;
+  }
+
+  /* A fixed transition snapshot is already the final compact payment layout. */
+  .salary-payment-transition-snapshot .settings-panel {
+    display: none !important;
+  }
+}

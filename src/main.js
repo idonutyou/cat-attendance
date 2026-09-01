@@ -20,6 +20,7 @@ import "./v179-overrides.css";
 import "./v180-overrides.css";
 import "./v181-overrides.css";
 import "./v184-overrides.css";
+import "./v185-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -2740,47 +2741,98 @@ async function closeSalarySettingsToPayment() {
     return;
   }
 
-  const salaryLayout = salaryDetailCard.querySelector(".salary-layout");
-
-  if (!salaryLayout) {
-    salarySettingsOpen = false;
-    salaryDetailCard.scrollTop = 0;
-    updateSalarySettingsVisibility();
-    return;
-  }
-
   salaryMobilePageTransitioning = true;
   armCalendarSwipeTapRecovery();
 
   /*
-   * 월별 급여 화면 전환과 완전히 같은 방식으로 처리한다.
-   * 두 화면을 위·아래로 겹쳐 놓고 translate3d를 한 번에 바꾸며,
-   * 시간(270ms)과 easing도 salary-page-layout의 모바일 페이지 전환과 같다.
+   * v185:
+   * 설정이 열린 상태의 payment-panel을 직접 움직이면 전환 중에는
+   * salary-detail-compact가 아직 적용되지 않아 지급/공제 화면의 폭과 높이가
+   * 작게 렌더링되고, 전환 종료 후 compact 레이아웃이 적용되면서 다시 커졌다.
+   *
+   * 그래서 실제 최종 급여내역 화면을 미리 복제해 정확한 최종 크기로 만든 뒤
+   * 아래에서 위로 한 번만 slide-in 한다. 원래 설정 화면은 같은 시간에 위로
+   * slide-out 하고, 애니메이션이 끝난 뒤에만 실제 상태를 닫는다.
+   * 전환 중/후의 급여내역 레이아웃 크기가 동일하므로 크기 튐이 없다.
    */
-  salaryLayout.classList.add("salary-settings-inner-pager");
-  salaryLayout.dataset.salarySettingsPage = "settings";
+  const cardRect = salaryDetailCard.getBoundingClientRect();
+  const paymentSnapshot = salaryDetailCard.cloneNode(true);
 
-  // 첫 상태를 실제 프레임에 확정한 다음 같은 pager transition으로 이동한다.
-  void salaryLayout.offsetHeight;
+  paymentSnapshot.removeAttribute("id");
+  paymentSnapshot.setAttribute("aria-hidden", "true");
+  paymentSnapshot.inert = true;
+  paymentSnapshot.classList.add(
+    "salary-detail-compact",
+    "salary-payment-transition-snapshot",
+  );
+
+  const snapshotHeading = paymentSnapshot.querySelector(".salary-heading h2");
+  const snapshotSettingsToggle = paymentSnapshot.querySelector(
+    ".salary-settings-toggle",
+  );
+  const snapshotSettingsPanel = paymentSnapshot.querySelector(".settings-panel");
+  const snapshotPaymentPanel = paymentSnapshot.querySelector(".payment-panel");
+
+  if (snapshotHeading) {
+    snapshotHeading.textContent = salaryMonthTitle.textContent;
+  }
+
+  if (snapshotSettingsToggle) {
+    snapshotSettingsToggle.setAttribute("aria-expanded", "false");
+  }
+
+  if (snapshotSettingsPanel) {
+    snapshotSettingsPanel.hidden = true;
+  }
+
+  if (snapshotPaymentPanel) {
+    snapshotPaymentPanel.style.removeProperty("display");
+  }
+
+  Object.assign(paymentSnapshot.style, {
+    position: "fixed",
+    left: `${cardRect.left}px`,
+    top: `${cardRect.top}px`,
+    width: `${cardRect.width}px`,
+    height: `${cardRect.height}px`,
+    minHeight: "0",
+    maxHeight: "none",
+    margin: "0",
+    zIndex: "40",
+    pointerEvents: "none",
+  });
+
+  document.body.appendChild(paymentSnapshot);
+  salaryDetailCard.classList.add("salary-settings-transition-source");
+
+  // 시작 상태를 한 프레임 확정한 뒤, 월별 급여 pager와 같은 270ms/easing으로 이동한다.
+  void paymentSnapshot.offsetHeight;
 
   await new Promise((resolve) => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        salaryLayout.dataset.salarySettingsPage = "payment";
+        paymentSnapshot.classList.add("is-entering");
+        salaryDetailCard.classList.add("is-settings-leaving");
         window.setTimeout(resolve, 300);
       });
     });
   });
 
+  // 최종 화면이 snapshot에 완전히 가려진 상태에서 실제 레이아웃을 최종 상태로 만든다.
   salarySettingsOpen = false;
   salaryDetailCard.scrollTop = 0;
   updateSalarySettingsVisibility();
 
-  salaryLayout.classList.remove("salary-settings-inner-pager");
-  salaryLayout.removeAttribute("data-salary-settings-page");
+  salaryDetailCard.classList.remove(
+    "salary-settings-transition-source",
+    "is-settings-leaving",
+  );
+
+  // 실제 최종 화면과 snapshot이 동일한 프레임에서 snapshot만 제거한다.
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  paymentSnapshot.remove();
   salaryMobilePageTransitioning = false;
 }
-
 function moveSalaryMobilePage(direction) {
   if (
     !isSalaryMobilePager() ||
