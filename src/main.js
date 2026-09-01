@@ -14,6 +14,7 @@ import "./v137-overrides.css";
 import "./v140-overrides.css";
 import "./v150-overrides.css";
 import "./v176-overrides.css";
+import "./v177-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -1350,7 +1351,7 @@ app.innerHTML = `
                   <h4>공제 내역 설정</h4>
 
                   <label class="salary-input-row">
-                    <span>공제대상 가족 수</span>
+                    <span>공제대상 가족 수 (본인 포함)</span>
 
                     <div class="input-with-unit">
                       <input
@@ -1366,6 +1367,10 @@ app.innerHTML = `
                       <span>명</span>
                     </div>
                   </label>
+
+                  <p class="salary-dependent-family-note">
+                    본인만 해당되는 경우 1명
+                  </p>
 
                   <label class="salary-input-row">
                     <span>국민연금</span>
@@ -3244,25 +3249,16 @@ salaryDetailCard.addEventListener(
     const distance = typeof currentY === "number"
       ? currentY - salarySettingsSwipeStartY
       : 0;
-    const isAtTop = salaryDetailCard.scrollTop <= 2;
-    const isAtBottom =
-      salaryDetailCard.scrollTop + salaryDetailCard.clientHeight >=
-      salaryDetailCard.scrollHeight - 2;
-    const shouldReturnToOverview =
-      (distance >= 48 && isAtTop) ||
-      (distance <= -48 && isAtBottom);
 
-    if (!shouldReturnToOverview) {
+    if (Math.abs(distance) < 56) {
       return;
     }
 
     event.preventDefault();
     salarySettingsSwipeHandled = true;
     salarySettingsSwipeStartY = null;
-
-    setSalaryMobilePage(0, {
-      collapseSettingsAfter: true,
-    });
+    salarySettingsOpen = false;
+    updateSalarySettingsVisibility();
   },
   { passive: false },
 );
@@ -3285,21 +3281,14 @@ salaryDetailCard.addEventListener(
     const distance = typeof endY === "number"
       ? endY - salarySettingsSwipeStartY
       : 0;
-    const isAtTop = salaryDetailCard.scrollTop <= 2;
-    const isAtBottom =
-      salaryDetailCard.scrollTop + salaryDetailCard.clientHeight >=
-      salaryDetailCard.scrollHeight - 2;
-    const shouldReturnToOverview =
-      (distance >= 48 && isAtTop) ||
-      (distance <= -48 && isAtBottom);
+    const shouldCloseSettings = Math.abs(distance) >= 56;
 
     salarySettingsSwipeStartY = null;
     salarySettingsSwipeHandled = false;
 
-    if (shouldReturnToOverview) {
-      setSalaryMobilePage(0, {
-        collapseSettingsAfter: true,
-      });
+    if (shouldCloseSettings) {
+      salarySettingsOpen = false;
+      updateSalarySettingsVisibility();
     }
   },
   { passive: true },
