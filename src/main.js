@@ -3305,6 +3305,22 @@ salaryBonusRows.addEventListener("input", (event) => {
   updateBonusEntryFromControl(control);
 });
 
+function applySalarySettingsLocalState() {
+  salarySettingsPanel.hidden = !salarySettingsOpen;
+  salarySettingsToggle.setAttribute(
+    "aria-expanded",
+    String(salarySettingsOpen),
+  );
+  salaryPageLayout.classList.toggle(
+    "salary-settings-expanded",
+    salarySettingsOpen,
+  );
+  salaryDetailCard.classList.toggle(
+    "salary-detail-compact",
+    !salarySettingsOpen,
+  );
+}
+
 async function transitionSalarySettingsLikeBonus(nextOpen) {
   if (
     !isSalaryMobilePager() ||
@@ -3340,22 +3356,27 @@ async function transitionSalarySettingsLikeBonus(nextOpen) {
   salaryDetailCard.scrollTop = 0;
 
   /*
-   * v186:
-   * 모바일 급여 설정 버튼도 상여/보너스 페이지와 같은 방식으로 움직인다.
-   * 현재 화면은 -100%, 다음 화면은 +100%에서 0으로 이동하며,
-   * 실제 급여 모바일 pager와 동일한 270ms/easing을 CSS에서 사용한다.
+   * v187:
+   * 상여/보너스 페이지와 같은 순서로 전환한다.
+   * 1) 다음 화면을 화면 밖 위치에서 먼저 준비하고
+   * 2) 한 번의 transform 전환만 실행한 뒤
+   * 3) 전환이 끝난 후 실제 open/close 상태를 확정한다.
+   *
+   * v186처럼 상태 변경 중 updateSalaryScrollSnapState()가 즉시 실행되면
+   * outer pager가 한 프레임 transition:none으로 재적용되어 깜박일 수 있다.
+   * 그래서 전환 중에는 급여 설정의 로컬 상태만 바꾸고 outer pager는 건드리지 않는다.
    */
   salaryLayout.classList.add("salary-settings-bonus-pager");
+  salaryLayout.dataset.salarySettingsTogglePage = nextOpen
+    ? "payment"
+    : "settings";
 
   if (nextOpen) {
     salarySettingsOpen = true;
-    updateSalarySettingsVisibility();
-    salaryLayout.dataset.salarySettingsTogglePage = "payment";
-  } else {
-    salaryLayout.dataset.salarySettingsTogglePage = "settings";
+    applySalarySettingsLocalState();
   }
 
-  // 시작 위치를 실제 한 프레임 렌더링한 뒤 상여/보너스와 같은 한 번의 slide를 실행한다.
+  // 상여/보너스와 동일하게 시작 위치를 먼저 확정한다.
   void salaryLayout.offsetHeight;
 
   await new Promise((resolve) => {
@@ -3370,10 +3391,13 @@ async function transitionSalarySettingsLikeBonus(nextOpen) {
   });
 
   if (!nextOpen) {
+    // payment가 완전히 들어온 뒤 보이지 않는 settings를 접는다.
     salarySettingsOpen = false;
-    updateSalarySettingsVisibility();
+    applySalarySettingsLocalState();
   }
 
+  // 실제 최종 상태를 한 프레임 확정한 다음 임시 pager 껍데기만 제거한다.
+  await new Promise((resolve) => requestAnimationFrame(resolve));
   salaryLayout.classList.remove("salary-settings-bonus-pager");
   salaryLayout.removeAttribute("data-salary-settings-toggle-page");
   salaryMobilePageTransitioning = false;
@@ -3511,15 +3535,7 @@ salaryDetailCard.addEventListener(
 );
 
 function updateSalarySettingsVisibility() {
-  salarySettingsPanel.hidden = !salarySettingsOpen;
-  salarySettingsToggle.setAttribute(
-    "aria-expanded",
-    String(salarySettingsOpen),
-  );
-  salaryPageLayout.classList.toggle(
-    "salary-settings-expanded",
-    salarySettingsOpen,
-  );
+  applySalarySettingsLocalState();
   updateSalaryScrollSnapState();
 }
 
