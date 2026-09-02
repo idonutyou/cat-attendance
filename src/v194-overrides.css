@@ -1,0 +1,163 @@
+/* v194 - compact hosted salary settings so the whole form fits one mobile screen */
+@media (max-width: 620px) {
+  /* Keep the existing pager/swipe structure. Only reduce visual spacing. */
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-toggle {
+    flex: 0 0 48px !important;
+    min-height: 48px !important;
+    padding: 0 12px !important;
+    font-size: 16px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel {
+    padding: 0 6px 6px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .salary-bonus-panel.salary-settings-host-panel
+    > .settings-panel {
+    padding: 8px 10px 6px !important;
+    border-radius: 14px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel h3 {
+    margin: 0 0 5px !important;
+    font-size: 15px !important;
+    line-height: 1.15 !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-input-row {
+    min-height: 34px !important;
+    margin: 0 0 4px !important;
+    gap: 8px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-input-row > span,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-dependent-family-label {
+    font-size: 12.5px !important;
+    line-height: 1.15 !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-dependent-family-label {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 4px !important;
+    white-space: nowrap !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-dependent-family-sublabel {
+    font-size: 10.5px !important;
+  }
+
+  /* All editable boxes, including family count, stay exactly the same height. */
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-input-row .input-with-unit,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-input-row .salary-family-select-control,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-output-row .salary-inline-output,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-fixed-output-row .salary-inline-output {
+    height: 34px !important;
+    min-height: 34px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .input-with-unit input {
+    height: 32px !important;
+    min-height: 0 !important;
+    padding: 0 5px 0 11px !important;
+    line-height: 32px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-output-row .salary-inline-output output {
+    padding: 0 5px 0 11px !important;
+    line-height: 32px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-output-row .salary-inline-output span,
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .input-with-unit > span {
+    line-height: 32px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-family-select-control .salary-number-select {
+    height: 32px !important;
+    min-height: 0 !important;
+    line-height: 32px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .formula-note {
+    margin: 4px 0 0 !important;
+    padding: 5px 8px !important;
+    border-radius: 9px !important;
+    font-size: 9.5px !important;
+    line-height: 1.25 !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-deduction-settings-block {
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-deduction-settings-block h4 {
+    margin: 0 0 6px !important;
+    font-size: 15px !important;
+    line-height: 1.15 !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-dependent-family-note {
+    margin: -1px 0 4px !important;
+    font-size: 10.5px !important;
+    line-height: 1.2 !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-deduction-period-note {
+    margin: 3px 0 4px !important;
+    padding: 5px 8px !important;
+  }
+
+  html.salary-mobile-pager-enabled
+    .salary-bonus-card.salary-settings-in-bonus-page
+    .settings-panel .salary-deduction-period-note:last-child {
+    margin-bottom: 0 !important;
+  }
+}
