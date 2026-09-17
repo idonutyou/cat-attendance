@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Build CAT Android Widget APK
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -17,6 +22,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     steps:
@@ -34,6 +40,15 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Add latest CAT widget APK to Pages
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 \
+            --output dist/CAT-widget.apk \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/widget-latest/CAT-widget.apk"
+          test -s dist/CAT-widget.apk
+          echo "CAT widget APK added to GitHub Pages: $(wc -c < dist/CAT-widget.apk) bytes"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
