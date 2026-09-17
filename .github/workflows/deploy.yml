@@ -70,3 +70,46 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+
+  notify:
+    if: ${{ always() && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - deploy
+
+    steps:
+      - name: Send web deploy phone notification
+        shell: bash
+        env:
+          CAT_NTFY_TOPIC: ${{ secrets.CAT_NTFY_TOPIC }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+        run: |
+          if [ -z "${CAT_NTFY_TOPIC}" ]; then
+            echo "CAT_NTFY_TOPIC is not configured; skipping phone notification."
+            exit 0
+          fi
+
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          if [ "${BUILD_RESULT}" = "success" ] && [ "${DEPLOY_RESULT}" = "success" ]; then
+            TITLE="CAT 웹앱 배포 완료"
+            MESSAGE="CAT 웹앱 GitHub Pages 업데이트가 완료됐습니다."
+            TAGS="white_check_mark,computer"
+            PRIORITY="default"
+          else
+            TITLE="CAT 웹앱 배포 실패"
+            MESSAGE="CAT 웹앱 업데이트가 실패했습니다. GitHub Actions 로그를 확인해 주세요."
+            TAGS="x,warning,computer"
+            PRIORITY="high"
+          fi
+
+          curl --fail --silent --show-error \
+            -H "Title: ${TITLE}" \
+            -H "Priority: ${PRIORITY}" \
+            -H "Tags: ${TAGS}" \
+            -H "Click: ${RUN_URL}" \
+            -d "${MESSAGE}" \
+            "https://ntfy.sh/${CAT_NTFY_TOPIC}"
+
