@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-widget-apk:
@@ -71,7 +71,13 @@ jobs:
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPO="${GITHUB_REPOSITORY##*/}"
           APP_URL="https://${OWNER}.github.io/${REPO}/"
+          AUTO_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))
+          AUTO_VERSION_NAME="1.29.${GITHUB_RUN_NUMBER}"
           echo "CAT_APP_URL=${APP_URL}"
+          echo "Widget versionCode=${AUTO_VERSION_CODE}"
+          echo "Widget versionName=${AUTO_VERSION_NAME}"
+          sed -i -E "s/versionCode [0-9]+/versionCode ${AUTO_VERSION_CODE}/" android-widget/app/build.gradle
+          sed -i -E "s/versionName '[^']+'/versionName '${AUTO_VERSION_NAME}'/" android-widget/app/build.gradle
           gradle -p android-widget :app:assembleRelease -PCAT_APP_URL="${APP_URL}"
 
       - name: Verify APK signature
@@ -87,3 +93,19 @@ jobs:
         with:
           name: CAT-widget-v122-signed-apk
           path: android-widget/app/build/outputs/apk/release/app-release.apk
+      - name: Publish latest widget APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p release
+          cp android-widget/app/build/outputs/apk/release/app-release.apk release/CAT-widget.apk
+
+          if gh release view widget-latest >/dev/null 2>&1; then
+            gh release upload widget-latest release/CAT-widget.apk --clobber
+          else
+            gh release create widget-latest release/CAT-widget.apk \
+              --title "CAT Widget Latest" \
+              --notes "CAT 위젯 최신 설치 파일입니다. WIDGET 버튼에서 이 파일을 사용합니다."
+          fi
+

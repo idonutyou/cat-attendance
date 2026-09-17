@@ -72,7 +72,7 @@ const APP_PAGE_TITLES = {
 const FIXED_SAFETY_ALLOWANCE = 50000;
 
 const WIDGET_INSTALL_URL_KEY = "cat-widget-install-url-v1";
-const DEFAULT_WIDGET_INSTALL_URL = "";
+const DEFAULT_WIDGET_INSTALL_URL = "https://github.com/idonutyou/cat-attendance/releases/download/widget-latest/CAT-widget.apk";
 const widgetInstallImageUrl = `${import.meta.env.BASE_URL}android-widget-user.png`;
 
 const CAT_BROWSER_ENV = (() => {
