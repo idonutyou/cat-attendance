@@ -19,10 +19,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -44,14 +44,8 @@ jobs:
           CAT_WIDGET_KEYSTORE_BASE64: ${{ secrets.CAT_WIDGET_KEYSTORE_BASE64 }}
           CAT_WIDGET_KEYSTORE_PASSWORD: ${{ secrets.CAT_WIDGET_KEYSTORE_PASSWORD }}
         run: |
-          if [ -z "${CAT_WIDGET_KEYSTORE_BASE64}" ]; then
-            echo "::error::Missing repository secret CAT_WIDGET_KEYSTORE_BASE64"
-            exit 1
-          fi
-          if [ -z "${CAT_WIDGET_KEYSTORE_PASSWORD}" ]; then
-            echo "::error::Missing repository secret CAT_WIDGET_KEYSTORE_PASSWORD"
-            exit 1
-          fi
+          test -n "${CAT_WIDGET_KEYSTORE_BASE64}" || { echo "::error::Missing CAT_WIDGET_KEYSTORE_BASE64"; exit 1; }
+          test -n "${CAT_WIDGET_KEYSTORE_PASSWORD}" || { echo "::error::Missing CAT_WIDGET_KEYSTORE_PASSWORD"; exit 1; }
 
       - name: Restore fixed signing keystore
         shell: bash
@@ -71,13 +65,10 @@ jobs:
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPO="${GITHUB_REPOSITORY##*/}"
           APP_URL="https://${OWNER}.github.io/${REPO}/"
-          AUTO_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))
-          AUTO_VERSION_NAME="1.29.${GITHUB_RUN_NUMBER}"
-          echo "CAT_APP_URL=${APP_URL}"
-          echo "Widget versionCode=${AUTO_VERSION_CODE}"
-          echo "Widget versionName=${AUTO_VERSION_NAME}"
-          sed -i -E "s/versionCode [0-9]+/versionCode ${AUTO_VERSION_CODE}/" android-widget/app/build.gradle
-          sed -i -E "s/versionName '[^']+'/versionName '${AUTO_VERSION_NAME}'/" android-widget/app/build.gradle
+          echo "CAT_WIDGET_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "${GITHUB_ENV}"
+          echo "CAT_WIDGET_VERSION_NAME=1.29.${GITHUB_RUN_NUMBER}" >> "${GITHUB_ENV}"
+          export CAT_WIDGET_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))
+          export CAT_WIDGET_VERSION_NAME="1.29.${GITHUB_RUN_NUMBER}"
           gradle -p android-widget :app:assembleRelease -PCAT_APP_URL="${APP_URL}"
 
       - name: Verify APK signature
@@ -88,24 +79,22 @@ jobs:
             --print-certs \
             android-widget/app/build/outputs/apk/release/app-release.apk
 
-      - name: Upload signed APK
+      - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CAT-widget-v122-signed-apk
+          name: CAT-widget-signed-apk
           path: android-widget/app/build/outputs/apk/release/app-release.apk
-      - name: Publish latest widget APK
+
+      - name: Publish fixed latest download
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p release
-          cp android-widget/app/build/outputs/apk/release/app-release.apk release/CAT-widget.apk
-
+          cp android-widget/app/build/outputs/apk/release/app-release.apk CAT-widget.apk
           if gh release view widget-latest >/dev/null 2>&1; then
-            gh release upload widget-latest release/CAT-widget.apk --clobber
+            gh release upload widget-latest CAT-widget.apk --clobber
           else
-            gh release create widget-latest release/CAT-widget.apk \
+            gh release create widget-latest CAT-widget.apk \
               --title "CAT Widget Latest" \
-              --notes "CAT 위젯 최신 설치 파일입니다. WIDGET 버튼에서 이 파일을 사용합니다."
+              --notes "CAT 위젯 최신 설치 파일"
           fi
-

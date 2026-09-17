@@ -11,6 +11,9 @@ def escapedCatAppUrl = rawCatAppUrl
 def widgetKeystorePath = System.getenv("CAT_WIDGET_KEYSTORE_PATH")
 def widgetKeystorePassword = System.getenv("CAT_WIDGET_KEYSTORE_PASSWORD")
 
+def widgetVersionCode = (System.getenv("CAT_WIDGET_VERSION_CODE") ?: "29").toInteger()
+def widgetVersionName = System.getenv("CAT_WIDGET_VERSION_NAME") ?: "1.28.0"
+
 android {
     namespace 'com.cat.attendance.widget'
     compileSdk 36
@@ -19,8 +22,8 @@ android {
         applicationId 'com.cat.attendance.widget'
         minSdk 26
         targetSdk 36
-        versionCode 29
-        versionName '1.28.0'
+        versionCode widgetVersionCode
+        versionName widgetVersionName
         buildConfigField 'String', 'CAT_APP_URL', '"' + escapedCatAppUrl + '"'
     }
 
