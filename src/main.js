@@ -989,14 +989,33 @@ app.innerHTML = `
             id="widgetInstallButton"
             class="widget-install-button"
             type="button"
-            aria-label="CAT 위젯 설치 또는 업데이트"
+            aria-label="CAT 위젯"
           >
-            <span class="widget-install-illustration" aria-hidden="true">
-              <img src="/android-widget-bot.svg" alt="" />
-            </span>
-            <span class="widget-install-copy">
-              <strong>위젯</strong>
-              <span>설치 / 업데이트</span>
+            <span class="widget-install-badge" aria-hidden="true">
+              <span class="widget-install-illustration">
+                <svg
+                  class="widget-install-bot"
+                  viewBox="0 0 128 128"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <defs>
+                    <linearGradient id="widgetBotBody" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#3ddc84" />
+                      <stop offset="100%" stop-color="#22c55e" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M42 25 35 13M86 25l7-12" stroke="#22c55e" stroke-width="6" stroke-linecap="round" fill="none" />
+                  <rect x="34" y="22" width="60" height="34" rx="18" fill="url(#widgetBotBody)" />
+                  <circle cx="53" cy="39" r="3.8" fill="#ffffff" />
+                  <circle cx="75" cy="39" r="3.8" fill="#ffffff" />
+                  <rect x="26" y="54" width="76" height="38" rx="16" fill="url(#widgetBotBody)" />
+                  <rect x="16" y="56" width="12" height="30" rx="6" fill="url(#widgetBotBody)" />
+                  <rect x="100" y="56" width="12" height="30" rx="6" fill="url(#widgetBotBody)" />
+                  <rect x="40" y="88" width="13" height="26" rx="6.5" fill="url(#widgetBotBody)" />
+                  <rect x="75" y="88" width="13" height="26" rx="6.5" fill="url(#widgetBotBody)" />
+                </svg>
+              </span>
+              <span class="widget-install-text">WIDGET</span>
             </span>
           </button>
 
