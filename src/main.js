@@ -73,6 +73,7 @@ const FIXED_SAFETY_ALLOWANCE = 50000;
 
 const WIDGET_INSTALL_URL_KEY = "cat-widget-install-url-v1";
 const DEFAULT_WIDGET_INSTALL_URL = "";
+const widgetInstallImageUrl = `${import.meta.env.BASE_URL}android-widget-user.png`;
 
 const CAT_BROWSER_ENV = (() => {
   const userAgent = navigator.userAgent || "";
@@ -996,7 +997,7 @@ app.innerHTML = `
               <span class="widget-install-illustration">
                 <img
                   class="widget-install-image"
-                  src="/android-widget-user.jpg"
+                  src="${widgetInstallImageUrl}"
                   alt=""
                 />
               </span>

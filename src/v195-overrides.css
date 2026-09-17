@@ -1,4 +1,4 @@
-/* v195: 메뉴에 CAT 위젯 버튼 추가 + 월/일 토글을 오른쪽 정렬 */
+/* v199: approved WIDGET button design from test v7 */
 
 .navigation-utility-row {
   position: absolute;
@@ -18,12 +18,12 @@
   width: 104px;
   min-width: 104px;
   height: 104px;
-  padding: 0;
-  display: block;
+  padding: 8px;
   border: 1px solid #dbe4f2;
   border-radius: 24px;
   background: #ffffff;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
   cursor: pointer;
 }
 
@@ -32,45 +32,44 @@
 }
 
 .widget-install-badge {
-  position: relative;
   width: 100%;
   height: 100%;
-  display: block;
+  display: grid;
+  grid-template-rows: 23px 1fr;
+  align-items: center;
+  gap: 4px;
 }
 
 .widget-install-text {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 2;
-  padding: 4px 10px 5px;
+  justify-self: center;
+  transform: translateY(2px);
+  padding: 4px 12px 5px;
   border-radius: 999px;
   color: #ffffff;
-  background: rgba(30, 41, 59, 0.82);
+  background: rgba(30, 41, 59, 0.84);
   font-size: 11px;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   line-height: 1;
   white-space: nowrap;
 }
 
 .widget-install-illustration {
-  position: absolute;
-  inset: 9px;
-  top: 22px;
+  min-height: 0;
   display: grid;
   place-items: center;
   overflow: hidden;
-  border-radius: 18px;
-  background: #f8fafc;
+  border-radius: 14px;
+  background: #ffffff;
 }
 
 .widget-install-image {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center center;
+  transform: translateY(4px);
 }
 
 .week-start-toggle {
@@ -82,29 +81,4 @@
   margin-left: auto;
   align-self: center;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-}
-
-@media (max-width: 420px) {
-  .navigation-utility-row {
-    gap: 12px;
-  }
-
-  .widget-install-button {
-    flex-basis: 98px;
-    width: 98px;
-    min-width: 98px;
-    height: 98px;
-    border-radius: 22px;
-  }
-
-  .widget-install-text {
-    top: 8px;
-    font-size: 10px;
-  }
-
-  .widget-install-illustration {
-    inset: 8px;
-    top: 20px;
-    border-radius: 16px;
-  }
 }
