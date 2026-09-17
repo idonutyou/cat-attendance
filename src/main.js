@@ -6051,6 +6051,12 @@ function handleAppCloseRequest() {
     return;
   }
 
+  if (currentAppPage !== "attendance") {
+    setAppPage("attendance");
+    resetBackExitState();
+    return;
+  }
+
   if (!exitBackReady) {
     // 첫 번째 Android 뒤로가기는 CloseWatcher가 소비한다.
     // 안내가 보이는 동안에는 watcher를 만들지 않아 두 번째 요청을
@@ -6211,6 +6217,12 @@ function handleAppBackNavigation() {
 
   if (datePickerModal.classList.contains("open")) {
     closeDatePicker();
+    resetBackExitState();
+    return;
+  }
+
+  if (currentAppPage !== "attendance") {
+    setAppPage("attendance");
     resetBackExitState();
     return;
   }
