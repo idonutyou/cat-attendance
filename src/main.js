@@ -2285,7 +2285,7 @@ widgetInstallButton?.addEventListener("click", () => {
     return;
   }
 
-  window.open(widgetInstallUrl, "_blank", "noopener,noreferrer");
+  window.location.assign(widgetInstallUrl);
 });
 
 salaryYearButton.addEventListener("click", () => {
