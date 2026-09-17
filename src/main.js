@@ -26,6 +26,7 @@ import "./v190-overrides.css";
 import "./v191-overrides.css";
 import "./v193-overrides.css";
 import "./v194-overrides.css";
+import "./v195-overrides.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -69,6 +70,9 @@ const APP_PAGE_TITLES = {
 };
 
 const FIXED_SAFETY_ALLOWANCE = 50000;
+
+const WIDGET_INSTALL_URL_KEY = "cat-widget-install-url-v1";
+const DEFAULT_WIDGET_INSTALL_URL = "";
 
 const CAT_BROWSER_ENV = (() => {
   const userAgent = navigator.userAgent || "";
@@ -980,26 +984,43 @@ app.innerHTML = `
           </div>
         </section>
 
-        <div
-          id="weekStartToggle"
-          class="week-start-toggle"
-          role="group"
-          aria-label="달력 시작 요일 선택"
-        >
+        <div class="navigation-utility-row">
           <button
-            class="week-start-option active"
+            id="widgetInstallButton"
+            class="widget-install-button"
             type="button"
-            data-week-start="monday"
-            aria-pressed="true"
-            title="월요일부터 시작"
-          >월 <span aria-hidden="true">›</span></button>
-          <button
-            class="week-start-option"
-            type="button"
-            data-week-start="sunday"
-            aria-pressed="false"
-            title="일요일부터 시작"
-          >일 <span aria-hidden="true">›</span></button>
+            aria-label="CAT 위젯 설치 또는 업데이트"
+          >
+            <span class="widget-install-illustration" aria-hidden="true">
+              <img src="/android-widget-bot.svg" alt="" />
+            </span>
+            <span class="widget-install-copy">
+              <strong>위젯</strong>
+              <span>설치 / 업데이트</span>
+            </span>
+          </button>
+
+          <div
+            id="weekStartToggle"
+            class="week-start-toggle"
+            role="group"
+            aria-label="달력 시작 요일 선택"
+          >
+            <button
+              class="week-start-option active"
+              type="button"
+              data-week-start="monday"
+              aria-pressed="true"
+              title="월요일부터 시작"
+            >월 <span aria-hidden="true">›</span></button>
+            <button
+              class="week-start-option"
+              type="button"
+              data-week-start="sunday"
+              aria-pressed="false"
+              title="일요일부터 시작"
+            >일 <span aria-hidden="true">›</span></button>
+          </div>
         </div>
       </aside>
     </div>
@@ -1924,6 +1945,7 @@ const accountName = document.querySelector("#accountName");
 const accountEmail = document.querySelector("#accountEmail");
 const cloudSyncStatus = document.querySelector("#cloudSyncStatus");
 const accountSwitchButton = document.querySelector("#accountSwitchButton");
+const widgetInstallButton = document.querySelector("#widgetInstallButton");
 const monthTitle = document.querySelector("#monthTitle");
 const calendarGrid = document.querySelector("#calendarGrid");
 const mainCalendarWeekdays = document.querySelector(
@@ -2247,6 +2269,19 @@ googleLoginButton.addEventListener("click", () => {
 
 accountSwitchButton.addEventListener("click", () => {
   returnToLoginChooser();
+});
+
+widgetInstallButton?.addEventListener("click", () => {
+  const widgetInstallUrl = getWidgetInstallUrl();
+
+  if (!widgetInstallUrl) {
+    window.alert(
+      "위젯 설치 링크가 아직 설정되지 않았습니다.\n\nPlay 내부 테스트 링크가 준비되면 이 버튼에 바로 연결할 수 있습니다.",
+    );
+    return;
+  }
+
+  window.open(widgetInstallUrl, "_blank", "noopener,noreferrer");
 });
 
 salaryYearButton.addEventListener("click", () => {
@@ -4356,6 +4391,20 @@ function saveWeekStartPreference() {
       error,
     );
   }
+}
+
+function getWidgetInstallUrl() {
+  try {
+    const savedUrl = localStorage.getItem(WIDGET_INSTALL_URL_KEY)?.trim();
+
+    if (savedUrl) {
+      return savedUrl;
+    }
+  } catch (error) {
+    console.warn("위젯 설치 링크를 불러오지 못했습니다.", error);
+  }
+
+  return DEFAULT_WIDGET_INSTALL_URL;
 }
 
 function getCalendarWeekdays() {

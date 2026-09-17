@@ -1,0 +1,111 @@
+/* v195: 메뉴에 CAT 위젯 설치/업데이트 버튼 추가 + 월/일 토글을 오른쪽 정렬 */
+
+.navigation-utility-row {
+  position: absolute;
+  right: 18px;
+  bottom: calc(max(22px, env(safe-area-inset-bottom)) + 116px);
+  left: 18px;
+  z-index: 2;
+
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.widget-install-button {
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 72px;
+  padding: 10px 14px;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  border: 1px solid #dbe4f2;
+  border-radius: 20px;
+  background: #ffffff;
+  color: #27354c;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  text-align: left;
+  cursor: pointer;
+}
+
+.widget-install-button:hover {
+  background: #f8fbff;
+}
+
+.widget-install-illustration {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ecfdf5 0%, #dcfce7 100%);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.12);
+}
+
+.widget-install-illustration img {
+  width: 38px;
+  height: 38px;
+  display: block;
+}
+
+.widget-install-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.widget-install-copy strong {
+  color: #27354c;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.widget-install-copy span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.week-start-toggle {
+  position: static;
+  right: auto;
+  bottom: auto;
+  flex: 0 0 148px;
+  width: 148px;
+  align-self: center;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+@media (max-width: 420px) {
+  .navigation-utility-row {
+    gap: 10px;
+  }
+
+  .widget-install-button {
+    min-height: 68px;
+    padding: 10px 12px;
+  }
+
+  .widget-install-illustration {
+    flex-basis: 52px;
+    width: 52px;
+    height: 52px;
+  }
+
+  .widget-install-copy strong {
+    font-size: 17px;
+  }
+
+  .widget-install-copy span {
+    font-size: 11px;
+  }
+}
