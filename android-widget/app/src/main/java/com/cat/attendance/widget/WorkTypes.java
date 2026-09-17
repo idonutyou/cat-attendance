@@ -65,11 +65,7 @@ public final class WorkTypes {
 
     public static String shortLabel(String id, String customLabel) {
         if (CUSTOM_ID.equals(id)) {
-            String label = customLabel == null ? "" : customLabel.trim();
-            if (label.length() > 5) {
-                return label.substring(0, 5);
-            }
-            return label;
+            return customLabel == null ? "" : customLabel.trim();
         }
         return SHORT_LABELS.getOrDefault(id, "");
     }

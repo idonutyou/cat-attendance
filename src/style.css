@@ -1151,6 +1151,16 @@ input {
   background: var(--custom-work);
 }
 
+/* 직접 입력은 고정 글자수로 자르지 않고 셀 너비만큼 최대한 표시한다. */
+.type-custom .work-badge {
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 1px;
+  padding-right: 1px;
+  font-size: 7px;
+  letter-spacing: -0.2px;
+}
+
 .section-title-row {
   display: flex;
   align-items: center;
