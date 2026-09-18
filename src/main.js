@@ -120,6 +120,43 @@ function hasNativeWidgetPairing() {
   return false;
 }
 
+let nativeWidgetAutoPairAttempted = false;
+
+function autoPairNativeWidgetOnAppOpen() {
+  if (
+    nativeWidgetAutoPairAttempted ||
+    !CAT_BROWSER_ENV.isAndroid ||
+    CAT_BROWSER_ENV.isNaverInApp
+  ) {
+    return;
+  }
+
+  const hasFirebaseBridge =
+    (authMode === "google" &&
+      activeGoogleUser?.uid &&
+      activeGoogleUser?.refreshToken) ||
+    (authMode === "guest" &&
+      activeGuestUser?.uid &&
+      activeGuestUser?.refreshToken);
+
+  if (!hasFirebaseBridge) {
+    return;
+  }
+
+  nativeWidgetAutoPairAttempted = true;
+
+  // CAT 앱을 여는 것만으로 새 폰의 위젯에도 현재 로그인 계정과
+  // 근태 데이터를 한 번 전달합니다. 위젯이 없는 폰은 숨은
+  // fallback frame에서 끝나므로 웹앱 화면은 그대로 유지됩니다.
+  window.setTimeout(() => {
+    markNativeWidgetPaired();
+    sendCurrentStateBackToNativeWidget({
+      allowUnpaired: true,
+      allowBackground: true,
+    });
+  }, 180);
+}
+
 function readNativeWidgetLaunchPayload(
   sourceUrl = window.location.href,
 ) {
@@ -182,7 +219,11 @@ function encodeNativeWidgetPayload(payload) {
   }
 }
 
-function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
+function sendCurrentStateBackToNativeWidget({
+  userInitiated = false,
+  allowUnpaired = false,
+  allowBackground = false,
+} = {}) {
   try {
     const url = new URL(window.location.href);
 
@@ -201,7 +242,10 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
     // 앱 -> 위젯 동기화는 사용자가 실제로 근태/설정을 변경한
     // 클릭/키 입력 동작 안에서만 실행합니다. 자동 페이지 로드에서는
     // 네이티브 앱 호출을 하지 않아 확인창이 뜨지 않습니다.
-    if (!userInitiated || !navigator.userActivation?.isActive) {
+    if (
+      !allowBackground &&
+      (!userInitiated || !navigator.userActivation?.isActive)
+    ) {
       return;
     }
 
@@ -215,7 +259,7 @@ function sendCurrentStateBackToNativeWidget({ userInitiated = false } = {}) {
     // have never been connected to the CAT widget. This prevents Chrome/PWA
     // from relaunching or showing an app/store error when no widget exists.
     // Paired widget phones continue through the exact existing sync path.
-    if (!hasNativeWidgetPairing()) {
+    if (!allowUnpaired && !hasNativeWidgetPairing()) {
       return;
     }
 
@@ -2284,6 +2328,15 @@ widgetInstallButton?.addEventListener("click", () => {
     );
     return;
   }
+
+  // WIDGET 버튼은 설치/업데이트뿐 아니라 새 기기의 최초 연결도 겸합니다.
+  // 사용자가 명시적으로 버튼을 누른 경우에만 미연결 위젯으로 현재
+  // 근태 데이터와 Firebase 브리지 정보를 한 번 전달합니다.
+  markNativeWidgetPaired();
+  sendCurrentStateBackToNativeWidget({
+    userInitiated: true,
+    allowUnpaired: true,
+  });
 
   const downloadLink = document.createElement("a");
   downloadLink.href = widgetInstallUrl;
@@ -9919,6 +9972,7 @@ async function initializeGuestCloudBridge() {
     }
 
     subscribeToGuestCloudChanges();
+    autoPairNativeWidgetOnAppOpen();
     return true;
   } catch (error) {
     // Guest 자체 저장은 로컬로 계속 정상 동작합니다. Firebase 익명 인증이
@@ -10209,6 +10263,7 @@ async function enterGoogleMode(user) {
   }
 
   subscribeToCloudChanges();
+  autoPairNativeWidgetOnAppOpen();
 
   if (widgetDataApplied) {
     scheduleCloudSync();
