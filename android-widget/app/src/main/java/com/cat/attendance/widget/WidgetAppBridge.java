@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.ResolveInfo;
@@ -20,6 +21,9 @@ import java.util.List;
 
 public final class WidgetAppBridge {
     private static final long SILENT_HOME_DELAY_MS = 90L;
+    private static final String LAUNCH_CACHE_PREFS = "cat_widget_launch_cache";
+    private static final String LAUNCH_CACHE_PACKAGE = "package";
+    private static final String LAUNCH_CACHE_CLASS = "class";
 
     private WidgetAppBridge() {}
 
@@ -65,12 +69,21 @@ public final class WidgetAppBridge {
         // the handler for an external ACTION_VIEW URL.  Find the same
         // ACTION_MAIN + CATEGORY_LAUNCHER component that the home screen uses
         // and launch that exact component first.
+        ComponentName cachedLauncher = getCachedCatLauncherComponent(activity);
+        if (cachedLauncher != null) {
+            if (launchExactLauncherComponent(activity, cachedLauncher)) {
+                return true;
+            }
+            clearCachedCatLauncherComponent(activity);
+        }
+
         ComponentName catLauncher = findCatLauncherComponent(activity);
-        if (
-                catLauncher != null &&
-                launchExactLauncherComponent(activity, catLauncher)
-        ) {
-            return true;
+        if (catLauncher != null) {
+            cacheCatLauncherComponent(activity, catLauncher);
+            if (launchExactLauncherComponent(activity, catLauncher)) {
+                return true;
+            }
+            clearCachedCatLauncherComponent(activity);
         }
 
         // Only fall back to the URL path when CAT is not installed as a
@@ -83,13 +96,79 @@ public final class WidgetAppBridge {
         return startCatIntentWithFallback(activity, catIntent);
     }
 
-    private static ComponentName findCatLauncherComponent(Activity activity) {
+    public static void prepareCatLauncher(Context context) {
+        if (context == null || getCachedCatLauncherComponent(context) != null) {
+            return;
+        }
+
+        ComponentName component = findCatLauncherComponent(context);
+        if (component != null) {
+            cacheCatLauncherComponent(context, component);
+        }
+    }
+
+    private static ComponentName getCachedCatLauncherComponent(Context context) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(
+                    LAUNCH_CACHE_PREFS,
+                    Context.MODE_PRIVATE
+            );
+            String packageName = prefs.getString(LAUNCH_CACHE_PACKAGE, "");
+            String className = prefs.getString(LAUNCH_CACHE_CLASS, "");
+
+            if (packageName.isEmpty() || className.isEmpty()) {
+                return null;
+            }
+
+            return new ComponentName(packageName, className);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static void cacheCatLauncherComponent(
+            Context context,
+            ComponentName component
+    ) {
+        if (context == null || component == null) {
+            return;
+        }
+
+        try {
+            context.getSharedPreferences(
+                    LAUNCH_CACHE_PREFS,
+                    Context.MODE_PRIVATE
+            ).edit()
+                    .putString(
+                            LAUNCH_CACHE_PACKAGE,
+                            component.getPackageName()
+                    )
+                    .putString(
+                            LAUNCH_CACHE_CLASS,
+                            component.getClassName()
+                    )
+                    .apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void clearCachedCatLauncherComponent(Context context) {
+        try {
+            context.getSharedPreferences(
+                    LAUNCH_CACHE_PREFS,
+                    Context.MODE_PRIVATE
+            ).edit().clear().apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static ComponentName findCatLauncherComponent(Context context) {
         try {
             Intent launcherQuery = new Intent(Intent.ACTION_MAIN)
                     .addCategory(Intent.CATEGORY_LAUNCHER);
 
             List<ResolveInfo> launchers =
-                    activity.getPackageManager()
+                    context.getPackageManager()
                             .queryIntentActivities(launcherQuery, 0);
 
             for (ResolveInfo launcher : launchers) {
@@ -106,13 +185,13 @@ public final class WidgetAppBridge {
                 if (
                         packageName == null ||
                         className == null ||
-                        packageName.equals(activity.getPackageName())
+                        packageName.equals(context.getPackageName())
                 ) {
                     continue;
                 }
 
                 CharSequence rawLabel =
-                        launcher.loadLabel(activity.getPackageManager());
+                        launcher.loadLabel(context.getPackageManager());
                 String label = rawLabel == null
                         ? ""
                         : rawLabel.toString().trim();

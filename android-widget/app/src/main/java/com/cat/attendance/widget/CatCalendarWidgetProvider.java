@@ -122,6 +122,7 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
     }
 
     private static void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
+        WidgetAppBridge.prepareCatLauncher(context);
         YearMonth visibleMonth = getVisibleMonth(context, widgetId);
         boolean startsMonday = WidgetDataStore.startsOnMonday(context);
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_calendar);
