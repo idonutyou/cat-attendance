@@ -199,7 +199,7 @@ public class WorkTypeActivity extends Activity {
             delete.setOnClickListener(v -> {
                 WidgetDataStore.setWorkType(this, dateKey, "");
                 CatCalendarWidgetProvider.refreshAll(this);
-                WidgetCloudSync.pushCurrentStateAsync(this);
+                syncWidgetChangeToApp();
                 finish();
                 overridePendingTransition(0, 0);
             });
@@ -362,7 +362,7 @@ public class WorkTypeActivity extends Activity {
     private void saveWorkTypeAndFinish(String id) {
         WidgetDataStore.setWorkType(this, dateKey, id);
         CatCalendarWidgetProvider.refreshAll(this);
-        WidgetCloudSync.pushCurrentStateAsync(this);
+        syncWidgetChangeToApp();
         finish();
         overridePendingTransition(0, 0);
     }
@@ -454,9 +454,19 @@ public class WorkTypeActivity extends Activity {
 
         WidgetDataStore.setCustomWorkType(this, dateKey, label);
         CatCalendarWidgetProvider.refreshAll(this);
-        WidgetCloudSync.pushCurrentStateAsync(this);
+        syncWidgetChangeToApp();
         finish();
         overridePendingTransition(0, 0);
+    }
+
+    private void syncWidgetChangeToApp() {
+        WidgetCloudSync.pushCurrentStateAsync(this);
+
+        // 새 설치에서 아직 Firebase bridge 정보가 저장되지 않은 경우에도
+        // 위젯에서 바꾼 근태를 CAT 앱에 조용히 전달합니다.
+        if (WidgetDataStore.getCloudBridgeCredentials(this) == null) {
+            WidgetAppBridge.deliverPendingToRunningAppSilently(this);
+        }
     }
 
     private void updateWindowBounds() {

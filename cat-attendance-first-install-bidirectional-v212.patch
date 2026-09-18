@@ -1,0 +1,45 @@
+diff --git a/android-widget/app/src/main/java/com/cat/attendance/widget/WorkTypeActivity.java b/android-widget/app/src/main/java/com/cat/attendance/widget/WorkTypeActivity.java
+--- a/android-widget/app/src/main/java/com/cat/attendance/widget/WorkTypeActivity.java
++++ b/android-widget/app/src/main/java/com/cat/attendance/widget/WorkTypeActivity.java
+@@ -179,7 +179,7 @@ public class WorkTypeActivity extends Activity {
+             delete.setOnClickListener(v -> {
+                 WidgetDataStore.setWorkType(this, dateKey, "");
+                 CatCalendarWidgetProvider.refreshAll(this);
+-                WidgetCloudSync.pushCurrentStateAsync(this);
++                syncWidgetChangeToApp();
+                 finish();
+                 overridePendingTransition(0, 0);
+             });
+@@ -328,7 +328,7 @@ public class WorkTypeActivity extends Activity {
+     private void saveWorkTypeAndFinish(String id) {
+         WidgetDataStore.setWorkType(this, dateKey, id);
+         CatCalendarWidgetProvider.refreshAll(this);
+-        WidgetCloudSync.pushCurrentStateAsync(this);
++        syncWidgetChangeToApp();
+         finish();
+         overridePendingTransition(0, 0);
+     }
+@@ -410,11 +410,22 @@ public class WorkTypeActivity extends Activity {
+         }
+         WidgetDataStore.setCustomWorkType(this, dateKey, label);
+         CatCalendarWidgetProvider.refreshAll(this);
+-        WidgetCloudSync.pushCurrentStateAsync(this);
++        syncWidgetChangeToApp();
+         finish();
+         overridePendingTransition(0, 0);
+     }
++
++    private void syncWidgetChangeToApp() {
++        WidgetCloudSync.pushCurrentStateAsync(this);
++
++        // First-time widget installs can receive app -> widget data before the
++        // Firebase bridge credentials have been persisted.  In that state the
++        // cloud push is intentionally a no-op, so deliver the pending widget
++        // change to the installed CAT PWA silently as a fallback.
++        if (WidgetDataStore.getCloudBridgeCredentials(this) == null) {
++            WidgetAppBridge.deliverPendingToRunningAppSilently(this);
++        }
++    }
+
+     private void updateWindowBounds() {
+         if (activityWindow == null || rootContent == null) {
