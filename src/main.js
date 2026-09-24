@@ -9681,6 +9681,19 @@ function showAppShell() {
   render();
 }
 
+function showCachedAppShellWhileCloudRestores() {
+  // 저장된 근태/급여 데이터는 이미 localStorage에서 읽혀 있으므로
+  // Firebase 인증/Firestore 조회를 기다리지 않고 화면부터 보여줍니다.
+  // 계정 패널은 실제 인증 복원이 끝난 뒤 showAppShell()에서 갱신합니다.
+  authGate.hidden = true;
+  authGate.setAttribute("aria-hidden", "true");
+  appShell.hidden = false;
+  appShell.classList.remove("auth-locked");
+  appShell.setAttribute("aria-hidden", "false");
+  document.documentElement.classList.remove("auth-gate-active");
+  render();
+}
+
 function captureAppStorageSnapshot() {
   const storage = {};
 
@@ -10601,8 +10614,20 @@ function initializeSplashScreen() {
         (authMode === "google" && activeGoogleUser)
       ) {
         showAppShell();
-      } else if (!authRedirectInProgress) {
-        showAuthGate();
+      } else {
+        const savedMode = localStorage.getItem(AUTH_MODE_KEY);
+        const savedGoogleUid = localStorage.getItem(
+          ACTIVE_GOOGLE_UID_KEY,
+        );
+        const canShowCachedShell =
+          savedMode === "guest" ||
+          (savedMode === "google" && Boolean(savedGoogleUid));
+
+        if (canShowCachedShell) {
+          showCachedAppShellWhileCloudRestores();
+        } else if (!authRedirectInProgress) {
+          showAuthGate();
+        }
       }
     }, 420);
   }, 1600);
