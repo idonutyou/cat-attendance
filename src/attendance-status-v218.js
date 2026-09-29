@@ -17,7 +17,8 @@ const STATUS_ROWS = [
   { key: "night", label: "심야", total: true },
   { key: "overnight", label: "철야", total: true },
   { key: "holiday", label: "휴일", total: true },
-  { key: "shutdown", label: "휴업" },
+  { key: "holidayOvertime", label: "휴연", total: true },
+  { key: "attendance", label: "근태" },
 ];
 
 const TYPE_STATUS = {
@@ -56,8 +57,8 @@ const TYPE_STATUS = {
     clockIn: "0800",
     clockOut: "2000",
     normal: 8,
-    overtime2: 2.5,
     holiday: 8,
+    holidayOvertime: 2.5,
   },
   nightHoliday: {
     clockIn: "2000",
@@ -70,19 +71,19 @@ const TYPE_STATUS = {
     clockIn: "2000",
     clockOut: "0800",
     normal: 8,
-    overtime2: 2,
     night: 6,
     overnight: 1,
     holiday: 8,
+    holidayOvertime: 2,
   },
   earlyLeave: {
     earlyLeave: 4,
   },
   halfAnnualLeave: {
-    shutdown: "반차",
+    attendance: "반차",
   },
   annualLeave: {
-    shutdown: "연차",
+    attendance: "연차",
   },
 };
 
@@ -131,10 +132,19 @@ function getRecordType(record) {
 
 function getStatusValues(record) {
   const type = getRecordType(record);
+
   if (type === "custom") {
-    return {
-      shutdown: String(record?.label || "직접 입력").trim() || "직접 입력",
-    };
+    const label = String(record?.label || "").trim();
+
+    if (label === "휴가") {
+      return {
+        normal: 8,
+        attendance: "급휴",
+      };
+    }
+
+    // 직접 입력한 메모/기타 문구는 근태현황에 표시하지 않습니다.
+    return {};
   }
 
   return TYPE_STATUS[type] ? { ...TYPE_STATUS[type] } : {};
@@ -451,6 +461,35 @@ function activateStatusNavigation() {
   });
 }
 
+function restoreStatusAfterResume() {
+  if (!statusVisible || !statusPage) {
+    return;
+  }
+
+  document.documentElement.classList.add(
+    "attendance-status-landscape-active",
+  );
+
+  statusPage.hidden = false;
+  statusPage.classList.add("active");
+  statusPage.setAttribute("aria-hidden", "false");
+
+  if (titleElement) {
+    titleElement.textContent = STATUS_TITLE;
+    titleElement.classList.remove("hours-leave-title");
+  }
+
+  activateStatusNavigation();
+  normalizeStatusRootClasses();
+  renderStatus();
+  syncStatusLandscapeFallback();
+
+  requestAnimationFrame(() => {
+    normalizeStatusRootClasses();
+    syncStatusLandscapeFallback();
+  });
+}
+
 function hideStatusPage() {
   if (!statusPage || !statusVisible) {
     return;
@@ -686,8 +725,7 @@ function setupObservers() {
 
   window.addEventListener("focus", () => {
     if (statusVisible) {
-      renderStatus();
-      syncStatusLandscapeFallback();
+      restoreStatusAfterResume();
     }
   });
 
@@ -711,15 +749,103 @@ function setupObservers() {
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && statusVisible) {
-      renderStatus();
+      restoreStatusAfterResume();
     }
   });
 
-  window.addEventListener("pagehide", () => {
+  window.addEventListener("pageshow", () => {
     if (statusVisible) {
-      exitStatusLandscapeMode();
+      restoreStatusAfterResume();
     }
   });
+
+  // 다른 앱으로 전환할 때는 근태현황 상태를 해제하지 않습니다.
+  // 브라우저가 fullscreen을 자동 해제해도 복귀 시 CSS 가로모드로 즉시 복원됩니다.
+  window.addEventListener("pagehide", () => {
+    statusFullscreenOwned = false;
+  });
+}
+
+function updateLeavePickerLabel() {
+  const annualLeaveButton = document.querySelector(
+    '[data-work-type="annualLeave"]',
+  );
+  const label = annualLeaveButton?.querySelector("span:last-child");
+
+  if (label && !label.textContent.includes("휴가")) {
+    label.textContent = "연차 / 조퇴 / 휴가";
+  }
+}
+
+function savePaidLeaveThroughExistingEditor() {
+  const annualLeaveChoice = document.querySelector("#annualLeaveChoice");
+  const workTypeList = document.querySelector("#workTypeList");
+  const customButton = workTypeList?.querySelector(
+    "[data-custom-work-type]",
+  );
+  const input = document.querySelector("#customWorkTypeInput");
+  const saveButton = document.querySelector("#saveCustomWorkTypeButton");
+
+  if (!customButton || !input || !saveButton) {
+    return;
+  }
+
+  if (annualLeaveChoice) {
+    annualLeaveChoice.hidden = true;
+  }
+  if (workTypeList) {
+    workTypeList.hidden = false;
+  }
+
+  customButton.click();
+
+  requestAnimationFrame(() => {
+    input.value = "휴가";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    saveButton.click();
+  });
+}
+
+function installPaidLeaveChoice() {
+  const annualLeaveChoice = document.querySelector("#annualLeaveChoice");
+  const workTypeList = document.querySelector("#workTypeList");
+
+  if (!annualLeaveChoice || !workTypeList) {
+    return false;
+  }
+
+  if (!annualLeaveChoice.querySelector("[data-paid-leave-choice]")) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.paidLeaveChoice = "true";
+    button.textContent = "휴가";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      savePaidLeaveThroughExistingEditor();
+    });
+    annualLeaveChoice.appendChild(button);
+  }
+
+  updateLeavePickerLabel();
+
+  const workTypeObserver = new MutationObserver(() => {
+    updateLeavePickerLabel();
+  });
+  workTypeObserver.observe(workTypeList, {
+    childList: true,
+    subtree: true,
+  });
+
+  return true;
+}
+
+function ensurePaidLeaveChoice() {
+  if (installPaidLeaveChoice()) {
+    return;
+  }
+
+  requestAnimationFrame(ensurePaidLeaveChoice);
 }
 
 function initializeAttendanceStatus() {
@@ -752,6 +878,7 @@ function initializeAttendanceStatus() {
 
   watchExistingNavigation();
   setupObservers();
+  ensurePaidLeaveChoice();
   renderStatus();
 }
 

@@ -362,3 +362,5 @@ html.attendance-status-landscape-fallback .attendance-status-card {
   width: 100% !important;
   height: 100% !important;
 }
+
+/* v222: 휴연/근태 행 및 앱 복귀 안정화 */
