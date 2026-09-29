@@ -42,31 +42,35 @@ const TYPE_STATUS = {
     clockIn: "2000",
     clockOut: "0800",
     normal: 8,
-    overtime1: 2,
+    overtime2: 2,
     night: 7,
     overnight: 1,
   },
   dayHoliday: {
     clockIn: "0800",
     clockOut: "1700",
+    normal: 8,
     holiday: 8,
   },
   dayHolidayOvertime: {
     clockIn: "0800",
     clockOut: "2000",
+    normal: 8,
     overtime2: 2.5,
     holiday: 8,
   },
   nightHoliday: {
     clockIn: "2000",
     clockOut: "0500",
+    normal: 8,
     night: 6,
     holiday: 8,
   },
   nightHolidayOvertime: {
     clockIn: "2000",
     clockOut: "0800",
-    overtime1: 2,
+    normal: 8,
+    overtime2: 2,
     night: 6,
     overnight: 1,
     holiday: 8,
@@ -215,10 +219,22 @@ function renderStatus() {
 
   const monthLabel = `${year}년 ${String(month + 1).padStart(2, "0")}월`;
   const title = statusPage.querySelector("#attendanceStatusMonthLabel");
+  const monthPickerButton = statusPage.querySelector(
+    "#attendanceStatusMonthPickerButton",
+  );
+  const monthInput = statusPage.querySelector(
+    "#attendanceStatusMonthInput",
+  );
   const tableWrap = statusPage.querySelector("#attendanceStatusTableWrap");
   const footer = statusPage.querySelector("#attendanceStatusFooter");
 
   title.textContent = `( ${monthLabel} )`;
+  if (monthPickerButton) {
+    monthPickerButton.textContent = `${year}년 ${month + 1}월`;
+  }
+  if (monthInput) {
+    monthInput.value = `${year}-${String(month + 1).padStart(2, "0")}`;
+  }
 
   const dayHead = Array.from({ length: 31 }, (_, index) => {
     const day = index + 1;
@@ -301,6 +317,43 @@ function renderStatus() {
   `;
 }
 
+
+function changeSelectedMonth(offset) {
+  selectedMonth = new Date(
+    selectedMonth.getFullYear(),
+    selectedMonth.getMonth() + offset,
+    1,
+  );
+  renderStatus();
+}
+
+function enterStatusLandscapeMode() {
+  document.documentElement.classList.add(
+    "attendance-status-landscape-active",
+  );
+
+  try {
+    const orientation = window.screen?.orientation;
+    if (orientation?.lock) {
+      Promise.resolve(orientation.lock("landscape")).catch(() => {});
+    }
+  } catch {
+    // Some browsers only allow orientation lock in installed/fullscreen PWAs.
+  }
+}
+
+function exitStatusLandscapeMode() {
+  document.documentElement.classList.remove(
+    "attendance-status-landscape-active",
+  );
+
+  try {
+    window.screen?.orientation?.unlock?.();
+  } catch {
+    // Ignore browsers without orientation unlock support.
+  }
+}
+
 function normalizeStatusRootClasses() {
   if (!statusVisible) {
     return;
@@ -332,6 +385,7 @@ function hideStatusPage() {
   }
 
   statusVisible = false;
+  exitStatusLandscapeMode();
   statusPage.hidden = true;
   statusPage.classList.remove("active");
   statusPage.setAttribute("aria-hidden", "true");
@@ -340,6 +394,8 @@ function hideStatusPage() {
 }
 
 function showStatusPage() {
+  enterStatusLandscapeMode();
+
   const salaryNavigation = document.querySelector('[data-app-navigation="salary"]');
   salaryNavigation?.click();
 
@@ -390,20 +446,20 @@ function buildStatusPage() {
         <span id="attendanceStatusMonthLabel"></span>
       </div>
 
-      <div class="attendance-status-toolbar" aria-label="근태현황 월 이동">
+      <div class="attendance-status-toolbar" aria-label="근태현황 연월 선택">
         <button
-          id="attendanceStatusPreviousMonth"
-          class="attendance-status-month-button"
+          id="attendanceStatusMonthPickerButton"
+          class="attendance-status-month-picker-button"
           type="button"
-          aria-label="이전 달"
-        >‹</button>
-        <strong id="attendanceStatusToolbarMonth"></strong>
-        <button
-          id="attendanceStatusNextMonth"
-          class="attendance-status-month-button"
-          type="button"
-          aria-label="다음 달"
-        >›</button>
+          aria-label="연월 선택"
+        ></button>
+        <input
+          id="attendanceStatusMonthInput"
+          class="attendance-status-month-input"
+          type="month"
+          aria-label="근태현황 연월 선택"
+          tabindex="-1"
+        />
       </div>
 
       <div
@@ -416,32 +472,79 @@ function buildStatusPage() {
     </section>
   `;
 
-  const toolbarMonth = page.querySelector("#attendanceStatusToolbarMonth");
-  const syncToolbarMonth = () => {
-    toolbarMonth.textContent = `${selectedMonth.getFullYear()}년 ${selectedMonth.getMonth() + 1}월`;
-  };
+  const monthPickerButton = page.querySelector(
+    "#attendanceStatusMonthPickerButton",
+  );
+  const monthInput = page.querySelector("#attendanceStatusMonthInput");
 
-  page.querySelector("#attendanceStatusPreviousMonth")?.addEventListener("click", () => {
+  monthPickerButton?.addEventListener("click", () => {
+    try {
+      if (typeof monthInput?.showPicker === "function") {
+        monthInput.showPicker();
+      } else {
+        monthInput?.click();
+      }
+    } catch {
+      monthInput?.click();
+    }
+  });
+
+  monthInput?.addEventListener("change", () => {
+    const match = monthInput.value.match(/^(\d{4})-(\d{2})$/);
+    if (!match) {
+      return;
+    }
+
     selectedMonth = new Date(
-      selectedMonth.getFullYear(),
-      selectedMonth.getMonth() - 1,
+      Number(match[1]),
+      Number(match[2]) - 1,
       1,
     );
-    syncToolbarMonth();
     renderStatus();
   });
 
-  page.querySelector("#attendanceStatusNextMonth")?.addEventListener("click", () => {
-    selectedMonth = new Date(
-      selectedMonth.getFullYear(),
-      selectedMonth.getMonth() + 1,
-      1,
-    );
-    syncToolbarMonth();
-    renderStatus();
-  });
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeTracking = false;
 
-  page.addEventListener("attendance-status-shown", syncToolbarMonth);
+  page.addEventListener(
+    "touchstart",
+    (event) => {
+      if (event.touches.length !== 1) {
+        swipeTracking = false;
+        return;
+      }
+
+      swipeTracking = true;
+      swipeStartX = event.touches[0].clientX;
+      swipeStartY = event.touches[0].clientY;
+    },
+    { passive: true },
+  );
+
+  page.addEventListener(
+    "touchend",
+    (event) => {
+      if (!swipeTracking || event.changedTouches.length !== 1) {
+        swipeTracking = false;
+        return;
+      }
+
+      swipeTracking = false;
+      const endX = event.changedTouches[0].clientX;
+      const endY = event.changedTouches[0].clientY;
+      const deltaX = endX - swipeStartX;
+      const deltaY = endY - swipeStartY;
+
+      if (Math.abs(deltaX) < 54 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+        return;
+      }
+
+      changeSelectedMonth(deltaX < 0 ? 1 : -1);
+    },
+    { passive: true },
+  );
+
   return page;
 }
 
@@ -519,6 +622,12 @@ function setupObservers() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && statusVisible) {
       renderStatus();
+    }
+  });
+
+  window.addEventListener("pagehide", () => {
+    if (statusVisible) {
+      exitStatusLandscapeMode();
     }
   });
 }
