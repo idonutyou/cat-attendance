@@ -129,7 +129,7 @@ public class WorkTypeActivity extends Activity {
                 "night", "nightOvertime", "nightHoliday", "nightHolidayOvertime", WorkTypes.CUSTOM_ID
         };
         String[] labels = {
-                "주간", "주간잔업", "주간특근", "주간특근잔업", "연차 / 조퇴",
+                "주간", "주간잔업", "주간특근", "주간특근잔업", "연차 / 조퇴\n/ 휴가",
                 "야간", "야간잔업", "야간특근", "야간특근잔업", "직접 입력"
         };
         for (int rowIndex = 0; rowIndex < 2; rowIndex++) {

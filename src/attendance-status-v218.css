@@ -208,7 +208,7 @@ html.attendance-status-landscape-active .attendance-status-page {
   height: 100%;
   min-height: 0;
   animation: none;
-  touch-action: pan-y;
+  touch-action: none;
   overflow: hidden;
 }
 
@@ -364,3 +364,11 @@ html.attendance-status-landscape-fallback .attendance-status-card {
 }
 
 /* v222: 휴연/근태 행 및 앱 복귀 안정화 */
+
+
+/* v226: 날짜/요일 헤더 아래 구분선 */
+.attendance-status-table thead tr:last-child th,
+.attendance-status-table thead .attendance-status-corner,
+.attendance-status-table thead .attendance-status-sum-head {
+  border-bottom: 1.5px solid #475569 !important;
+}

@@ -181,8 +181,11 @@ function getStatusValues(record) {
       };
     }
 
-    // 직접 입력한 메모/기타 문구는 근태현황에 표시하지 않습니다.
-    return {};
+    // 직접 입력한 메모/기타 문구 자체는 근태현황에 표시하지 않되,
+    // 회사 근태표의 정상 근무시간은 8시간으로 반영합니다.
+    return {
+      normal: 8,
+    };
   }
 
   return TYPE_STATUS[type] ? { ...TYPE_STATUS[type] } : {};
@@ -206,7 +209,7 @@ function formatTotal(value) {
     return "";
   }
 
-  return Number.isInteger(value) ? String(value) : String(value);
+  return value.toFixed(1);
 }
 
 function countSundays(year, month) {
@@ -696,12 +699,25 @@ function buildStatusPage() {
       const endY = event.changedTouches[0].clientY;
       const deltaX = endX - swipeStartX;
       const deltaY = endY - swipeStartY;
+      const fallbackRotated = document.documentElement.classList.contains(
+        "attendance-status-landscape-fallback",
+      );
+      const rotation = statusFallbackRotation >= 0 ? 90 : -90;
+      const visualDeltaX = fallbackRotated
+        ? (rotation > 0 ? deltaY : -deltaY)
+        : deltaX;
+      const visualDeltaY = fallbackRotated
+        ? deltaX
+        : deltaY;
 
-      if (Math.abs(deltaX) < 54 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+      if (
+        Math.abs(visualDeltaX) < 54 ||
+        Math.abs(visualDeltaX) <= Math.abs(visualDeltaY)
+      ) {
         return;
       }
 
-      changeSelectedMonth(deltaX < 0 ? 1 : -1);
+      changeSelectedMonth(visualDeltaX < 0 ? 1 : -1);
     },
     { passive: true },
   );
@@ -899,6 +915,71 @@ function ensurePaidLeaveChoice() {
   requestAnimationFrame(ensurePaidLeaveChoice);
 }
 
+function getOpenWorkModalDateKey() {
+  const title = document.querySelector("#modalTitle")?.textContent || "";
+  const match = title.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+  if (!match) {
+    return "";
+  }
+
+  return `${match[1]}-${String(Number(match[2])).padStart(2, "0")}-${String(
+    Number(match[3]),
+  ).padStart(2, "0")}`;
+}
+
+function syncPaidLeaveModalPresentation() {
+  const workModal = document.querySelector("#workModal");
+  if (!workModal?.classList.contains("open")) {
+    return;
+  }
+
+  const dateKey = getOpenWorkModalDateKey();
+  if (!dateKey) {
+    return;
+  }
+
+  const record = parseRecords()[dateKey];
+  const isVacation = Boolean(
+    record &&
+      typeof record === "object" &&
+      record.type === "custom" &&
+      String(record.label || "").trim() === "휴가",
+  );
+
+  if (!isVacation) {
+    return;
+  }
+
+  const workTypeList = document.querySelector("#workTypeList");
+  const leaveTile = workTypeList?.querySelector('[data-work-type="annualLeave"]');
+  const customTile = workTypeList?.querySelector("[data-custom-work-type]");
+  const customEditor = document.querySelector("#customWorkTypeEditor");
+
+  leaveTile?.classList.add("selected");
+  customTile?.classList.remove("selected");
+  if (customEditor) {
+    customEditor.hidden = true;
+  }
+}
+
+function watchPaidLeaveModalPresentation() {
+  const workModal = document.querySelector("#workModal");
+  if (!workModal) {
+    requestAnimationFrame(watchPaidLeaveModalPresentation);
+    return;
+  }
+
+  const observer = new MutationObserver(() => {
+    requestAnimationFrame(syncPaidLeaveModalPresentation);
+  });
+  observer.observe(workModal, {
+    attributes: true,
+    attributeFilter: ["class", "aria-hidden"],
+    childList: true,
+    subtree: true,
+  });
+}
+
 function initializeAttendanceStatus() {
   const navigationList = document.querySelector(".navigation-list");
   const attendanceNavigation = navigationList?.querySelector(
@@ -930,6 +1011,7 @@ function initializeAttendanceStatus() {
   watchExistingNavigation();
   setupObservers();
   ensurePaidLeaveChoice();
+  watchPaidLeaveModalPresentation();
   void ensureStatusHolidays();
   renderStatus();
 }
