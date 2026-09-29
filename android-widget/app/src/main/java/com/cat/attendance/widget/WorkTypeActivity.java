@@ -1,5 +1,4 @@
 package com.cat.attendance.widget;
-
 import android.app.Activity;
 import android.app.Dialog;
 import android.appwidget.AppWidgetManager;
@@ -21,7 +20,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -36,7 +34,6 @@ public class WorkTypeActivity extends Activity {
     private ScrollView contentScrollView;
     private LinearLayout rootContent;
     private Window activityWindow;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -51,7 +48,6 @@ public class WorkTypeActivity extends Activity {
             finish();
             return;
         }
-
         activityWindow = getWindow();
         if (activityWindow != null) {
             activityWindow.setDimAmount(0.50f);
@@ -63,13 +59,11 @@ public class WorkTypeActivity extends Activity {
         }
 
         setContentView(buildContent());
-
         if (activityWindow != null) {
             activityWindow.setLayout(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
             );
-
             View decorView = activityWindow.getDecorView();
             decorView.setOnApplyWindowInsetsListener((view, insets) -> {
                 updateWindowBounds();
@@ -79,13 +73,11 @@ public class WorkTypeActivity extends Activity {
             decorView.requestApplyInsets();
         }
     }
-
     private View buildContent() {
         contentScrollView = new ScrollView(this);
         contentScrollView.setFillViewport(false);
         contentScrollView.setClipToPadding(false);
         contentScrollView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
-
         rootContent = new LinearLayout(this);
         rootContent.setOrientation(LinearLayout.VERTICAL);
         rootContent.setPadding(dp(16), dp(12), dp(16), dp(14));
@@ -97,7 +89,6 @@ public class WorkTypeActivity extends Activity {
                         ViewGroup.LayoutParams.WRAP_CONTENT
                 )
         );
-
         LinearLayout root = rootContent;
 
         LinearLayout header = new LinearLayout(this);
@@ -109,7 +100,6 @@ public class WorkTypeActivity extends Activity {
         titleBox.setLayoutParams(new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
         ));
-
         TextView title = text(formatDateTitle(), 25, 0xFF172033, true);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -117,7 +107,6 @@ public class WorkTypeActivity extends Activity {
         );
         titleParams.topMargin = 0;
         titleBox.addView(title, titleParams);
-
         TextView close = text("×", 34, 0xFF64748B, false);
         close.setGravity(Gravity.CENTER);
         close.setBackground(roundRect(0xFFF1F5F9, 16, 0, Color.TRANSPARENT));
@@ -125,7 +114,6 @@ public class WorkTypeActivity extends Activity {
         header.addView(titleBox);
         header.addView(close, new LinearLayout.LayoutParams(dp(46), dp(46)));
         root.addView(header);
-
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(
@@ -134,10 +122,8 @@ public class WorkTypeActivity extends Activity {
         );
         gridParams.topMargin = dp(14);
         root.addView(grid, gridParams);
-
         String currentType = WidgetDataStore.getWorkType(this, dateKey);
         String currentCustom = WidgetDataStore.getCustomLabel(this, dateKey);
-
         String[] ids = {
                 "day", "dayOvertime", "dayHoliday", "dayHolidayOvertime", "annualLeave",
                 "night", "nightOvertime", "nightHoliday", "nightHolidayOvertime", WorkTypes.CUSTOM_ID
@@ -146,12 +132,10 @@ public class WorkTypeActivity extends Activity {
                 "주간", "주간잔업", "주간특근", "주간특근잔업", "연차 / 조퇴",
                 "야간", "야간잔업", "야간특근", "야간특근잔업", "직접 입력"
         };
-
         for (int rowIndex = 0; rowIndex < 2; rowIndex++) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setWeightSum(5f);
-
             if (rowIndex == 1) {
                 LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -162,16 +146,19 @@ public class WorkTypeActivity extends Activity {
             } else {
                 grid.addView(row);
             }
-
             for (int column = 0; column < 5; column++) {
                 int index = rowIndex * 5 + column;
                 String id = ids[index];
                 String label = labels[index];
+                boolean isVacation =
+                        WorkTypes.CUSTOM_ID.equals(currentType) &&
+                        "휴가".equals(currentCustom);
                 boolean selected =
-                        id.equals(currentType) ||
+                        (id.equals(currentType) && !isVacation) ||
                         ("annualLeave".equals(id) &&
                                 (WorkTypes.HALF_ANNUAL_LEAVE_ID.equals(currentType) ||
-                                 WorkTypes.EARLY_LEAVE_ID.equals(currentType)));
+                                 WorkTypes.EARLY_LEAVE_ID.equals(currentType) ||
+                                 isVacation));
                 View tile = createWorkTypeTile(id, label, selected);
                 LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
                         0, dp(88), 1f
@@ -182,7 +169,6 @@ public class WorkTypeActivity extends Activity {
                 row.addView(tile, tileParams);
             }
         }
-
         customEditor = buildCustomEditor(currentCustom);
         LinearLayout.LayoutParams editorParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -190,8 +176,11 @@ public class WorkTypeActivity extends Activity {
         );
         editorParams.topMargin = dp(10);
         root.addView(customEditor, editorParams);
-        customEditor.setVisibility(WorkTypes.CUSTOM_ID.equals(currentType) ? View.VISIBLE : View.GONE);
-
+        customEditor.setVisibility(
+                WorkTypes.CUSTOM_ID.equals(currentType) && !"휴가".equals(currentCustom)
+                        ? View.VISIBLE
+                        : View.GONE
+        );
         if (!currentType.isEmpty()) {
             TextView delete = text("이 날짜의 기록 삭제", 14, 0xFFDC2626, true);
             delete.setGravity(Gravity.CENTER);
@@ -209,7 +198,6 @@ public class WorkTypeActivity extends Activity {
             deleteParams.topMargin = dp(10);
             root.addView(delete, deleteParams);
         }
-
         return contentScrollView;
     }
 
@@ -224,11 +212,9 @@ public class WorkTypeActivity extends Activity {
                 selected ? 2 : 1,
                 selected ? 0xFF2563EB : 0xFFE2E8F0
         ));
-
         TextView dot = text("●", 19, WorkTypes.dotColor(id), true);
         dot.setGravity(Gravity.CENTER);
         tile.addView(dot);
-
         TextView name = text(label, 11, 0xFF334155, true);
         name.setGravity(Gravity.CENTER);
         name.setMaxLines(2);
@@ -238,7 +224,6 @@ public class WorkTypeActivity extends Activity {
         );
         nameParams.topMargin = dp(2);
         tile.addView(name, nameParams);
-
         tile.setOnClickListener(v -> {
             if (WorkTypes.CUSTOM_ID.equals(id)) {
                 customEditor.setVisibility(View.VISIBLE);
@@ -252,7 +237,6 @@ public class WorkTypeActivity extends Activity {
                 showAnnualLeaveChoiceDialog();
                 return;
             }
-
             saveWorkTypeAndFinish(id);
         });
 
@@ -264,7 +248,6 @@ public class WorkTypeActivity extends Activity {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setCanceledOnTouchOutside(true);
         dialog.setCancelable(true);
-
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.HORIZONTAL);
         panel.setGravity(Gravity.CENTER);
@@ -272,7 +255,7 @@ public class WorkTypeActivity extends Activity {
         panel.setBackground(roundRect(Color.WHITE, 22, 0, Color.TRANSPARENT));
 
         String currentType = WidgetDataStore.getWorkType(this, dateKey);
-
+        String currentCustom = WidgetDataStore.getCustomLabel(this, dateKey);
         TextView halfDay = createLeaveChoiceButton(
                 "반차",
                 WorkTypes.HALF_ANNUAL_LEAVE_ID.equals(currentType)
@@ -285,22 +268,30 @@ public class WorkTypeActivity extends Activity {
                 "조퇴",
                 WorkTypes.EARLY_LEAVE_ID.equals(currentType)
         );
-
+        TextView vacation = createLeaveChoiceButton(
+                "휴가",
+                WorkTypes.CUSTOM_ID.equals(currentType) &&
+                        "휴가".equals(currentCustom)
+        );
         LinearLayout.LayoutParams halfParams =
                 new LinearLayout.LayoutParams(0, dp(62), 1f);
-        halfParams.rightMargin = dp(4);
+        halfParams.rightMargin = dp(3);
         panel.addView(halfDay, halfParams);
 
         LinearLayout.LayoutParams fullParams =
                 new LinearLayout.LayoutParams(0, dp(62), 1f);
-        fullParams.leftMargin = dp(4);
-        fullParams.rightMargin = dp(4);
+        fullParams.leftMargin = dp(3);
+        fullParams.rightMargin = dp(3);
         panel.addView(fullDay, fullParams);
-
         LinearLayout.LayoutParams earlyParams =
                 new LinearLayout.LayoutParams(0, dp(62), 1f);
-        earlyParams.leftMargin = dp(4);
+        earlyParams.leftMargin = dp(3);
+        earlyParams.rightMargin = dp(3);
         panel.addView(earlyLeave, earlyParams);
+        LinearLayout.LayoutParams vacationParams =
+                new LinearLayout.LayoutParams(0, dp(62), 1f);
+        vacationParams.leftMargin = dp(3);
+        panel.addView(vacation, vacationParams);
 
         halfDay.setOnClickListener(v -> {
             dialog.dismiss();
@@ -311,15 +302,17 @@ public class WorkTypeActivity extends Activity {
             dialog.dismiss();
             saveWorkTypeAndFinish("annualLeave");
         });
-
         earlyLeave.setOnClickListener(v -> {
             dialog.dismiss();
             saveWorkTypeAndFinish(WorkTypes.EARLY_LEAVE_ID);
         });
+        vacation.setOnClickListener(v -> {
+            dialog.dismiss();
+            saveVacationAndFinish();
+        });
 
         dialog.setContentView(panel);
         dialog.show();
-
         Window dialogWindow = dialog.getWindow();
         if (dialogWindow != null) {
             dialogWindow.setBackgroundDrawable(
@@ -330,18 +323,16 @@ public class WorkTypeActivity extends Activity {
                     WindowManager.LayoutParams.FLAG_DIM_BEHIND
             );
             dialogWindow.setGravity(Gravity.CENTER);
-
             int displayWidth =
                     getResources().getDisplayMetrics().widthPixels;
-            int width = Math.min(displayWidth - dp(40), dp(340));
+            int width = Math.min(displayWidth - dp(40), dp(380));
 
             dialogWindow.setLayout(
-                    Math.max(dp(280), width),
+                    Math.max(dp(300), width),
                     ViewGroup.LayoutParams.WRAP_CONTENT
             );
         }
     }
-
     private TextView createLeaveChoiceButton(String label, boolean selected) {
         TextView button = text(
                 label,
@@ -358,7 +349,6 @@ public class WorkTypeActivity extends Activity {
         ));
         return button;
     }
-
     private void saveWorkTypeAndFinish(String id) {
         WidgetDataStore.setWorkType(this, dateKey, id);
         CatCalendarWidgetProvider.refreshAll(this);
@@ -366,7 +356,13 @@ public class WorkTypeActivity extends Activity {
         finish();
         overridePendingTransition(0, 0);
     }
-
+    private void saveVacationAndFinish() {
+        WidgetDataStore.setCustomWorkType(this, dateKey, "휴가");
+        CatCalendarWidgetProvider.refreshAll(this);
+        syncWidgetChangeToApp();
+        finish();
+        overridePendingTransition(0, 0);
+    }
     private LinearLayout buildCustomEditor(String initialValue) {
         LinearLayout editor = new LinearLayout(this);
         editor.setOrientation(LinearLayout.VERTICAL);
@@ -375,11 +371,9 @@ public class WorkTypeActivity extends Activity {
 
         TextView label = text("근무 내용 직접 입력", 13, 0xFF334155, true);
         editor.addView(label);
-
         LinearLayout control = new LinearLayout(this);
         control.setOrientation(LinearLayout.HORIZONTAL);
         control.setGravity(Gravity.CENTER_VERTICAL);
-
         customInput = new EditText(this);
         customInput.setSingleLine(true);
         customInput.setText(initialValue == null ? "" : initialValue);
@@ -391,26 +385,22 @@ public class WorkTypeActivity extends Activity {
         customInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
         customInput.setPadding(dp(12), 0, dp(12), 0);
         customInput.setBackground(roundRect(Color.WHITE, 12, 1, 0xFFD8E0EA));
-
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(
                 0, dp(46), 1f
         );
         control.addView(customInput, inputParams);
-
         TextView save = text("저장", 14, Color.WHITE, true);
         save.setGravity(Gravity.CENTER);
         save.setBackground(roundRect(0xFF2563EB, 12, 0, Color.TRANSPARENT));
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(68), dp(46));
         saveParams.leftMargin = dp(8);
         control.addView(save, saveParams);
-
         LinearLayout.LayoutParams controlParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
         controlParams.topMargin = dp(8);
         editor.addView(control, controlParams);
-
         TextView message = text(
                 "직접 입력한 기록은 근무시간 0시간으로 계산됩니다.",
                 11,
@@ -423,7 +413,6 @@ public class WorkTypeActivity extends Activity {
         );
         messageParams.topMargin = dp(7);
         editor.addView(message, messageParams);
-
         View.OnClickListener saveAction = v -> saveCustomWorkType();
         save.setOnClickListener(saveAction);
         customInput.setOnEditorActionListener((v, actionId, event) -> {
@@ -436,7 +425,6 @@ public class WorkTypeActivity extends Activity {
 
         return editor;
     }
-
     private void saveCustomWorkType() {
         String label = customInput.getText() == null
                 ? ""
@@ -451,7 +439,6 @@ public class WorkTypeActivity extends Activity {
         if (label.length() > 20) {
             label = label.substring(0, 20);
         }
-
         WidgetDataStore.setCustomWorkType(this, dateKey, label);
         CatCalendarWidgetProvider.refreshAll(this);
         syncWidgetChangeToApp();
@@ -461,7 +448,6 @@ public class WorkTypeActivity extends Activity {
 
     private void syncWidgetChangeToApp() {
         WidgetCloudSync.pushCurrentStateAsync(this);
-
         // 새 설치에서 아직 Firebase bridge 정보가 저장되지 않은 경우에도
         // 위젯에서 바꾼 근태를 CAT 앱에 조용히 전달합니다.
         if (WidgetDataStore.getCloudBridgeCredentials(this) == null) {
@@ -473,7 +459,6 @@ public class WorkTypeActivity extends Activity {
         if (activityWindow == null || rootContent == null) {
             return;
         }
-
         View decorView = activityWindow.getDecorView();
         int navigationBottom = getNavigationBarInset(decorView);
         int statusTop = getStatusBarInset(decorView);
@@ -484,7 +469,6 @@ public class WorkTypeActivity extends Activity {
                 dp(260),
                 displayHeight - statusTop - navigationBottom - safeTopGap
         );
-
         int contentHeight = rootContent.getMeasuredHeight();
         int targetHeight = contentHeight > 0
                 ? Math.min(contentHeight, maxHeight)
@@ -494,7 +478,6 @@ public class WorkTypeActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 targetHeight
         );
-
         WindowManager.LayoutParams params = activityWindow.getAttributes();
         params.gravity = Gravity.BOTTOM;
         // Move the actual bottom-sheet window above the Android navigation bar.
@@ -502,7 +485,6 @@ public class WorkTypeActivity extends Activity {
         params.y = Math.max(0, navigationBottom);
         activityWindow.setAttributes(params);
     }
-
     private int getNavigationBarInset(View decorView) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             WindowInsets insets = decorView.getRootWindowInsets();
@@ -520,7 +502,6 @@ public class WorkTypeActivity extends Activity {
                 }
             }
         }
-
         int resourceId = getResources().getIdentifier(
                 "navigation_bar_height",
                 "dimen",
@@ -530,7 +511,6 @@ public class WorkTypeActivity extends Activity {
                 ? getResources().getDimensionPixelSize(resourceId)
                 : dp(48);
     }
-
     private int getStatusBarInset(View decorView) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             WindowInsets insets = decorView.getRootWindowInsets();
@@ -543,7 +523,6 @@ public class WorkTypeActivity extends Activity {
         }
         return 0;
     }
-
     private String formatDateTitle() {
         try {
             LocalDate date = LocalDate.parse(dateKey, DateTimeFormatter.ISO_LOCAL_DATE);
@@ -558,7 +537,6 @@ public class WorkTypeActivity extends Activity {
             return dateKey;
         }
     }
-
     private TextView text(String value, int sizeSp, int color, boolean bold) {
         TextView view = new TextView(this);
         view.setText(value);
@@ -569,7 +547,6 @@ public class WorkTypeActivity extends Activity {
         }
         return view;
     }
-
     private GradientDrawable roundRect(int fillColor, int radiusDp, int strokeDp, int strokeColor) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(fillColor);

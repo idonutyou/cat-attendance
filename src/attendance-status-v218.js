@@ -80,9 +80,11 @@ const TYPE_STATUS = {
     earlyLeave: 4,
   },
   halfAnnualLeave: {
+    normal: 4,
     attendance: "반차",
   },
   annualLeave: {
+    normal: 8,
     attendance: "연차",
   },
 };
@@ -96,9 +98,45 @@ let titleObserver = null;
 let statusVisible = false;
 let statusFullscreenOwned = false;
 let statusFallbackRotation = 90;
+let statusHolidays = {};
+let statusHolidayLoadPromise = null;
 
 function firstDayOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function ensureStatusHolidays() {
+  if (statusHolidayLoadPromise) {
+    return statusHolidayLoadPromise;
+  }
+
+  statusHolidayLoadPromise = fetch(
+    `${import.meta.env.BASE_URL}holidays.json`,
+    { cache: "no-cache" },
+  )
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      statusHolidays =
+        data && typeof data === "object" && !Array.isArray(data)
+          ? data
+          : {};
+      if (statusVisible) {
+        renderStatus();
+      }
+      return statusHolidays;
+    })
+    .catch((error) => {
+      console.warn("근태현황 공휴일 정보를 불러오지 못했습니다.", error);
+      statusHolidays = {};
+      return statusHolidays;
+    });
+
+  return statusHolidayLoadPromise;
 }
 
 function parseRecords() {
@@ -226,7 +264,20 @@ function renderStatus() {
       return {};
     }
 
-    return getStatusValues(records[createDateKey(year, month, day)]);
+    const date = new Date(year, month, day);
+    const dateKey = createDateKey(year, month, day);
+    const values = getStatusValues(records[dateKey]);
+    const isSaturday = date.getDay() === 6;
+    const isSunday = date.getDay() === 0;
+    const isRedHoliday = Boolean(statusHolidays[dateKey]) && !isSunday;
+
+    // 회사 근태표 기준: 토요일과 공휴일(일요일 제외)은 정상 8시간.
+    // 반차처럼 명시적으로 정상 시간이 있는 기록은 그 값을 우선합니다.
+    if (values.normal === undefined && (isSaturday || isRedHoliday)) {
+      values.normal = 8;
+    }
+
+    return values;
   });
 
   const monthLabel = `${year}년 ${String(month + 1).padStart(2, "0")}월`;
@@ -879,6 +930,7 @@ function initializeAttendanceStatus() {
   watchExistingNavigation();
   setupObservers();
   ensurePaidLeaveChoice();
+  void ensureStatusHolidays();
   renderStatus();
 }
 
