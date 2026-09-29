@@ -1,0 +1,236 @@
+.attendance-status-nav-icon {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.08em;
+}
+
+.attendance-status-page {
+  width: 100%;
+  min-width: 0;
+}
+
+.attendance-status-page[hidden] {
+  display: none !important;
+}
+
+.attendance-status-card {
+  width: 100%;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #d7dee8;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+}
+
+.attendance-status-report-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 2px 0 10px;
+  color: #172033;
+  text-align: center;
+}
+
+.attendance-status-report-title strong {
+  font-size: clamp(21px, 4.8vw, 29px);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.attendance-status-report-title span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.attendance-status-toolbar {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  width: min(340px, 100%);
+  margin: 0 auto 12px;
+}
+
+.attendance-status-toolbar > strong {
+  color: #172033;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.attendance-status-month-button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #d9e0ea;
+  border-radius: 12px;
+  color: #172033;
+  background: #f8fafc;
+  font-size: 27px;
+  line-height: 1;
+}
+
+.attendance-status-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #334155;
+  border-radius: 2px;
+  background: #ffffff;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.attendance-status-table {
+  width: max-content;
+  min-width: 1120px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: #1f2937;
+  background: #ffffff;
+  font-size: 11px;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.attendance-status-table th,
+.attendance-status-table td {
+  width: 32px;
+  min-width: 32px;
+  height: 29px;
+  padding: 2px 1px;
+  border-right: 1px solid #94a3b8;
+  border-bottom: 1px solid #94a3b8;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.attendance-status-table thead th {
+  height: 25px;
+  color: #334155;
+  background: #f8fafc;
+  font-weight: 800;
+}
+
+.attendance-status-table .attendance-status-corner,
+.attendance-status-table .attendance-status-row-label {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  width: 54px;
+  min-width: 54px;
+  color: #1f2937;
+  background: #ffffff;
+  font-weight: 800;
+}
+
+.attendance-status-table thead .attendance-status-corner {
+  z-index: 7;
+  background: #f8fafc;
+}
+
+.attendance-status-table .attendance-status-sum-head,
+.attendance-status-table .attendance-status-total {
+  position: sticky;
+  left: 54px;
+  z-index: 3;
+  width: 48px;
+  min-width: 48px;
+  background: #ffffff;
+  font-weight: 800;
+}
+
+.attendance-status-table thead .attendance-status-sum-head {
+  z-index: 6;
+  color: #334155;
+  background: #f8fafc;
+}
+
+.attendance-status-table .is-saturday {
+  color: #2563eb;
+}
+
+.attendance-status-table .is-sunday {
+  color: #dc2626;
+}
+
+.attendance-status-table .is-outside {
+  color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.attendance-status-table tr:last-child th,
+.attendance-status-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.attendance-status-table th:last-child,
+.attendance-status-table td:last-child {
+  border-right: 0;
+}
+
+.attendance-status-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 30px;
+  margin-top: 12px;
+  padding: 0 4px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attendance-status-footer strong {
+  margin-left: 3px;
+  color: #111827;
+  font-weight: 900;
+}
+
+@media (max-width: 620px) {
+  .attendance-status-card {
+    padding: 14px 10px 16px;
+    border-radius: 18px;
+  }
+
+  .attendance-status-report-title strong {
+    font-size: 22px;
+  }
+
+  .attendance-status-table {
+    min-width: 1110px;
+    font-size: 10px;
+  }
+
+  .attendance-status-table th,
+  .attendance-status-table td {
+    width: 32px;
+    min-width: 32px;
+    height: 28px;
+  }
+
+  .attendance-status-table .attendance-status-corner,
+  .attendance-status-table .attendance-status-row-label {
+    width: 52px;
+    min-width: 52px;
+  }
+
+  .attendance-status-table .attendance-status-sum-head,
+  .attendance-status-table .attendance-status-total {
+    left: 52px;
+    width: 46px;
+    min-width: 46px;
+  }
+
+  .attendance-status-footer {
+    gap: 7px 18px;
+    font-size: 12px;
+  }
+}
