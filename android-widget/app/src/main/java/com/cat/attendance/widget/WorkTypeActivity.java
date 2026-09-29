@@ -226,6 +226,14 @@ public class WorkTypeActivity extends Activity {
         tile.addView(name, nameParams);
         tile.setOnClickListener(v -> {
             if (WorkTypes.CUSTOM_ID.equals(id)) {
+                String currentType = WidgetDataStore.getWorkType(this, dateKey);
+                String currentCustom = WidgetDataStore.getCustomLabel(this, dateKey);
+                boolean isVacation =
+                        WorkTypes.CUSTOM_ID.equals(currentType) &&
+                        "휴가".equals(currentCustom);
+                if (isVacation) {
+                    customInput.setText("");
+                }
                 customEditor.setVisibility(View.VISIBLE);
                 customInput.requestFocus();
                 customInput.setSelection(customInput.getText().length());

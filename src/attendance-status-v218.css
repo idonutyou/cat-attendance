@@ -177,7 +177,7 @@
   font-weight: 900;
 }
 
-/* 근태현황은 가로 전용 전체화면 레이아웃 */
+/* 근태현황은 시스템 상태바/내비게이션을 유지하는 가로 전용 레이아웃 */
 html.attendance-status-landscape-active,
 html.attendance-status-landscape-active body {
   width: 100%;
@@ -371,4 +371,12 @@ html.attendance-status-landscape-fallback .attendance-status-card {
 .attendance-status-table thead .attendance-status-corner,
 .attendance-status-table thead .attendance-status-sum-head {
   border-bottom: 1.5px solid #475569 !important;
+}
+
+
+/* v229: immersive fullscreen 금지 - 현재 브라우저/PWA viewport 안에서만 표시 */
+html.attendance-status-landscape-active .app-main,
+html.attendance-status-landscape-fallback .app-main {
+  max-width: 100vw !important;
+  max-height: 100dvh !important;
 }

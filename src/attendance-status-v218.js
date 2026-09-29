@@ -97,9 +97,10 @@ let calendarObserver = null;
 let titleObserver = null;
 let statusVisible = false;
 let statusFullscreenOwned = false;
-let statusFallbackRotation = 90;
+let statusFallbackRotation = -90;
 let statusHolidays = {};
 let statusHolidayLoadPromise = null;
+let paidLeaveDirectInputOverride = false;
 
 function firstDayOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -427,7 +428,7 @@ function updateStatusFallbackRotation(event) {
     return;
   }
 
-  statusFallbackRotation = gamma < 0 ? -90 : 90;
+  statusFallbackRotation = gamma < 0 ? 90 : -90;
   document.documentElement.style.setProperty(
     "--attendance-status-fallback-rotation",
     `${statusFallbackRotation}deg`,
@@ -439,21 +440,11 @@ function enterStatusLandscapeMode() {
     "attendance-status-landscape-active",
   );
 
-  // 가로 전환 API가 늦거나 막혀도 표는 즉시 가로 형태로 보여줍니다.
+  // 시스템 상태바/내비게이션 버튼은 그대로 보이게 두고,
+  // 화면 방향만 가로로 맞춥니다. 잠금이 막히면 CSS 회전으로 즉시 대체합니다.
   syncStatusLandscapeFallback();
 
-  const root = document.documentElement;
-
   const lockLandscape = async () => {
-    try {
-      if (!document.fullscreenElement && root.requestFullscreen) {
-        await root.requestFullscreen({ navigationUI: "hide" });
-        statusFullscreenOwned = Boolean(document.fullscreenElement);
-      }
-    } catch {
-      // Installed PWA/browser policy can reject fullscreen; CSS fallback remains.
-    }
-
     try {
       const orientation = window.screen?.orientation;
       if (orientation?.lock) {
@@ -484,9 +475,6 @@ function exitStatusLandscapeMode() {
     // Ignore browsers without orientation unlock support.
   }
 
-  if (statusFullscreenOwned && document.fullscreenElement) {
-    Promise.resolve(document.exitFullscreen?.()).catch(() => {});
-  }
   statusFullscreenOwned = false;
 }
 
@@ -827,7 +815,7 @@ function setupObservers() {
   });
 
   // 다른 앱으로 전환할 때는 근태현황 상태를 해제하지 않습니다.
-  // 브라우저가 fullscreen을 자동 해제해도 복귀 시 CSS 가로모드로 즉시 복원됩니다.
+  // 다른 앱에서 돌아와도 시스템 UI를 유지한 채 가로모드를 즉시 복원합니다.
   window.addEventListener("pagehide", () => {
     statusFullscreenOwned = false;
   });
@@ -930,6 +918,7 @@ function getOpenWorkModalDateKey() {
 function syncPaidLeaveModalPresentation() {
   const workModal = document.querySelector("#workModal");
   if (!workModal?.classList.contains("open")) {
+    paidLeaveDirectInputOverride = false;
     return;
   }
 
@@ -946,14 +935,57 @@ function syncPaidLeaveModalPresentation() {
       String(record.label || "").trim() === "휴가",
   );
 
-  if (!isVacation) {
-    return;
-  }
-
   const workTypeList = document.querySelector("#workTypeList");
   const leaveTile = workTypeList?.querySelector('[data-work-type="annualLeave"]');
   const customTile = workTypeList?.querySelector("[data-custom-work-type]");
   const customEditor = document.querySelector("#customWorkTypeEditor");
+  const customInput = document.querySelector("#customWorkTypeInput");
+
+  if (customTile && customTile.dataset.vacationDirectInputFix !== "1") {
+    customTile.dataset.vacationDirectInputFix = "1";
+    customTile.addEventListener("click", (event) => {
+      if (!event.isTrusted) {
+        return;
+      }
+
+      const activeDateKey = getOpenWorkModalDateKey();
+      const activeRecord = activeDateKey
+        ? parseRecords()[activeDateKey]
+        : null;
+      const activeVacation = Boolean(
+        activeRecord &&
+          typeof activeRecord === "object" &&
+          activeRecord.type === "custom" &&
+          String(activeRecord.label || "").trim() === "휴가",
+      );
+
+      if (!activeVacation) {
+        paidLeaveDirectInputOverride = false;
+        return;
+      }
+
+      paidLeaveDirectInputOverride = true;
+
+      requestAnimationFrame(() => {
+        leaveTile?.classList.remove("selected");
+        customTile.classList.add("selected");
+        if (customEditor) {
+          customEditor.hidden = false;
+        }
+        if (customInput) {
+          customInput.value = "";
+          customInput.dispatchEvent(
+            new Event("input", { bubbles: true }),
+          );
+          customInput.focus();
+        }
+      });
+    });
+  }
+
+  if (!isVacation || paidLeaveDirectInputOverride) {
+    return;
+  }
 
   leaveTile?.classList.add("selected");
   customTile?.classList.remove("selected");
