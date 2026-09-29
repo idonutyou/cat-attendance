@@ -93,6 +93,8 @@ let titleElement = null;
 let calendarObserver = null;
 let titleObserver = null;
 let statusVisible = false;
+let statusFullscreenOwned = false;
+let statusFallbackRotation = 90;
 
 function firstDayOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -327,24 +329,89 @@ function changeSelectedMonth(offset) {
   renderStatus();
 }
 
+function syncStatusLandscapeFallback() {
+  if (!statusVisible) {
+    document.documentElement.classList.remove(
+      "attendance-status-landscape-fallback",
+    );
+    return;
+  }
+
+  const isLandscape = window.innerWidth > window.innerHeight;
+  document.documentElement.classList.toggle(
+    "attendance-status-landscape-fallback",
+    !isLandscape,
+  );
+  document.documentElement.style.setProperty(
+    "--attendance-status-fallback-rotation",
+    `${statusFallbackRotation}deg`,
+  );
+}
+
+function updateStatusFallbackRotation(event) {
+  if (
+    !statusVisible ||
+    !document.documentElement.classList.contains(
+      "attendance-status-landscape-fallback",
+    )
+  ) {
+    return;
+  }
+
+  const gamma = Number(event?.gamma);
+  if (!Number.isFinite(gamma) || Math.abs(gamma) < 45) {
+    return;
+  }
+
+  statusFallbackRotation = gamma < 0 ? -90 : 90;
+  document.documentElement.style.setProperty(
+    "--attendance-status-fallback-rotation",
+    `${statusFallbackRotation}deg`,
+  );
+}
+
 function enterStatusLandscapeMode() {
   document.documentElement.classList.add(
     "attendance-status-landscape-active",
   );
 
-  try {
-    const orientation = window.screen?.orientation;
-    if (orientation?.lock) {
-      Promise.resolve(orientation.lock("landscape")).catch(() => {});
+  // 가로 전환 API가 늦거나 막혀도 표는 즉시 가로 형태로 보여줍니다.
+  syncStatusLandscapeFallback();
+
+  const root = document.documentElement;
+
+  const lockLandscape = async () => {
+    try {
+      if (!document.fullscreenElement && root.requestFullscreen) {
+        await root.requestFullscreen({ navigationUI: "hide" });
+        statusFullscreenOwned = Boolean(document.fullscreenElement);
+      }
+    } catch {
+      // Installed PWA/browser policy can reject fullscreen; CSS fallback remains.
     }
-  } catch {
-    // Some browsers only allow orientation lock in installed/fullscreen PWAs.
-  }
+
+    try {
+      const orientation = window.screen?.orientation;
+      if (orientation?.lock) {
+        await orientation.lock("landscape");
+      }
+    } catch {
+      // CSS fallback keeps the page landscape even when native lock is blocked.
+    }
+
+    requestAnimationFrame(syncStatusLandscapeFallback);
+  };
+
+  void lockLandscape();
 }
 
 function exitStatusLandscapeMode() {
   document.documentElement.classList.remove(
     "attendance-status-landscape-active",
+    "attendance-status-landscape-fallback",
+  );
+  document.documentElement.style.removeProperty(
+    "--attendance-status-fallback-rotation",
   );
 
   try {
@@ -352,6 +419,11 @@ function exitStatusLandscapeMode() {
   } catch {
     // Ignore browsers without orientation unlock support.
   }
+
+  if (statusFullscreenOwned && document.fullscreenElement) {
+    Promise.resolve(document.exitFullscreen?.()).catch(() => {});
+  }
+  statusFullscreenOwned = false;
 }
 
 function normalizeStatusRootClasses() {
@@ -394,13 +466,12 @@ function hideStatusPage() {
 }
 
 function showStatusPage() {
-  enterStatusLandscapeMode();
-
   const salaryNavigation = document.querySelector('[data-app-navigation="salary"]');
   salaryNavigation?.click();
 
   selectedMonth = readAttendanceMonth();
   statusVisible = true;
+  enterStatusLandscapeMode();
 
   document.querySelectorAll(".app-main > .app-page").forEach((page) => {
     if (page === statusPage) {
@@ -616,8 +687,27 @@ function setupObservers() {
   window.addEventListener("focus", () => {
     if (statusVisible) {
       renderStatus();
+      syncStatusLandscapeFallback();
     }
   });
+
+  window.addEventListener("resize", () => {
+    if (statusVisible) {
+      syncStatusLandscapeFallback();
+    }
+  });
+
+  window.addEventListener("orientationchange", () => {
+    if (statusVisible) {
+      window.setTimeout(syncStatusLandscapeFallback, 80);
+    }
+  });
+
+  window.addEventListener(
+    "deviceorientation",
+    updateStatusFallbackRotation,
+    { passive: true },
+  );
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && statusVisible) {

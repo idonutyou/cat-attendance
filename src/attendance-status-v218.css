@@ -326,18 +326,39 @@ html.attendance-status-landscape-active .attendance-status-footer {
   white-space: nowrap;
 }
 
-/* 자동 회전 잠금이 허용되지 않는 브라우저의 안내용 */
-@media (orientation: portrait) {
-  html.attendance-status-landscape-active .attendance-status-page::after {
-    content: "가로 화면으로 전환 중…";
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: grid;
-    place-items: center;
-    color: #172033;
-    background: #eef2f8;
-    font-size: 18px;
-    font-weight: 900;
-  }
+
+/* v221: native orientation lock이 막혀도 즉시 가로 표를 보여주는 fallback */
+html.attendance-status-landscape-fallback,
+html.attendance-status-landscape-fallback body {
+  overflow: hidden !important;
+}
+
+html.attendance-status-landscape-fallback .app-main {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+html.attendance-status-landscape-fallback .attendance-status-page {
+  position: fixed !important;
+  left: 50% !important;
+  top: 50% !important;
+  z-index: 10000 !important;
+  width: 100dvh !important;
+  height: 100vw !important;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--attendance-status-fallback-rotation, 90deg));
+  transform-origin: center center;
+  background: #eef2f8;
+  overflow: hidden !important;
+}
+
+html.attendance-status-landscape-fallback .attendance-status-card {
+  width: 100% !important;
+  height: 100% !important;
 }
