@@ -647,6 +647,7 @@ const DEFAULT_SETTINGS = {
   safetyAllowance: FIXED_SAFETY_ALLOWANCE,
   longevityAllowance: 0,
   otherAllowance: 0,
+  familyAllowance: 0,
 };
 
 const WORK_TYPES = [
@@ -1391,6 +1392,22 @@ app.innerHTML = `
                   <div class="input-with-unit">
                     <input
                       id="otherAllowance"
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      placeholder="0"
+                      value=""
+                    />
+                    <span>원</span>
+                  </div>
+                </label>
+
+                <label class="salary-input-row">
+                  <span>가족수당</span>
+
+                  <div class="input-with-unit">
+                    <input
+                      id="familyAllowance"
                       type="number"
                       inputmode="numeric"
                       min="0"
@@ -2193,6 +2210,10 @@ const longevityAllowanceInput = document.querySelector(
 
 const otherAllowanceInput = document.querySelector(
   "#otherAllowance",
+);
+
+const familyAllowanceInput = document.querySelector(
+  "#familyAllowance",
 );
 
 const dependentFamilyCountInput = document.querySelector(
@@ -4319,6 +4340,22 @@ otherAllowanceInput.addEventListener("input", () => {
   settingsByMonth[monthKey] = {
     ...existingMonthlySettings,
     otherAllowance: getInputNumber(otherAllowanceInput),
+  };
+
+  saveSettingsByMonth();
+  renderSalary();
+});
+
+familyAllowanceInput.addEventListener("input", () => {
+  const monthKey = getMonthKeyFromParts(
+    salarySelectedYear,
+    salarySelectedMonth,
+  );
+  const existingMonthlySettings = settingsByMonth[monthKey] || {};
+
+  settingsByMonth[monthKey] = {
+    ...existingMonthlySettings,
+    familyAllowance: getInputNumber(familyAllowanceInput),
   };
 
   saveSettingsByMonth();
@@ -7467,6 +7504,7 @@ function renderSalary() {
     ["철야수당", salary.payments.overnightPay],
     ["주차수당", salary.payments.weeklyAllowance],
     ["휴연수당", salary.payments.holidayOvertimePay],
+    ["가족수당", salary.familyAllowance],
     ["안전수당", salary.safetyAllowance],
     ["근속수당", salary.longevityAllowance],
     ["기타수당", salary.otherAllowance],
@@ -7820,6 +7858,7 @@ function calculateSalaryForMonth(year, month) {
   const longevityAllowance =
     Number(settings.longevityAllowance) || 0;
   const otherAllowance = Number(settings.otherAllowance) || 0;
+  const familyAllowance = Number(settings.familyAllowance) || 0;
 
   const ordinaryHourlyWage = baseHourlyWage > 0
     ? baseHourlyWage +
@@ -7877,6 +7916,9 @@ function calculateSalaryForMonth(year, month) {
   const payableOtherAllowance = hasAttendanceRecords
     ? otherAllowance
     : 0;
+  const payableFamilyAllowance = hasAttendanceRecords
+    ? familyAllowance
+    : 0;
 
   const baseTotalPay =
     payments.basePay +
@@ -7888,7 +7930,8 @@ function calculateSalaryForMonth(year, month) {
     payments.holidayOvertimePay +
     payableSafetyAllowance +
     payableLongevityAllowance +
-    payableOtherAllowance;
+    payableOtherAllowance +
+    payableFamilyAllowance;
   const bonusTotal = getBonusTotalForMonth(year, month);
   const totalPay = baseTotalPay;
 
@@ -7905,6 +7948,7 @@ function calculateSalaryForMonth(year, month) {
     safetyAllowance: payableSafetyAllowance,
     longevityAllowance: payableLongevityAllowance,
     otherAllowance: payableOtherAllowance,
+    familyAllowance: payableFamilyAllowance,
     basePayDays: hasAttendanceRecords ? basePayDays : 0,
     basePayHours: hasAttendanceRecords ? payableBasePayHours : 0,
     earlyLeaveDeductionHours:
@@ -9438,6 +9482,28 @@ function getFiscalSettingsForMonth(year, month) {
   return migratedFiscalSettings;
 }
 
+function getFamilyAllowanceForMonth(year, month) {
+  const targetMonthKey = getMonthKeyFromParts(year, month);
+  const allowanceEntries = Object.entries(settingsByMonth)
+    .filter(([monthKey, value]) => (
+      monthKey <= targetMonthKey &&
+      value &&
+      Object.prototype.hasOwnProperty.call(value, "familyAllowance") &&
+      Number.isFinite(Number(value.familyAllowance)) &&
+      Number(value.familyAllowance) >= 0
+    ))
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+
+  if (allowanceEntries.length === 0) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.trunc(Number(allowanceEntries.at(-1)[1].familyAllowance) || 0),
+  );
+}
+
 function getSettingsForMonth(year, month) {
   const monthKey = getMonthKeyFromParts(year, month);
   const monthlySettings = settingsByMonth[monthKey] || {};
@@ -9447,6 +9513,7 @@ function getSettingsForMonth(year, month) {
     ...DEFAULT_SETTINGS,
     ...monthlySettings,
     ...fiscalSettings,
+    familyAllowance: getFamilyAllowanceForMonth(year, month),
     safetyAllowance: FIXED_SAFETY_ALLOWANCE,
   };
 }
@@ -9467,6 +9534,7 @@ function syncSalaryInputs() {
   baseHourlyWageInput.value = settings.baseHourlyWage || "";
   longevityAllowanceInput.value = settings.longevityAllowance || "";
   otherAllowanceInput.value = settings.otherAllowance || "";
+  familyAllowanceInput.value = settings.familyAllowance || "";
 
   const deductionSettings = getDeductionSettingsForMonth(
     salarySelectedYear,
