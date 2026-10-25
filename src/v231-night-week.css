@@ -5,7 +5,7 @@
 
 .day-cell.empty,
 .day-cell.empty.night-week {
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 .day-cell.today.night-week {

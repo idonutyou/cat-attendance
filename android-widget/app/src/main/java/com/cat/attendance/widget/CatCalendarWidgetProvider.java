@@ -230,7 +230,9 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
         cell.setTextViewText(R.id.day_number, Integer.toString(date.getDayOfMonth()));
         boolean shadeNightWeek = inMonth && isNightWeek;
         int backgroundResource;
-        if (isToday) {
+        if (!inMonth) {
+            backgroundResource = R.drawable.widget_day_empty_bg;
+        } else if (isToday) {
             backgroundResource = shadeNightWeek
                     ? R.drawable.widget_day_today_night_week_bg
                     : R.drawable.widget_day_today_bg;
