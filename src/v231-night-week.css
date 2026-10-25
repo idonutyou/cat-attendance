@@ -1,12 +1,13 @@
-/* v231 - 2주 교대 야간주 표시 */
-.day-cell.night-week {
-  background: #f7f8fa;
+/* v232 - 야간주와 날짜 없는 빈칸을 확실히 구분 */
+.day-cell.night-week:not(.empty) {
+  background: #eef2f6;
 }
 
+.day-cell.empty,
 .day-cell.empty.night-week {
-  background: #f5f6f8;
+  background: #f8fafc;
 }
 
 .day-cell.today.night-week {
-  background: #f5f7fa;
+  background: #edf2f7;
 }

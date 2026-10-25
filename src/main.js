@@ -6694,11 +6694,6 @@ function renderCalendar() {
       const emptyCell = document.createElement("div");
 
       emptyCell.className = "day-cell empty";
-
-      if (isNightWeek) {
-        emptyCell.classList.add("night-week");
-      }
-
       calendarGrid.appendChild(emptyCell);
 
       continue;

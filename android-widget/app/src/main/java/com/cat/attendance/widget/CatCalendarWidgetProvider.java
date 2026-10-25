@@ -228,13 +228,14 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
         String holiday = HolidayStore.get(context, dateKey);
 
         cell.setTextViewText(R.id.day_number, Integer.toString(date.getDayOfMonth()));
+        boolean shadeNightWeek = inMonth && isNightWeek;
         int backgroundResource;
         if (isToday) {
-            backgroundResource = isNightWeek
+            backgroundResource = shadeNightWeek
                     ? R.drawable.widget_day_today_night_week_bg
                     : R.drawable.widget_day_today_bg;
         } else {
-            backgroundResource = isNightWeek
+            backgroundResource = shadeNightWeek
                     ? R.drawable.widget_day_night_week_bg
                     : R.drawable.widget_day_bg;
         }
