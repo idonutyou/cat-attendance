@@ -27,6 +27,7 @@ import "./v191-overrides.css";
 import "./v193-overrides.css";
 import "./v194-overrides.css";
 import "./v195-overrides.css";
+import "./v231-night-week.css";
 import { firebaseConfig } from "./firebase-config.js";
 
 const STORAGE_KEY = "cat-attendance-records-v1";
@@ -6476,6 +6477,179 @@ function render() {
   renderSalary();
 }
 
+const NIGHT_WEEK_NIGHT_TYPES = new Set([
+  "night",
+  "nightOvertime",
+  "nightHoliday",
+  "nightHolidayOvertime",
+]);
+
+const NIGHT_WEEK_DAY_TYPES = new Set([
+  "day",
+  "dayOvertime",
+  "dayHoliday",
+  "dayHolidayOvertime",
+]);
+
+function getShiftKindForNightWeek(workRecord) {
+  const workTypeId = typeof workRecord === "string"
+    ? workRecord
+    : workRecord && typeof workRecord === "object"
+      ? workRecord.type
+      : "";
+
+  if (NIGHT_WEEK_NIGHT_TYPES.has(workTypeId)) {
+    return "night";
+  }
+
+  if (NIGHT_WEEK_DAY_TYPES.has(workTypeId)) {
+    return "day";
+  }
+
+  return "";
+}
+
+function getNightWeekStartDate(date) {
+  const start = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const weekday = start.getDay();
+  const offset = weekStartsOnMonday
+    ? weekday === 0
+      ? -6
+      : 1 - weekday
+    : -weekday;
+
+  start.setDate(start.getDate() + offset);
+  return start;
+}
+
+function getNightWeekStartKey(date) {
+  const weekStart = getNightWeekStartDate(date);
+
+  return createDateKey(
+    weekStart.getFullYear(),
+    weekStart.getMonth(),
+    weekStart.getDate(),
+  );
+}
+
+function getNightWeekStartsForRange(rangeStart, rangeEnd) {
+  const explicitWeeks = new Map();
+  let firstExplicitWeek = null;
+
+  Object.entries(records).forEach(([dateKey, workRecord]) => {
+    const shiftKind = getShiftKindForNightWeek(workRecord);
+
+    if (!shiftKind) {
+      return;
+    }
+
+    const parsed = parseDateKey(dateKey);
+    const recordDate = new Date(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+    );
+
+    if (Number.isNaN(recordDate.getTime())) {
+      return;
+    }
+
+    const weekStart = getNightWeekStartDate(recordDate);
+    const weekKey = createDateKey(
+      weekStart.getFullYear(),
+      weekStart.getMonth(),
+      weekStart.getDate(),
+    );
+    const previous = explicitWeeks.get(weekKey);
+
+    // 같은 주 안에서 주간/야간 기록이 섞이면 뒤 날짜의 설정을
+    // 사용자의 최신 주간 전환 의도로 봅니다.
+    if (!previous || recordDate > previous.recordDate) {
+      explicitWeeks.set(weekKey, {
+        shiftKind,
+        recordDate,
+        weekStart,
+      });
+    }
+
+    if (!firstExplicitWeek || weekStart < firstExplicitWeek) {
+      firstExplicitWeek = weekStart;
+    }
+  });
+
+  const nightWeeks = new Set();
+
+  if (!firstExplicitWeek) {
+    return nightWeeks;
+  }
+
+  const firstVisibleWeek = getNightWeekStartDate(rangeStart);
+  const lastVisibleWeek = getNightWeekStartDate(rangeEnd);
+  let cycleActive = false;
+  let nightAnchor = null;
+
+  for (
+    let week = new Date(firstExplicitWeek);
+    week <= lastVisibleWeek;
+    week.setDate(week.getDate() + 7)
+  ) {
+    const weekDate = new Date(week);
+    const weekKey = createDateKey(
+      weekDate.getFullYear(),
+      weekDate.getMonth(),
+      weekDate.getDate(),
+    );
+
+    let predictedNight = false;
+
+    if (cycleActive && nightAnchor) {
+      const elapsedWeeks = Math.round(
+        (weekDate - nightAnchor) / (7 * 24 * 60 * 60 * 1000),
+      );
+      predictedNight = elapsedWeeks % 4 < 2;
+    }
+
+    const explicit = explicitWeeks.get(weekKey);
+
+    if (explicit?.shiftKind === "night") {
+      if (!cycleActive || !predictedNight) {
+        cycleActive = true;
+        nightAnchor = new Date(weekDate);
+      }
+    } else if (
+      explicit?.shiftKind === "day" &&
+      predictedNight
+    ) {
+      // 예상 야간주보다 일찍 주간으로 바꾸면 자동 2주 교대 예측을
+      // 여기서 끊고, 다음 실제 야간 기록이 나올 때까지 주간으로 둡니다.
+      cycleActive = false;
+      nightAnchor = null;
+    }
+
+    if (cycleActive && nightAnchor) {
+      const elapsedWeeks = Math.round(
+        (weekDate - nightAnchor) / (7 * 24 * 60 * 60 * 1000),
+      );
+      predictedNight = elapsedWeeks % 4 < 2;
+    } else {
+      predictedNight = false;
+    }
+
+    if (
+      predictedNight &&
+      weekDate >= firstVisibleWeek
+    ) {
+      nightWeeks.add(weekKey);
+    }
+  }
+
+  return nightWeeks;
+}
+
 function renderCalendar() {
   renderCalendarWeekdayHeaders();
 
@@ -6490,14 +6664,41 @@ function renderCalendar() {
 
   const firstDayPosition = getCalendarFirstDayPosition(firstDate);
   const today = new Date();
+  const calendarStart = new Date(
+    year,
+    month,
+    1 - firstDayPosition,
+  );
+  const calendarEnd = new Date(
+    calendarStart.getFullYear(),
+    calendarStart.getMonth(),
+    calendarStart.getDate() + 41,
+  );
+  const nightWeekStarts = getNightWeekStartsForRange(
+    calendarStart,
+    calendarEnd,
+  );
 
   for (let cellIndex = 0; cellIndex < 42; cellIndex += 1) {
     const dayNumber = cellIndex - firstDayPosition + 1;
+    const gridDate = new Date(
+      calendarStart.getFullYear(),
+      calendarStart.getMonth(),
+      calendarStart.getDate() + cellIndex,
+    );
+    const isNightWeek = nightWeekStarts.has(
+      getNightWeekStartKey(gridDate),
+    );
 
     if (dayNumber < 1 || dayNumber > daysInMonth) {
       const emptyCell = document.createElement("div");
 
       emptyCell.className = "day-cell empty";
+
+      if (isNightWeek) {
+        emptyCell.classList.add("night-week");
+      }
+
       calendarGrid.appendChild(emptyCell);
 
       continue;
@@ -6514,6 +6715,10 @@ function renderCalendar() {
 
     dayButton.type = "button";
     dayButton.className = "day-cell";
+
+    if (isNightWeek) {
+      dayButton.classList.add("night-week");
+    }
 
     if (
       today.getFullYear() === year &&

@@ -15,7 +15,14 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import org.json.JSONObject;
 
 public class CatCalendarWidgetProvider extends AppWidgetProvider {
     public static final String ACTION_PREVIOUS_MONTH = "com.cat.attendance.widget.PREVIOUS_MONTH";
@@ -178,6 +185,12 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
                 : first.getDayOfWeek().getValue() % 7;
         LocalDate start = first.minusDays(offset);
         LocalDate today = LocalDate.now();
+        Set<LocalDate> nightWeekStarts = buildNightWeekStarts(
+                context,
+                start,
+                start.plusDays(41),
+                startsMonday
+        );
 
         for (int row = 0; row < ROW_IDS.length; row++) {
             views.removeAllViews(ROW_IDS[row]);
@@ -188,7 +201,8 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
                         widgetId,
                         visibleMonth,
                         date,
-                        today
+                        today,
+                        nightWeekStarts.contains(getWeekStart(date, startsMonday))
                 );
                 views.addView(ROW_IDS[row], cell);
             }
@@ -202,7 +216,8 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
             int widgetId,
             YearMonth visibleMonth,
             LocalDate date,
-            LocalDate today
+            LocalDate today,
+            boolean isNightWeek
     ) {
         RemoteViews cell = new RemoteViews(context.getPackageName(), R.layout.widget_day_cell);
         boolean inMonth = YearMonth.from(date).equals(visibleMonth);
@@ -213,10 +228,20 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
         String holiday = HolidayStore.get(context, dateKey);
 
         cell.setTextViewText(R.id.day_number, Integer.toString(date.getDayOfMonth()));
+        int backgroundResource;
+        if (isToday) {
+            backgroundResource = isNightWeek
+                    ? R.drawable.widget_day_today_night_week_bg
+                    : R.drawable.widget_day_today_bg;
+        } else {
+            backgroundResource = isNightWeek
+                    ? R.drawable.widget_day_night_week_bg
+                    : R.drawable.widget_day_bg;
+        }
         cell.setInt(
                 R.id.day_root,
                 "setBackgroundResource",
-                isToday ? R.drawable.widget_day_today_bg : R.drawable.widget_day_bg
+                backgroundResource
         );
 
         int dayColor;
@@ -273,6 +298,159 @@ public class CatCalendarWidgetProvider extends AppWidgetProvider {
         }
 
         return cell;
+    }
+
+    private static Set<LocalDate> buildNightWeekStarts(
+            Context context,
+            LocalDate rangeStart,
+            LocalDate rangeEnd,
+            boolean startsMonday
+    ) {
+        JSONObject records = WidgetDataStore.getRecordsSnapshot(context);
+        Map<LocalDate, ShiftObservation> explicitWeeks = new HashMap<>();
+        LocalDate firstExplicitWeek = null;
+        Iterator<String> keys = records.keys();
+
+        while (keys.hasNext()) {
+            String dateKey = keys.next();
+            Object rawRecord = records.opt(dateKey);
+            String workType = "";
+
+            if (rawRecord instanceof String) {
+                workType = (String) rawRecord;
+            } else if (rawRecord instanceof JSONObject) {
+                workType = ((JSONObject) rawRecord).optString("type", "");
+            }
+
+            String shiftKind = getShiftKind(workType);
+            if (shiftKind.isEmpty()) {
+                continue;
+            }
+
+            LocalDate recordDate;
+            try {
+                recordDate = LocalDate.parse(dateKey, DATE_KEY);
+            } catch (Exception ignored) {
+                continue;
+            }
+
+            LocalDate weekStart = getWeekStart(recordDate, startsMonday);
+            ShiftObservation previous = explicitWeeks.get(weekStart);
+
+            // 같은 주 안에서 주간/야간 기록이 섞이면 뒤 날짜의 설정을
+            // 사용자의 최신 주간 전환 의도로 봅니다.
+            if (previous == null || recordDate.isAfter(previous.recordDate)) {
+                explicitWeeks.put(
+                        weekStart,
+                        new ShiftObservation(recordDate, shiftKind)
+                );
+            }
+
+            if (firstExplicitWeek == null || weekStart.isBefore(firstExplicitWeek)) {
+                firstExplicitWeek = weekStart;
+            }
+        }
+
+        Set<LocalDate> nightWeeks = new HashSet<>();
+        if (firstExplicitWeek == null) {
+            return nightWeeks;
+        }
+
+        LocalDate firstVisibleWeek = getWeekStart(rangeStart, startsMonday);
+        LocalDate lastVisibleWeek = getWeekStart(rangeEnd, startsMonday);
+        boolean cycleActive = false;
+        LocalDate nightAnchor = null;
+
+        for (
+                LocalDate week = firstExplicitWeek;
+                !week.isAfter(lastVisibleWeek);
+                week = week.plusWeeks(1)
+        ) {
+            boolean predictedNight = isPredictedNightWeek(
+                    cycleActive,
+                    nightAnchor,
+                    week
+            );
+            ShiftObservation explicit = explicitWeeks.get(week);
+
+            if (explicit != null && "night".equals(explicit.shiftKind)) {
+                if (!cycleActive || !predictedNight) {
+                    cycleActive = true;
+                    nightAnchor = week;
+                }
+            } else if (
+                    explicit != null &&
+                    "day".equals(explicit.shiftKind) &&
+                    predictedNight
+            ) {
+                // 예상 야간주 중간에 실제 주간 기록이 나오면 자동 2주 교대
+                // 예측을 멈추고 다음 실제 야간 기록 전까지 주간으로 둡니다.
+                cycleActive = false;
+                nightAnchor = null;
+            }
+
+            predictedNight = isPredictedNightWeek(
+                    cycleActive,
+                    nightAnchor,
+                    week
+            );
+
+            if (predictedNight && !week.isBefore(firstVisibleWeek)) {
+                nightWeeks.add(week);
+            }
+        }
+
+        return nightWeeks;
+    }
+
+    private static boolean isPredictedNightWeek(
+            boolean cycleActive,
+            LocalDate nightAnchor,
+            LocalDate week
+    ) {
+        if (!cycleActive || nightAnchor == null) {
+            return false;
+        }
+
+        long elapsedWeeks = ChronoUnit.WEEKS.between(nightAnchor, week);
+        return elapsedWeeks >= 0 && elapsedWeeks % 4 < 2;
+    }
+
+    private static LocalDate getWeekStart(
+            LocalDate date,
+            boolean startsMonday
+    ) {
+        int offset = startsMonday
+                ? date.getDayOfWeek().getValue() - 1
+                : date.getDayOfWeek().getValue() % 7;
+        return date.minusDays(offset);
+    }
+
+    private static String getShiftKind(String workType) {
+        switch (workType) {
+            case "night":
+            case "nightOvertime":
+            case "nightHoliday":
+            case "nightHolidayOvertime":
+                return "night";
+            case "day":
+            case "dayOvertime":
+            case "dayHoliday":
+            case "dayHolidayOvertime":
+                return "day";
+            default:
+                return "";
+        }
+    }
+
+    private static final class ShiftObservation {
+        final LocalDate recordDate;
+        final String shiftKind;
+
+        ShiftObservation(LocalDate recordDate, String shiftKind) {
+            this.recordDate = recordDate;
+            this.shiftKind = shiftKind;
+        }
     }
 
     private static PendingIntent broadcastIntent(
