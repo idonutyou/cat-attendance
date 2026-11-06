@@ -473,7 +473,7 @@ function clearNativeWidgetFallbackMarker() {
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && getNativeWidgetAccountId()) {
-    void detectInstalledNativeWidgetAndAutoConnect();
+    void detectInstalledNativeWidgetAndAutoConnect({ force: true });
   }
 });
 
@@ -10348,7 +10348,7 @@ async function initializeGuestCloudBridge() {
     }
 
     subscribeToGuestCloudChanges();
-    void detectInstalledNativeWidgetAndAutoConnect();
+    void detectInstalledNativeWidgetAndAutoConnect({ force: true });
     return true;
   } catch (error) {
     // Guest 자체 저장은 로컬로 계속 정상 동작합니다. Firebase 익명 인증이
