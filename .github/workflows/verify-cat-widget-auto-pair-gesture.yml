@@ -1,0 +1,79 @@
+name: Verify CAT installed widget automatic first-gesture pair
+on:
+  push:
+    branches:
+      - backup/cat-auto-pair-gesture-20261107-p30
+permissions:
+  contents: read
+jobs:
+  validate-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build changed PWA only
+        run: |
+          npm ci
+          node --check src/main.js
+          npm run build
+      - name: No manual connect and first normal tap pairing regression
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import fs from "node:fs";
+          import vm from "node:vm";
+          const s=fs.readFileSync("src/main.js","utf8");
+          assert.ok(!s.includes("widgetConnectButton"));
+          assert.ok(s.includes("navigator.getInstalledRelatedApps()"));
+          assert.ok(s.includes('document.addEventListener("click", autoPairNativeWidgetOnNormalInteraction)'));
+          const start=s.indexOf("function getNativeWidgetAccountId()");
+          const end=s.indexOf("function readNativeWidgetLaunchPayload(",start);
+          assert.ok(start>0&&end>start);
+          const db=new Map();let installs=false, sends=0;
+          const localStorage={
+            getItem:k=>db.has(k)?db.get(k):null,
+            setItem:(k,v)=>db.set(k,String(v)),
+            removeItem:k=>db.delete(k)
+          };
+          let handler=null;
+          const ctx={
+            authMode:"guest",activeGuestUser:{uid:"guest1"},activeGoogleUser:null,
+            deviceId:"d1",Date,console,
+            localStorage,
+            document:{addEventListener:(name,fn)=>{if(name==="click")handler=fn;}},
+            navigator:{
+              getInstalledRelatedApps:async()=>installs?[{platform:"play",id:"com.cat.attendance.widget"}]:[],
+              userActivation:{isActive:true}
+            },
+            CAT_BROWSER_ENV:{isAndroid:true,isNaverInApp:false},
+            NATIVE_WIDGET_VERIFIED_KEY:"cat-attendance-native-widget-verified-v2",
+            NATIVE_WIDGET_PAIR_NONCE_KEY:"cat-attendance-native-widget-pair-nonce-v2",
+            NATIVE_WIDGET_PACKAGE_ID:"com.cat.attendance.widget",
+            crypto:{randomUUID:()=>"nonce1"},
+            sendCurrentStateBackToNativeWidget:()=>{sends++;},
+            updateCloudSyncStatus:()=>{}
+          };
+          ctx.globalThis=ctx;vm.createContext(ctx);
+          vm.runInContext(s.slice(start,end),ctx);
+          assert.equal(typeof handler,"function");
+          await vm.runInContext("detectInstalledNativeWidgetAndAutoConnect({force:true})",ctx);
+          handler({isTrusted:true});assert.equal(sends,0,"No APK must never trigger intent");
+          installs=true;
+          await vm.runInContext("detectInstalledNativeWidgetAndAutoConnect({force:true})",ctx);
+          assert.equal(sends,0,"Install detection alone must not launch external app");
+          handler({isTrusted:false});assert.equal(sends,0,"Synthetic clicks are ignored");
+          ctx.navigator.userActivation.isActive=false;
+          handler({isTrusted:true});assert.equal(sends,0,"No activation must not launch");
+          ctx.navigator.userActivation.isActive=true;
+          handler({isTrusted:true});assert.equal(sends,1,"First normal tap auto pairs");
+          handler({isTrusted:true});assert.equal(sends,1,"Pairing is rate limited");
+          assert.equal(vm.runInContext('acknowledgeNativeWidgetPairing({sourceDeviceId:"android-widget-pair:d1",widgetPairingNonce:"nonce1"})',ctx),true);
+          assert.equal(vm.runInContext("hasNativeWidgetPairing()",ctx),true);
+          installs=false;
+          await vm.runInContext("detectInstalledNativeWidgetAndAutoConnect({force:true})",ctx);
+          handler({isTrusted:true});assert.equal(sends,1,"Uninstalled widget never receives intent");
+          console.log("PASS: no apk, auto first tap, gesture verification, ACK, uninstall");
+          NODE
