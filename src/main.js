@@ -47,6 +47,7 @@ const GOOGLE_CACHE_PREFIX = "cat-attendance-google-cache-v1";
 const DEVICE_ID_KEY = "cat-attendance-device-id-v1";
 const WIDGET_SYNC_APPLIED_KEY = "cat-attendance-widget-sync-applied-v1";
 const NATIVE_WIDGET_VERIFIED_KEY = "cat-attendance-native-widget-verified-v2";
+const NATIVE_WIDGET_PACKAGE_ID = "com.cat.attendance.widget";
 const NATIVE_WIDGET_PAIR_NONCE_KEY = "cat-attendance-native-widget-pair-nonce-v2";
 const FIREBASE_SDK_VERSION = "12.16.0";
 const CLOUD_SYNC_DEBOUNCE_MS = 550;
@@ -101,6 +102,102 @@ function getNativeWidgetAccountId() {
 }
 
 // Legacy v1 pairing markers were written without confirmation. Ignore them.
+// Session-scoped installation status. Never trust persisted 'paired'
+// markers as proof that a companion APK still exists on this device.
+let nativeWidgetInstalledThisSession = false;
+let nativeWidgetLastInstallCheck = 0;
+let nativeWidgetInstallCheckPromise = null;
+let nativeWidgetLastAutoPairKey = "";
+let nativeWidgetLastAutoPairAt = 0;
+
+async function detectInstalledNativeWidgetAndAutoConnect({ force = false } = {}) {
+  if (
+    !CAT_BROWSER_ENV.isAndroid ||
+    CAT_BROWSER_ENV.isNaverInApp ||
+    typeof navigator.getInstalledRelatedApps !== "function"
+  ) {
+    // Fail closed: neither missing APIs nor other browsers may probe
+    // an unverified native application by launching intent:// links.
+    nativeWidgetInstalledThisSession = false;
+    return false;
+  }
+  if (nativeWidgetInstallCheckPromise) {
+    return nativeWidgetInstallCheckPromise;
+  }
+  if (!force && Date.now() - nativeWidgetLastInstallCheck < 20000) {
+    return nativeWidgetInstalledThisSession;
+  }
+
+  nativeWidgetInstallCheckPromise = (async () => {
+    let related = [];
+    try {
+      related = await navigator.getInstalledRelatedApps();
+    } catch (error) {
+      nativeWidgetInstalledThisSession = false;
+      console.warn("위젯 설치 여부 확인을 지원하지 않습니다.", error);
+      return false;
+    }
+    nativeWidgetLastInstallCheck = Date.now();
+    const installed = Array.isArray(related) && related.some(
+      (app) => app?.platform === "play" && app?.id === NATIVE_WIDGET_PACKAGE_ID,
+    );
+    nativeWidgetInstalledThisSession = installed;
+
+    if (!installed) {
+      // Previously stored proof does not survive actual APK removal.
+      try {
+        localStorage.removeItem(NATIVE_WIDGET_VERIFIED_KEY);
+        localStorage.removeItem(NATIVE_WIDGET_PAIR_NONCE_KEY);
+      } catch {}
+      nativeWidgetLastAutoPairKey = "";
+      return false;
+    }
+
+    const accountId = getNativeWidgetAccountId();
+    if (!accountId || hasNativeWidgetPairing()) {
+      return true;
+    }
+
+    const attemptKey = `${deviceId}:${accountId}`;
+    if (
+      nativeWidgetLastAutoPairKey === attemptKey &&
+      Date.now() - nativeWidgetLastAutoPairAt < 120000
+    ) {
+      return true;
+    }
+    nativeWidgetLastAutoPairKey = attemptKey;
+    nativeWidgetLastAutoPairAt = Date.now();
+
+    // The native bridge is contacted only after the installed-app API
+    // positively confirms an APK signed by the related CAT application.
+    // This is automatic: no separate "connect" button is required.
+    let nonce = "";
+    try {
+      nonce = globalThis.crypto?.randomUUID?.() || "";
+      if (!nonce) {
+        const bytes = new Uint8Array(16);
+        globalThis.crypto.getRandomValues(bytes);
+        nonce = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      }
+      localStorage.setItem(NATIVE_WIDGET_PAIR_NONCE_KEY, nonce);
+    } catch (error) {
+      console.warn("위젯 연결 확인값 생성 실패:", error);
+      return true;
+    }
+
+    sendCurrentStateBackToNativeWidget({
+      allowUnpaired: true,
+      allowBackground: true,
+    });
+    return true;
+  })();
+  try {
+    return await nativeWidgetInstallCheckPromise;
+  } finally {
+    nativeWidgetInstallCheckPromise = null;
+  }
+}
+
 function markNativeWidgetPaired() {
   const accountId = getNativeWidgetAccountId();
   if (!accountId) return;
@@ -111,6 +208,7 @@ function markNativeWidgetPaired() {
 }
 
 function hasNativeWidgetPairing() {
+  if (!nativeWidgetInstalledThisSession) return false;
   const accountId = getNativeWidgetAccountId();
   if (!accountId) return false;
   try {
@@ -240,10 +338,15 @@ function sendCurrentStateBackToNativeWidget({
       return;
     }
 
-    // The v1 "paired" marker was set automatically on login, even when
-    // no widget was installed. v2 accepts only an actual native ACK.
+    // Only a verified installed CAT widget may receive native intents.
+    if (!nativeWidgetInstalledThisSession) {
+      return;
+    }
+
+    // v2 requires the actual native ACK. An installed APK can perform
+    // an automatic nonce handshake even without an extra button press.
     let pairingNonce = "";
-    if (allowUnpaired && userInitiated) {
+    if (allowUnpaired && (userInitiated || allowBackground)) {
       try {
         pairingNonce =
           localStorage.getItem(NATIVE_WIDGET_PAIR_NONCE_KEY) || "";
@@ -367,6 +470,12 @@ function clearNativeWidgetFallbackMarker() {
     console.warn("위젯 미설치 복귀 URL 정리 실패:", error);
   }
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && getNativeWidgetAccountId()) {
+    void detectInstalledNativeWidgetAndAutoConnect({ force: true });
+  }
+});
 
 window.addEventListener("hashchange", clearNativeWidgetFallbackMarker);
 clearNativeWidgetFallbackMarker();
@@ -1025,7 +1134,6 @@ app.innerHTML = `
         </section>
 
         <div class="navigation-utility-row">
-          <div class="widget-actions" style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 104px;">
           <button
             id="widgetInstallButton"
             class="widget-install-button"
@@ -1043,10 +1151,6 @@ app.innerHTML = `
               </span>
             </span>
           </button>
-          <button id="widgetConnectButton" type="button"
-            style="width:104px;min-height:25px;border-radius:9px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;"
-            title="이미 CAT 위젯 APK를 설치했다면 눌러 연결 확인">위젯 연결</button>
-          </div>
 
           <div
             id="weekStartToggle"
@@ -2010,7 +2114,6 @@ const accountEmail = document.querySelector("#accountEmail");
 const cloudSyncStatus = document.querySelector("#cloudSyncStatus");
 const accountSwitchButton = document.querySelector("#accountSwitchButton");
 const widgetInstallButton = document.querySelector("#widgetInstallButton");
-const widgetConnectButton = document.querySelector("#widgetConnectButton");
 const monthTitle = document.querySelector("#monthTitle");
 const calendarGrid = document.querySelector("#calendarGrid");
 const mainCalendarWeekdays = document.querySelector(
@@ -2359,25 +2462,6 @@ widgetInstallButton?.addEventListener("click", () => {
   document.body.append(downloadLink);
   downloadLink.click();
   downloadLink.remove();
-});
-
-widgetConnectButton.addEventListener("click", () => {
-  if (!CAT_BROWSER_ENV.isAndroid || CAT_BROWSER_ENV.isNaverInApp) {
-    window.alert("안드로이드에서 CAT 위젯 APK를 설치한 뒤 연결할 수 있습니다.");
-    return;
-  }
-  if (!getNativeWidgetAccountId()) {
-    window.alert("Guest 또는 Google 로그인 동기화 연결 후 시도해 주세요.");
-    return;
-  }
-  // Explicit pairing is user initiated; no automatic package probe is ever run.
-  const nonce = globalThis.crypto?.randomUUID?.() ||
-    `cat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  localStorage.setItem(NATIVE_WIDGET_PAIR_NONCE_KEY, nonce);
-  sendCurrentStateBackToNativeWidget({
-    userInitiated: true, allowUnpaired: true,
-  });
-  updateCloudSyncStatus("위젯 연결 확인 중…");
 });
 
 salaryYearButton.addEventListener("click", () => {
@@ -10264,6 +10348,7 @@ async function initializeGuestCloudBridge() {
     }
 
     subscribeToGuestCloudChanges();
+    void detectInstalledNativeWidgetAndAutoConnect({ force: true });
     return true;
   } catch (error) {
     // Guest 자체 저장은 로컬로 계속 정상 동작합니다. Firebase 익명 인증이
@@ -10555,6 +10640,7 @@ async function enterGoogleMode(user) {
   }
 
   subscribeToCloudChanges();
+  void detectInstalledNativeWidgetAndAutoConnect();
 
   if (widgetDataApplied) {
     scheduleCloudSync();
