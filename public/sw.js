@@ -1,4 +1,5 @@
-const CACHE_NAME = "cat-attendance-v194";
+const CACHE_NAME = "cat-attendance-v234";
+const CACHE_PREFIX = "cat-attendance-v";
 
 const APP_SHELL = [
   "./",
@@ -22,7 +23,9 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((cacheNames) =>
       Promise.all(
         cacheNames
-          .filter((cacheName) => cacheName !== CACHE_NAME)
+          .filter((cacheName) =>
+            cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME
+          )
           .map((cacheName) => caches.delete(cacheName))
       )
     )
@@ -33,15 +36,19 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
-  // CAT 위젯 APK는 항상 서버의 최신 파일을 직접 받는다.
-  // 서비스 워커 캐시에 오래된 APK가 남아 업데이트가 막히는 것을 방지한다.
-  if (new URL(event.request.url).pathname.endsWith("/CAT-widget.apk")) {
+  const pathname = new URL(event.request.url).pathname;
+
+  // Always fetch widget APK and fallback page directly from the server.
+  // In particular, never leave a cached blank widget-noop.html in place.
+  if (
+    pathname.endsWith("/CAT-widget.apk") ||
+    pathname.endsWith("/widget-noop.html")
+  ) {
     event.respondWith(fetch(event.request, { cache: "no-store" }));
     return;
   }
 
-  // 앱 시작 화면은 항상 서버의 최신 버전을 먼저 확인한다.
-  // 예전 index.html과 새 자산 파일이 섞여 하얀 화면이 뜨는 것을 막는다.
+  // Keep the app document network-first to avoid mismatched JS/CSS bundles.
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request)
