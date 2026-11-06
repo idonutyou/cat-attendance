@@ -1,0 +1,43 @@
+name: Package CAT widget restart hotfix v235
+on:
+  push:
+    branches:
+      - backup/widget-record-restart-20261106-p30
+permissions:
+  contents: read
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build existing app
+        run: |
+          npm ci
+          npm run build
+      - name: Verify no native intent from routine attendance editing
+        run: |
+          node --input-type=module -e '
+          import fs from "node:fs";
+          import assert from "node:assert/strict";
+          const s = fs.readFileSync("src/main.js", "utf8");
+          const block = s.split("function saveRecords() {")[1]?.split("function loadWeeklyDateRange()")[0];
+          assert.ok(block && !block.includes("sendCurrentStateBackToNativeWidget("));
+          assert.ok(!s.includes("autoPairNativeWidgetOnAppOpen"));
+          assert.ok(s.includes("navigator.userActivation?.isActive === false"));
+          assert.ok(s.includes("allowUnpaired: true"));
+          '
+      - name: Package actual modified file only
+        run: |
+          mkdir -p CAT_v235/src
+          cp src/main.js CAT_v235/src/main.js
+          (cd CAT_v235 && zip -q -r ../CAT_widget_restart_v235_patch_files.zip src)
+          unzip -t CAT_widget_restart_v235_patch_files.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CAT_widget_restart_v235_patch_files
+          path: CAT_widget_restart_v235_patch_files.zip
+          if-no-files-found: error
