@@ -4552,6 +4552,9 @@ dependentFamilyCountInput.addEventListener("change", () => {
       settingsByMonth[monthKey] = {
         ...existingMonthlySettings,
         [fieldName]: deductionAmount,
+        // Distinguish a newly edited July health value from the older
+        // legacy July-cycle health entry.
+        ...(isPension ? {} : { healthDeductionEffectiveMonth: true }),
       };
 
       saveSettingsByMonth();
@@ -7419,6 +7422,7 @@ function getLatestDeductionAmountInCycle(
   // migrating or rewriting previously stored months.
   let cursorYear = year;
   let cursorMonth = month;
+  let legacyJulyHealthAmount = null;
 
   for (let checked = 0; checked < 12; checked += 1) {
     if (
@@ -7429,13 +7433,25 @@ function getLatestDeductionAmountInCycle(
     }
 
     const monthKey = getMonthKeyFromParts(cursorYear, cursorMonth);
+    const monthSettings = settingsByMonth[monthKey] || {};
     const savedAmount = readSavedDeductionAmount(
-      settingsByMonth[monthKey] || {},
+      monthSettings,
       fieldName,
     );
 
     if (savedAmount !== null) {
-      return savedAmount;
+      if (
+        fieldName === "healthDeduction" &&
+        cursorMonth === 6 &&
+        monthSettings.healthDeductionEffectiveMonth !== true
+      ) {
+        // Before April-cycle support, health was saved under July.
+        // Such a legacy entry must not supersede a newer April/May/June
+        // entry, but remains a fallback when no newer entry exists.
+        legacyJulyHealthAmount = savedAmount;
+      } else {
+        return savedAmount;
+      }
     }
 
     cursorMonth -= 1;
@@ -7445,7 +7461,7 @@ function getLatestDeductionAmountInCycle(
     }
   }
 
-  return null;
+  return legacyJulyHealthAmount;
 }
 
 function getDeductionSettingsForMonth(year, month) {
