@@ -4531,16 +4531,13 @@ dependentFamilyCountInput.addEventListener("change", () => {
   (input) => {
     input.addEventListener("input", () => {
       const isPension = input === pensionDeductionSettingInput;
-      const cycleKey = isPension
-        ? getPensionCycleStartMonthKey(
-            salarySelectedYear,
-            salarySelectedMonth,
-          )
-        : getHealthCycleStartMonthKey(
-            salarySelectedYear,
-            salarySelectedMonth,
-          );
-      const existingCycleSettings = settingsByMonth[cycleKey] || {};
+      // Save from the selected month, never overwrite an earlier month
+      // in the same insurance cycle.
+      const monthKey = getMonthKeyFromParts(
+        salarySelectedYear,
+        salarySelectedMonth,
+      );
+      const existingMonthlySettings = settingsByMonth[monthKey] || {};
       const fieldName = isPension
         ? "pensionDeduction"
         : "healthDeduction";
@@ -4552,8 +4549,8 @@ dependentFamilyCountInput.addEventListener("change", () => {
         ? 0
         : Math.max(0, Math.trunc(normalizedValue));
 
-      settingsByMonth[cycleKey] = {
-        ...existingCycleSettings,
+      settingsByMonth[monthKey] = {
+        ...existingMonthlySettings,
         [fieldName]: deductionAmount,
       };
 
