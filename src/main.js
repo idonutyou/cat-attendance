@@ -30,6 +30,8 @@ import "./v195-overrides.css";
 import "./v231-night-week.css";
 import { firebaseConfig } from "./firebase-config.js";
 
+window.CAT_DIAG?.("app-module-loaded", "v236");
+
 const STORAGE_KEY = "cat-attendance-records-v1";
 const SETTINGS_KEY = "cat-attendance-settings-by-month-v2";
 const FISCAL_SETTINGS_KEY = "cat-attendance-fiscal-settings-v1";
@@ -190,17 +192,6 @@ function sendCurrentStateBackToNativeWidget({
   userInitiated = false,
   allowUnpaired = false,
 } = {}) {
-  // Android browsers may promote an iframe intent into a foreground PWA
-  // restart. Never send this intent from routine calendar edits or login.
-  // Only the explicit WIDGET action can initiate a native bridge handoff.
-  if (
-    !userInitiated ||
-    !allowUnpaired ||
-    navigator.userActivation?.isActive === false
-  ) {
-    return;
-  }
-
   try {
     const url = new URL(window.location.href);
 
@@ -214,6 +205,11 @@ function sendCurrentStateBackToNativeWidget({
         "",
         `${url.pathname}${url.search}${url.hash}`,
       );
+    }
+
+    // Native widget calls must come from a real tap; never use login/startup.
+    if (!userInitiated || navigator.userActivation?.isActive === false) {
+      return;
     }
 
     // Android 네이티브 위젯 브리지는 Android에서만 시도합니다.
@@ -311,6 +307,7 @@ function sendCurrentStateBackToNativeWidget({
     intentLink.rel = "noopener";
     intentLink.style.display = "none";
     document.body.appendChild(intentLink);
+    window.CAT_DIAG?.("native-widget-intent", "dispatch");
     intentLink.click();
     intentLink.remove();
   } catch (error) {
@@ -827,6 +824,7 @@ if (
   typeof window.launchQueue.setConsumer === "function"
 ) {
   window.launchQueue.setConsumer((launchParams) => {
+    window.CAT_DIAG?.("pwa-launchqueue-event");
     const targetUrl =
       typeof launchParams?.targetURL === "string"
         ? launchParams.targetURL
@@ -4449,6 +4447,7 @@ function saveWeekStartPreference() {
     );
     persistGuestSnapshotIfNeeded();
     scheduleCloudSync();
+    sendCurrentStateBackToNativeWidget({ userInitiated: true });
   } catch (error) {
     console.error(
       "달력 시작 요일 설정을 저장하지 못했습니다.",
@@ -6067,6 +6066,7 @@ function installBackExitTestHook() {
 }
 
 function handleAppCloseRequest() {
+  window.CAT_DIAG?.("closewatcher-close");
   appCloseWatcher = null;
 
   if (navigationDrawer.classList.contains("open")) {
@@ -6235,6 +6235,7 @@ function resetBackExitState() {
 }
 
 function handleAppBackNavigation() {
+  window.CAT_DIAG?.("history-popstate");
   if (allowAppExitNavigation) {
     return;
   }
@@ -6299,6 +6300,7 @@ function handleAppBackNavigation() {
 }
 
 function completeAppExit(fromCloseWatcher) {
+  window.CAT_DIAG?.("app-exit-request", String(fromCloseWatcher));
   exitBackReady = false;
   allowAppExitNavigation = true;
   window.clearTimeout(exitToastTimer);
@@ -8254,6 +8256,7 @@ function openModal(dateKey, year, month, dayNumber) {
     .forEach((button) => {
       button.addEventListener("click", () => {
         const workTypeId = button.dataset.workType;
+        window.CAT_DIAG?.("work-type-selected", workTypeId);
 
         if (workTypeId === "annualLeave") {
           showAnnualLeaveChoice();
@@ -8265,6 +8268,7 @@ function openModal(dateKey, year, month, dayNumber) {
         saveRecords();
         closeModal();
         render();
+        window.CAT_DIAG?.("work-ui-rendered", workTypeId);
       });
     });
 
@@ -9408,15 +9412,18 @@ function loadRecords() {
 }
 
 function saveRecords() {
+  window.CAT_DIAG?.("save-record-start");
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify(records),
   );
-  // Keep routine attendance edits inside the PWA; Android intent
-  // launches here can restart the app instead of staying in a hidden frame.
-  // Cloud syncing remains intact for Guest and Google accounts.
   persistGuestSnapshotIfNeeded();
   scheduleCloudSync();
+  window.CAT_DIAG?.("save-record-local-done");
+  // Restore the v234 immediate widget path removed in v235. Keep
+  // its attempt visible in local diagnostics for PWA restart triage.
+  sendCurrentStateBackToNativeWidget({ userInitiated: true });
+  window.CAT_DIAG?.("save-record-done");
 }
 
 function loadWeeklyDateRange() {
@@ -9902,6 +9909,7 @@ function showAuthGate() {
 }
 
 function showAppShell() {
+  window.CAT_DIAG?.("app-shell-show");
   authGate.hidden = true;
   authGate.setAttribute("aria-hidden", "true");
   appShell.hidden = false;
@@ -10820,6 +10828,7 @@ async function restoreSavedLoginMode() {
 }
 
 function initializeSplashScreen() {
+  window.CAT_DIAG?.("app-splash-init");
   const splash = document.querySelector("#appSplash");
 
   if (!splash) {
