@@ -532,10 +532,7 @@ function applyNativeWidgetPayloadObjectWhileRunning(
   }
 
   if (authMode === "guest") {
-    saveSnapshotToLocalKey(
-      GUEST_SNAPSHOT_KEY,
-      captureAppStorageSnapshot(),
-    );
+    persistGuestSnapshotIfNeeded();
   } else if (
     authMode === "google" &&
     activeGoogleUser
@@ -849,6 +846,12 @@ let cloudWritePending = false;
 let guestCloudUnsubscribe = null;
 let guestCloudSyncTimer = null;
 let guestCloudWritePending = false;
+// Local changes win over stale Guest Firebase snapshots. All flags below are
+// transient; records and snapshots remain in the existing storage keys.
+let guestLocalRevision = 0;
+let guestCloudSession = 0;
+let guestCloudWriteInFlight = false;
+let guestCloudBaseline = null;
 let splashFinished = false;
 let authRedirectInProgress = false;
 const deviceId = getOrCreateDeviceId();
@@ -9980,25 +9983,34 @@ function getGoogleCacheKey(uid) {
 
 function applyAppStorageSnapshot(snapshot) {
   if (!snapshot?.storage || typeof snapshot.storage !== "object") {
-    return;
+    return false;
   }
 
+  // A repeated/acknowledged cloud snapshot must not reconstruct the calendar
+  // or other interactive panels. Avoid a full app render unless data changed.
+  const updates = SYNCED_STORAGE_KEYS.map((key) => {
+    const value = snapshot.storage[key];
+    return [key, typeof value === "string" ? value : null];
+  }).filter(([key, value]) => localStorage.getItem(key) !== value);
+
+  if (updates.length === 0) {
+    return false;
+  }
+
+  const previousSuspension = cloudSyncSuspended;
   cloudSyncSuspended = true;
-
   try {
-    SYNCED_STORAGE_KEYS.forEach((key) => {
-      const value = snapshot.storage[key];
-
-      if (typeof value === "string") {
-        localStorage.setItem(key, value);
-      } else {
+    updates.forEach(([key, value]) => {
+      if (value === null) {
         localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, value);
       }
     });
-
     reloadAppStateFromStorage();
+    return true;
   } finally {
-    cloudSyncSuspended = false;
+    cloudSyncSuspended = previousSuspension;
   }
 }
 
@@ -10028,6 +10040,95 @@ function refreshVisibleAppValuesAfterWidgetSync() {
   });
 }
 
+// The Android widget uploads a full record map, which may have been built
+// before the user changed a different date in this PWA. Merge only the dates
+// that actually changed on the widget side since our last cloud baseline.
+function parseGuestRecordMap(value) {
+  if (typeof value !== "string") return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberGuestCloudBaseline(snapshot) {
+  const storage = snapshot?.storage;
+  if (!storage || typeof storage !== "object") return;
+  guestCloudBaseline = {
+    records: parseGuestRecordMap(storage[STORAGE_KEY]),
+    weekStart: typeof storage[WEEK_START_KEY] === "string"
+      ? storage[WEEK_START_KEY]
+      : null,
+  };
+}
+
+function applyGuestWidgetCloudSnapshot(snapshot) {
+  const storage = snapshot?.storage;
+  if (!storage || typeof storage !== "object") return false;
+  if (!guestCloudBaseline) {
+    // A usable baseline arrives from the initial Guest getDoc. Without one,
+    // a full native-widget record map is not safe to overwrite local data.
+    return false;
+  }
+
+  const incomingRecordsValue = storage[STORAGE_KEY];
+  const baselineRecords = guestCloudBaseline.records;
+  const localRecords = loadRecords();
+  const mergedRecords = { ...localRecords };
+  const incomingRecords = parseGuestRecordMap(incomingRecordsValue);
+  const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+  let recordsChanged = false;
+
+  if (typeof incomingRecordsValue === "string") {
+    const dates = new Set([
+      ...Object.keys(baselineRecords),
+      ...Object.keys(incomingRecords),
+    ]);
+    dates.forEach((dateKey) => {
+      const before = baselineRecords[dateKey];
+      const after = incomingRecords[dateKey];
+      if (same(before, after) || !same(localRecords[dateKey], before)) {
+        return;
+      }
+      if (after === undefined) delete mergedRecords[dateKey];
+      else mergedRecords[dateKey] = after;
+      recordsChanged = true;
+    });
+  }
+
+  const incomingWeek = storage[WEEK_START_KEY];
+  const currentWeek = localStorage.getItem(WEEK_START_KEY);
+  const weekChanged =
+    ["monday", "sunday"].includes(incomingWeek) &&
+    incomingWeek !== guestCloudBaseline.weekStart &&
+    currentWeek === guestCloudBaseline.weekStart;
+
+  if (recordsChanged) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedRecords));
+  }
+  if (weekChanged) localStorage.setItem(WEEK_START_KEY, incomingWeek);
+  const changed = recordsChanged || weekChanged;
+  if (changed) refreshVisibleAppValuesAfterWidgetSync();
+
+  // Store the actual cloud state as the baseline even when a more recent local
+  // edit won a conflict. Re-upload the merged local result if it diverges.
+  rememberGuestCloudBaseline(snapshot);
+  const localDiffersFromRemote =
+    typeof incomingRecordsValue === "string" &&
+      !same(recordsChanged ? mergedRecords : localRecords, incomingRecords) ||
+    ["monday", "sunday"].includes(incomingWeek) &&
+      (weekChanged ? incomingWeek : currentWeek) !== incomingWeek;
+
+  if (changed || localDiffersFromRemote) {
+    persistGuestSnapshotIfNeeded();
+  }
+  return changed;
+}
+
 function applyWidgetCloudStorageSnapshot(snapshot) {
   if (!snapshot?.storage || typeof snapshot.storage !== "object") {
     return false;
@@ -10037,7 +10138,10 @@ function applyWidgetCloudStorageSnapshot(snapshot) {
   const recordsValue = snapshot.storage[STORAGE_KEY];
   const weekStartValue = snapshot.storage[WEEK_START_KEY];
 
-  if (typeof recordsValue === "string") {
+  if (
+    typeof recordsValue === "string" &&
+    localStorage.getItem(STORAGE_KEY) !== recordsValue
+  ) {
     localStorage.setItem(STORAGE_KEY, recordsValue);
     changed = true;
   }
@@ -10046,8 +10150,10 @@ function applyWidgetCloudStorageSnapshot(snapshot) {
     typeof weekStartValue === "string" &&
     ["monday", "sunday"].includes(weekStartValue)
   ) {
-    localStorage.setItem(WEEK_START_KEY, weekStartValue);
-    changed = true;
+    if (localStorage.getItem(WEEK_START_KEY) !== weekStartValue) {
+      localStorage.setItem(WEEK_START_KEY, weekStartValue);
+      changed = true;
+    }
   }
 
   if (changed) {
@@ -10157,14 +10263,17 @@ function getCloudDocumentReference(services, uid) {
 }
 
 function stopGuestCloudBridge() {
+  // Invalidate any outstanding async callbacks from a previous Guest session.
+  guestCloudSession += 1;
   if (guestCloudSyncTimer) {
     window.clearTimeout(guestCloudSyncTimer);
     guestCloudSyncTimer = null;
   }
-
   guestCloudUnsubscribe?.();
   guestCloudUnsubscribe = null;
   guestCloudWritePending = false;
+  guestCloudWriteInFlight = false;
+  guestCloudBaseline = null;
   activeGuestUser = null;
 }
 
@@ -10173,6 +10282,10 @@ async function initializeGuestCloudBridge() {
     return false;
   }
 
+  // A cached Guest PWA can accept edits while authentication and getDoc
+  // are still running. Never replace those edits with an older cloud fetch.
+  const startingRevision = guestLocalRevision;
+  const session = guestCloudSession;
   try {
     const services = await initializeFirebaseServices();
     let user = services.auth.currentUser;
@@ -10194,6 +10307,18 @@ async function initializeGuestCloudBridge() {
     activeGuestUser = user;
     const documentReference = getCloudDocumentReference(services, user.uid);
     const remoteSnapshot = await services.getDoc(documentReference);
+    if (
+      authMode !== "guest" ||
+      guestCloudSession !== session ||
+      activeGuestUser?.uid !== user.uid
+    ) {
+      return false;
+    }
+
+    const editedDuringRestore =
+      guestLocalRevision !== startingRevision ||
+      guestCloudWritePending ||
+      Boolean(guestCloudSyncTimer);
 
     if (remoteSnapshot.exists()) {
       const remoteData = remoteSnapshot.data();
@@ -10201,18 +10326,34 @@ async function initializeGuestCloudBridge() {
         schemaVersion: remoteData.schemaVersion || 1,
         storage: remoteData.storage || {},
       };
-
-      applyAppStorageSnapshot(remoteAppSnapshot);
-      saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, remoteAppSnapshot);
+      rememberGuestCloudBaseline(remoteAppSnapshot);
+      if (editedDuringRestore) {
+        // The phone's newly edited Guest data is authoritative in this race.
+        // Push the current snapshot rather than applying a stale getDoc result.
+        scheduleGuestCloudSync();
+      } else {
+        applyAppStorageSnapshot(remoteAppSnapshot);
+        saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, remoteAppSnapshot);
+      }
     } else {
       const localSnapshot = captureAppStorageSnapshot();
+      const uploadedRevision = guestLocalRevision;
       await services.setDoc(documentReference, {
         schemaVersion: 1,
         storage: localSnapshot.storage || {},
         sourceDeviceId: deviceId,
         updatedAt: services.serverTimestamp(),
       });
-      saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, localSnapshot);
+      if (authMode !== "guest" || guestCloudSession !== session) {
+        return false;
+      }
+      rememberGuestCloudBaseline(localSnapshot);
+      if (guestLocalRevision !== uploadedRevision) {
+        // A user edit occurred during the first setDoc; send it next.
+        scheduleGuestCloudSync();
+      } else {
+        saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, localSnapshot);
+      }
     }
 
     subscribeToGuestCloudChanges();
@@ -10256,35 +10397,36 @@ function subscribeToGuestCloudChanges() {
       const isWidgetChange =
         sourceDeviceId.startsWith("android-widget");
 
-      if (
-        !isWidgetChange &&
-        (
-          sourceDeviceId === deviceId ||
-          guestCloudWritePending ||
-          guestCloudSyncTimer
-        )
-      ) {
-        return;
-      }
-
       const incomingSnapshot = {
         schemaVersion: data.schemaVersion || 1,
         storage: data.storage || {},
       };
-
-      if (isWidgetChange) {
-        markNativeWidgetPaired();
-        applyWidgetCloudStorageSnapshot(incomingSnapshot);
-        saveSnapshotToLocalKey(
-          GUEST_SNAPSHOT_KEY,
-          captureAppStorageSnapshot(),
-        );
-        updateCloudSyncStatus("Guest · 위젯 변경 반영", "success");
+      if (sourceDeviceId === deviceId) {
+        rememberGuestCloudBaseline(incomingSnapshot);
         return;
       }
 
-      applyAppStorageSnapshot(incomingSnapshot);
-      saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, incomingSnapshot);
+      if (isWidgetChange) {
+        markNativeWidgetPaired();
+        if (applyGuestWidgetCloudSnapshot(incomingSnapshot)) {
+          updateCloudSyncStatus("Guest · 위젯 변경 반영", "success");
+        }
+        return;
+      }
+
+      // Other cloud clients may publish an older snapshot while this phone
+      // is editing. Keep local Guest data until our upload is acknowledged.
+      if (
+        guestCloudWritePending ||
+        guestCloudSyncTimer ||
+        guestCloudWriteInFlight
+      ) {
+        return;
+      }
+      if (applyAppStorageSnapshot(incomingSnapshot)) {
+        saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, incomingSnapshot);
+      }
+      rememberGuestCloudBaseline(incomingSnapshot);
     },
     (error) => {
       console.warn("Guest 실시간 위젯 동기화 오류:", error);
@@ -10323,10 +10465,19 @@ async function flushGuestCloudSync() {
     return;
   }
 
+  // Serialize Guest writes: an older in-flight upload must never race
+  // another upload of a newer attendance record.
+  if (guestCloudWriteInFlight) {
+    return;
+  }
+  guestCloudWriteInFlight = true;
+  const session = guestCloudSession;
+  const userId = activeGuestUser.uid;
+  const sentRevision = guestLocalRevision;
   const snapshot = captureAppStorageSnapshot();
   const documentReference = getCloudDocumentReference(
     firebaseServices,
-    activeGuestUser.uid,
+    userId,
   );
 
   try {
@@ -10336,11 +10487,37 @@ async function flushGuestCloudSync() {
       sourceDeviceId: deviceId,
       updatedAt: firebaseServices.serverTimestamp(),
     });
-    saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, snapshot);
+    if (guestCloudSession === session && authMode === "guest") {
+      rememberGuestCloudBaseline(snapshot);
+    }
+    // An upload acknowledgement for an older snapshot must not replace
+    // the newer Guest backup that was already saved locally.
+    if (
+      authMode === "guest" &&
+      guestCloudSession === session &&
+      activeGuestUser?.uid === userId &&
+      guestLocalRevision === sentRevision
+    ) {
+      saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, snapshot);
+    }
   } catch (error) {
     console.warn("Guest 위젯 동기화 저장 실패:", error);
   } finally {
-    guestCloudWritePending = false;
+    if (guestCloudSession !== session) return;
+    guestCloudWriteInFlight = false;
+    if (guestLocalRevision !== sentRevision) {
+      // A second edit arrived during the network request. Keep the dirty
+      // marker until the latest revision has finished uploading.
+      guestCloudWritePending = true;
+      if (!guestCloudSyncTimer) {
+        guestCloudSyncTimer = window.setTimeout(() => {
+          guestCloudSyncTimer = null;
+          void flushGuestCloudSync();
+        }, 0);
+      }
+    } else {
+      guestCloudWritePending = Boolean(guestCloudSyncTimer);
+    }
   }
 }
 
@@ -10375,10 +10552,8 @@ async function enterGuestMode() {
   }
 
   if (widgetDataApplied) {
-    saveSnapshotToLocalKey(
-      GUEST_SNAPSHOT_KEY,
-      captureAppStorageSnapshot(),
-    );
+    // Native changes made during Guest login must survive a later getDoc.
+    persistGuestSnapshotIfNeeded();
   }
   localStorage.setItem(AUTH_MODE_KEY, "guest");
   localStorage.removeItem(ACTIVE_GOOGLE_UID_KEY);
@@ -10590,6 +10765,7 @@ function persistGuestSnapshotIfNeeded() {
     return;
   }
 
+  guestLocalRevision += 1;
   saveSnapshotToLocalKey(
     GUEST_SNAPSHOT_KEY,
     captureAppStorageSnapshot(),
