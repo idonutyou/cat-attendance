@@ -7384,21 +7384,11 @@ function getPensionCycleStartParts(year, month) {
     : { year: year - 1, month: 6 };
 }
 
-function getPensionCycleStartMonthKey(year, month) {
-  const cycleStart = getPensionCycleStartParts(year, month);
-  return getMonthKeyFromParts(cycleStart.year, cycleStart.month);
-}
-
 function getHealthCycleStartParts(year, month) {
   // 건강보험 보수월액: 매년 4월 ~ 다음 해 3월
   return month >= 3
     ? { year, month: 3 }
     : { year: year - 1, month: 3 };
-}
-
-function getHealthCycleStartMonthKey(year, month) {
-  const cycleStart = getHealthCycleStartParts(year, month);
-  return getMonthKeyFromParts(cycleStart.year, cycleStart.month);
 }
 
 function readSavedDeductionAmount(cycleSettings, fieldName) {
@@ -7415,6 +7405,47 @@ function readSavedDeductionAmount(cycleSettings, fieldName) {
   return Number.isFinite(savedAmount) && savedAmount >= 0
     ? Math.trunc(savedAmount)
     : null;
+}
+
+function getLatestDeductionAmountInCycle(
+  year,
+  month,
+  cycleStart,
+  fieldName,
+) {
+  // Find the newest override at or before this month, but never carry
+  // an amount across a pension (Jul-Jun) or health (Apr-Mar) boundary.
+  // This also reads legacy cycle-start and July health entries without
+  // migrating or rewriting previously stored months.
+  let cursorYear = year;
+  let cursorMonth = month;
+
+  for (let checked = 0; checked < 12; checked += 1) {
+    if (
+      cursorYear < cycleStart.year ||
+      (cursorYear === cycleStart.year && cursorMonth < cycleStart.month)
+    ) {
+      break;
+    }
+
+    const monthKey = getMonthKeyFromParts(cursorYear, cursorMonth);
+    const savedAmount = readSavedDeductionAmount(
+      settingsByMonth[monthKey] || {},
+      fieldName,
+    );
+
+    if (savedAmount !== null) {
+      return savedAmount;
+    }
+
+    cursorMonth -= 1;
+    if (cursorMonth < 0) {
+      cursorMonth = 11;
+      cursorYear -= 1;
+    }
+  }
+
+  return null;
 }
 
 function getDeductionSettingsForMonth(year, month) {
@@ -7440,51 +7471,25 @@ function getDeductionSettingsForMonth(year, month) {
       )
     : 1;
 
-  const pensionCycleKey = getPensionCycleStartMonthKey(year, month);
-  const healthCycleKey = getHealthCycleStartMonthKey(year, month);
-  const pensionCycleSettings = settingsByMonth[pensionCycleKey] || {};
-  const healthCycleSettings = settingsByMonth[healthCycleKey] || {};
+  const pensionCycleStart = getPensionCycleStartParts(year, month);
+  const healthCycleStart = getHealthCycleStartParts(year, month);
   const verifiedInsurance = getVerifiedPayrollInsuranceForMonth(
     year,
     month,
   );
 
-  const savedPension = readSavedDeductionAmount(
-    pensionCycleSettings,
+  const savedPension = getLatestDeductionAmountInCycle(
+    year,
+    month,
+    pensionCycleStart,
     "pensionDeduction",
   );
-  let savedHealth = readSavedDeductionAmount(
-    healthCycleSettings,
+  const savedHealth = getLatestDeductionAmountInCycle(
+    year,
+    month,
+    healthCycleStart,
     "healthDeduction",
   );
-
-  // Older versions used a July health-insurance cycle. Restore its value
-  // only if the newer April-cycle setting is missing, not if it is zero.
-  if (savedHealth === null) {
-    const legacyHealthCycleKey = getPensionCycleStartMonthKey(
-      year,
-      month,
-    );
-    const legacyHealthCycleSettings =
-      settingsByMonth[legacyHealthCycleKey] || {};
-    const legacySavedHealth = readSavedDeductionAmount(
-      legacyHealthCycleSettings,
-      "healthDeduction",
-    );
-
-    const healthCycleStart = getHealthCycleStartParts(year, month);
-    const legacyCycleStart = getPensionCycleStartParts(year, month);
-    const legacyFallsInsideHealthCycle =
-      legacyCycleStart.year === healthCycleStart.year &&
-      legacyCycleStart.month >= healthCycleStart.month;
-
-    if (
-      legacyFallsInsideHealthCycle &&
-      legacySavedHealth !== null
-    ) {
-      savedHealth = legacySavedHealth;
-    }
-  }
 
   return {
     dependentFamilyCount,
