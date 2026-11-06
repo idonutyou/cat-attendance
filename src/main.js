@@ -109,6 +109,7 @@ let nativeWidgetLastInstallCheck = 0;
 let nativeWidgetInstallCheckPromise = null;
 let nativeWidgetLastAutoPairKey = "";
 let nativeWidgetLastAutoPairAt = 0;
+let nativeWidgetLastGesturePairAt = 0;
 
 async function detectInstalledNativeWidgetAndAutoConnect({ force = false } = {}) {
   if (
@@ -168,9 +169,10 @@ async function detectInstalledNativeWidgetAndAutoConnect({ force = false } = {})
     nativeWidgetLastAutoPairKey = attemptKey;
     nativeWidgetLastAutoPairAt = Date.now();
 
-    // The native bridge is contacted only after the installed-app API
-    // positively confirms an APK signed by the related CAT application.
-    // This is automatic: no separate "connect" button is required.
+    // Prepare a one-time challenge only after verified installation.
+    // Chrome may block intent:// without user activation, so dispatch
+    // the actual pairing on the NEXT ordinary trusted app interaction.
+    // No separate "connect" button or silent background intent is used.
     let nonce = "";
     try {
       nonce = globalThis.crypto?.randomUUID?.() || "";
@@ -185,10 +187,6 @@ async function detectInstalledNativeWidgetAndAutoConnect({ force = false } = {})
       return true;
     }
 
-    sendCurrentStateBackToNativeWidget({
-      allowUnpaired: true,
-      allowBackground: true,
-    });
     return true;
   })();
   try {
@@ -197,6 +195,32 @@ async function detectInstalledNativeWidgetAndAutoConnect({ force = false } = {})
     nativeWidgetInstallCheckPromise = null;
   }
 }
+
+// Pairing piggybacks on a normal tap (for example a day selection).
+// This keeps Chrome's user-activation requirement while avoiding a dedicated
+// connection button and never probing a missing APK by launching it.
+function autoPairNativeWidgetOnNormalInteraction(event) {
+  if (
+    !event?.isTrusted ||
+    !navigator.userActivation?.isActive ||
+    !nativeWidgetInstalledThisSession ||
+    !getNativeWidgetAccountId() ||
+    hasNativeWidgetPairing() ||
+    Date.now() - nativeWidgetLastGesturePairAt < 120000
+  ) {
+    return;
+  }
+  let nonce = "";
+  try { nonce = localStorage.getItem(NATIVE_WIDGET_PAIR_NONCE_KEY) || ""; }
+  catch {}
+  if (!nonce) return;
+  nativeWidgetLastGesturePairAt = Date.now();
+  sendCurrentStateBackToNativeWidget({
+    userInitiated: true,
+    allowUnpaired: true,
+  });
+}
+document.addEventListener("click", autoPairNativeWidgetOnNormalInteraction);
 
 function markNativeWidgetPaired() {
   const accountId = getNativeWidgetAccountId();
