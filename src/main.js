@@ -4545,22 +4545,17 @@ dependentFamilyCountInput.addEventListener("change", () => {
         ? "pensionDeduction"
         : "healthDeduction";
       const rawValue = input.value.trim();
-      const nextSettings = { ...existingCycleSettings };
+      const normalizedValue = Number(rawValue);
+      // Empty input is an explicit zero, not a request to restore the
+      // historical statement baseline or a legacy insurance setting.
+      const deductionAmount = rawValue === "" || !Number.isFinite(normalizedValue)
+        ? 0
+        : Math.max(0, Math.trunc(normalizedValue));
 
-      if (rawValue === "") {
-        delete nextSettings[fieldName];
-      } else {
-        nextSettings[fieldName] = Math.max(
-          0,
-          Math.trunc(Number(rawValue) || 0),
-        );
-      }
-
-      if (Object.keys(nextSettings).length > 0) {
-        settingsByMonth[cycleKey] = nextSettings;
-      } else {
-        delete settingsByMonth[cycleKey];
-      }
+      settingsByMonth[cycleKey] = {
+        ...existingCycleSettings,
+        [fieldName]: deductionAmount,
+      };
 
       saveSettingsByMonth();
       renderSalary();
@@ -7409,6 +7404,22 @@ function getHealthCycleStartMonthKey(year, month) {
   return getMonthKeyFromParts(cycleStart.year, cycleStart.month);
 }
 
+function readSavedDeductionAmount(cycleSettings, fieldName) {
+  // Zero (including a previously saved blank) is a valid override.
+  // Only an absent or malformed setting uses the reference amount.
+  if (
+    !Object.prototype.hasOwnProperty.call(cycleSettings, fieldName) ||
+    cycleSettings[fieldName] === null
+  ) {
+    return null;
+  }
+
+  const savedAmount = Number(cycleSettings[fieldName]);
+  return Number.isFinite(savedAmount) && savedAmount >= 0
+    ? Math.trunc(savedAmount)
+    : null;
+}
+
 function getDeductionSettingsForMonth(year, month) {
   const targetMonthKey = getMonthKeyFromParts(year, month);
   const familyEntries = Object.entries(settingsByMonth)
@@ -7441,23 +7452,27 @@ function getDeductionSettingsForMonth(year, month) {
     month,
   );
 
-  const savedPension = Number(
-    pensionCycleSettings.pensionDeduction,
+  const savedPension = readSavedDeductionAmount(
+    pensionCycleSettings,
+    "pensionDeduction",
   );
-  let savedHealth = Number(healthCycleSettings.healthDeduction);
+  let savedHealth = readSavedDeductionAmount(
+    healthCycleSettings,
+    "healthDeduction",
+  );
 
-  // v176~v191에서는 건강보험도 7월 주기로 저장했다.
-  // 기존 사용자가 입력한 값을 잃지 않도록, 같은 건강보험 적용기간 안의
-  // 7월 키에 저장된 값이 있으면 새 4월 주기로 자동 승계한다.
-  if (!(Number.isFinite(savedHealth) && savedHealth > 0)) {
+  // Older versions used a July health-insurance cycle. Restore its value
+  // only if the newer April-cycle setting is missing, not if it is zero.
+  if (savedHealth === null) {
     const legacyHealthCycleKey = getPensionCycleStartMonthKey(
       year,
       month,
     );
     const legacyHealthCycleSettings =
       settingsByMonth[legacyHealthCycleKey] || {};
-    const legacySavedHealth = Number(
-      legacyHealthCycleSettings.healthDeduction,
+    const legacySavedHealth = readSavedDeductionAmount(
+      legacyHealthCycleSettings,
+      "healthDeduction",
     );
 
     const healthCycleStart = getHealthCycleStartParts(year, month);
@@ -7468,8 +7483,7 @@ function getDeductionSettingsForMonth(year, month) {
 
     if (
       legacyFallsInsideHealthCycle &&
-      Number.isFinite(legacySavedHealth) &&
-      legacySavedHealth > 0
+      legacySavedHealth !== null
     ) {
       savedHealth = legacySavedHealth;
     }
@@ -7477,14 +7491,8 @@ function getDeductionSettingsForMonth(year, month) {
 
   return {
     dependentFamilyCount,
-    pension:
-      Number.isFinite(savedPension) && savedPension > 0
-        ? Math.trunc(savedPension)
-        : verifiedInsurance.pension,
-    health:
-      Number.isFinite(savedHealth) && savedHealth > 0
-        ? Math.trunc(savedHealth)
-        : verifiedInsurance.health,
+    pension: savedPension ?? verifiedInsurance.pension,
+    health: savedHealth ?? verifiedInsurance.health,
   };
 }
 
@@ -9892,9 +9900,9 @@ function syncSalaryInputs() {
   dependentFamilyCountInput.value =
     deductionSettings.dependentFamilyCount || 1;
   pensionDeductionSettingInput.value =
-    deductionSettings.pension || "";
+    deductionSettings.pension ?? "";
   healthDeductionSettingInput.value =
-    deductionSettings.health || "";
+    deductionSettings.health ?? "";
 
   safetyAllowanceOutput.textContent = formatMoneyValue(
     FIXED_SAFETY_ALLOWANCE,
