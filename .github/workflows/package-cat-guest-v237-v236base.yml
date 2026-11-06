@@ -1,0 +1,51 @@
+name: Validate CAT Guest v237 on v236 and package files
+on:
+  push:
+    branches:
+      - backup/cat-guest-sync-fix-20261106-p70
+permissions:
+  contents: read
+jobs:
+  validate-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install and build v236 based CAT app
+        run: |
+          npm ci
+          npm run build
+      - name: Guest safety and v236 regression checks
+        run: |
+          node --check src/main.js
+          node --check public/cat-diagnostics.js
+          node --input-type=module -e '
+          import fs from "node:fs";
+          import assert from "node:assert/strict";
+          const s=fs.readFileSync("src/main.js","utf8");
+          const save=s.split("function saveRecords() {")[1]?.split("function loadWeeklyDateRange()")[0];
+          assert.ok(save?.includes("sendCurrentStateBackToNativeWidget({ userInitiated: true })"));
+          assert.ok(save?.includes("persistGuestSnapshotIfNeeded()"));
+          assert.ok(s.includes("GUEST_CLOUD_DIRTY_KEY"));
+          assert.ok(s.includes("applyGuestWidgetCloudSnapshot("));
+          assert.ok(s.includes("guestLocalRevision !== startingRevision"));
+          assert.ok(s.includes("guestCloudWriteInFlight"));
+          assert.ok(s.includes("equivalentSyncedStorageValue"));
+          assert.ok(s.includes("window.CAT_DIAG"));
+          assert.ok(fs.readFileSync("dist/index.html","utf8").includes("cat-diagnostics.js"));
+          assert.ok(fs.existsSync("dist/cat-diagnostics.js"));
+          '
+      - name: Package only changed application files
+        run: |
+          mkdir -p release/src
+          cp src/main.js release/src/main.js
+          (cd release && zip -q -r ../CAT_Guest_v237_Fold7_patch_files.zip src)
+          unzip -t CAT_Guest_v237_Fold7_patch_files.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CAT_Guest_v237_Fold7_patch_files
+          path: CAT_Guest_v237_Fold7_patch_files.zip
+          if-no-files-found: error
