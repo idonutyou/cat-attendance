@@ -46,7 +46,8 @@ const GUEST_SNAPSHOT_KEY = "cat-attendance-guest-snapshot-v1";
 const GOOGLE_CACHE_PREFIX = "cat-attendance-google-cache-v1";
 const DEVICE_ID_KEY = "cat-attendance-device-id-v1";
 const WIDGET_SYNC_APPLIED_KEY = "cat-attendance-widget-sync-applied-v1";
-const NATIVE_WIDGET_PAIRED_KEY = "cat-attendance-native-widget-paired-v1";
+const NATIVE_WIDGET_VERIFIED_KEY = "cat-attendance-native-widget-verified-v2";
+const NATIVE_WIDGET_PAIR_NONCE_KEY = "cat-attendance-native-widget-pair-nonce-v2";
 const FIREBASE_SDK_VERSION = "12.16.0";
 const CLOUD_SYNC_DEBOUNCE_MS = 550;
 const SYNCED_STORAGE_KEYS = [
@@ -94,68 +95,41 @@ const CAT_BROWSER_ENV = (() => {
 
 const NATIVE_WIDGET_FALLBACK_HASH_KEY = "catWidgetNoHandler";
 
+function getNativeWidgetAccountId() {
+  return authMode === "guest" ? activeGuestUser?.uid || ""
+    : authMode === "google" ? activeGoogleUser?.uid || "" : "";
+}
+
+// Legacy v1 pairing markers were written without confirmation. Ignore them.
 function markNativeWidgetPaired() {
+  const accountId = getNativeWidgetAccountId();
+  if (!accountId) return;
   try {
-    localStorage.setItem(NATIVE_WIDGET_PAIRED_KEY, "1");
-  } catch {
-    // localStorage unavailable: keep web/PWA behavior unchanged.
-  }
+    localStorage.setItem(NATIVE_WIDGET_VERIFIED_KEY,
+      JSON.stringify({ deviceId, accountId, verifiedAt: Date.now() }));
+  } catch {}
 }
 
 function hasNativeWidgetPairing() {
+  const accountId = getNativeWidgetAccountId();
+  if (!accountId) return false;
   try {
-    if (localStorage.getItem(NATIVE_WIDGET_PAIRED_KEY) === "1") {
-      return true;
-    }
-
-    // Migrate phones that already exchanged native widget payloads before v170.
-    const applied = localStorage.getItem(WIDGET_SYNC_APPLIED_KEY);
-    if (applied && applied !== "{}") {
-      localStorage.setItem(NATIVE_WIDGET_PAIRED_KEY, "1");
-      return true;
-    }
-  } catch {
-    // Treat unknown/unavailable storage as an unpaired web-only phone.
-  }
-
-  return false;
+    const verified = JSON.parse(localStorage.getItem(NATIVE_WIDGET_VERIFIED_KEY) || "null");
+    return verified?.deviceId === deviceId && verified?.accountId === accountId;
+  } catch { return false; }
 }
 
-let nativeWidgetAutoPairAttempted = false;
-
-function autoPairNativeWidgetOnAppOpen() {
-  if (
-    nativeWidgetAutoPairAttempted ||
-    !CAT_BROWSER_ENV.isAndroid ||
-    CAT_BROWSER_ENV.isNaverInApp
-  ) {
-    return;
+function acknowledgeNativeWidgetPairing(data) {
+  let nonce = "";
+  try { nonce = localStorage.getItem(NATIVE_WIDGET_PAIR_NONCE_KEY) || ""; } catch {}
+  if (!nonce || data?.widgetPairingNonce !== nonce ||
+      data?.sourceDeviceId !== `android-widget-pair:${deviceId}`) {
+    return false;
   }
-
-  const hasFirebaseBridge =
-    (authMode === "google" &&
-      activeGoogleUser?.uid &&
-      activeGoogleUser?.refreshToken) ||
-    (authMode === "guest" &&
-      activeGuestUser?.uid &&
-      activeGuestUser?.refreshToken);
-
-  if (!hasFirebaseBridge) {
-    return;
-  }
-
-  nativeWidgetAutoPairAttempted = true;
-
-  // CAT 앱을 여는 것만으로 새 폰의 위젯에도 현재 로그인 계정과
-  // 근태 데이터를 한 번 전달합니다. 위젯이 없는 폰은 숨은
-  // fallback frame에서 끝나므로 웹앱 화면은 그대로 유지됩니다.
-  window.setTimeout(() => {
-    markNativeWidgetPaired();
-    sendCurrentStateBackToNativeWidget({
-      allowUnpaired: true,
-      allowBackground: true,
-    });
-  }, 180);
+  markNativeWidgetPaired();
+  try { localStorage.removeItem(NATIVE_WIDGET_PAIR_NONCE_KEY); } catch {}
+  updateCloudSyncStatus("위젯 연결 확인됨", "success");
+  return true;
 }
 
 function readNativeWidgetLaunchPayload(
@@ -266,11 +240,16 @@ function sendCurrentStateBackToNativeWidget({
       return;
     }
 
-    // Never launch an Android widget intent on ordinary Galaxy phones that
-    // have never been connected to the CAT widget. This prevents Chrome/PWA
-    // from relaunching or showing an app/store error when no widget exists.
-    // Paired widget phones continue through the exact existing sync path.
-    if (!allowUnpaired && !hasNativeWidgetPairing()) {
+    // The v1 "paired" marker was set automatically on login, even when
+    // no widget was installed. v2 accepts only an actual native ACK.
+    let pairingNonce = "";
+    if (allowUnpaired && userInitiated) {
+      try {
+        pairingNonce =
+          localStorage.getItem(NATIVE_WIDGET_PAIR_NONCE_KEY) || "";
+      } catch {}
+    }
+    if (!hasNativeWidgetPairing() && !pairingNonce) {
       return;
     }
 
@@ -314,6 +293,10 @@ function sendCurrentStateBackToNativeWidget({
         : "sunday",
       firebaseBridge,
       syncedAt: Date.now(),
+      ...(pairingNonce ? {
+        pairingDeviceId: deviceId,
+        pairingNonce,
+      } : {}),
     });
 
     if (!encodedPayload) {
@@ -1042,6 +1025,7 @@ app.innerHTML = `
         </section>
 
         <div class="navigation-utility-row">
+          <div class="widget-actions" style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 104px;">
           <button
             id="widgetInstallButton"
             class="widget-install-button"
@@ -1059,6 +1043,10 @@ app.innerHTML = `
               </span>
             </span>
           </button>
+          <button id="widgetConnectButton" type="button"
+            style="width:104px;min-height:25px;border-radius:9px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;"
+            title="이미 CAT 위젯 APK를 설치했다면 눌러 연결 확인">위젯 연결</button>
+          </div>
 
           <div
             id="weekStartToggle"
@@ -2022,6 +2010,7 @@ const accountEmail = document.querySelector("#accountEmail");
 const cloudSyncStatus = document.querySelector("#cloudSyncStatus");
 const accountSwitchButton = document.querySelector("#accountSwitchButton");
 const widgetInstallButton = document.querySelector("#widgetInstallButton");
+const widgetConnectButton = document.querySelector("#widgetConnectButton");
 const monthTitle = document.querySelector("#monthTitle");
 const calendarGrid = document.querySelector("#calendarGrid");
 const mainCalendarWeekdays = document.querySelector(
@@ -2361,15 +2350,8 @@ widgetInstallButton?.addEventListener("click", () => {
     return;
   }
 
-  // WIDGET 버튼은 설치/업데이트뿐 아니라 새 기기의 최초 연결도 겸합니다.
-  // 사용자가 명시적으로 버튼을 누른 경우에만 미연결 위젯으로 현재
-  // 근태 데이터와 Firebase 브리지 정보를 한 번 전달합니다.
-  markNativeWidgetPaired();
-  sendCurrentStateBackToNativeWidget({
-    userInitiated: true,
-    allowUnpaired: true,
-  });
-
+  // WIDGET downloads an APK only. Neither a download click nor guest
+  // login proves the native widget is installed.
   const downloadLink = document.createElement("a");
   downloadLink.href = widgetInstallUrl;
   downloadLink.download = "CAT-widget.apk";
@@ -2377,6 +2359,25 @@ widgetInstallButton?.addEventListener("click", () => {
   document.body.append(downloadLink);
   downloadLink.click();
   downloadLink.remove();
+});
+
+widgetConnectButton.addEventListener("click", () => {
+  if (!CAT_BROWSER_ENV.isAndroid || CAT_BROWSER_ENV.isNaverInApp) {
+    window.alert("안드로이드에서 CAT 위젯 APK를 설치한 뒤 연결할 수 있습니다.");
+    return;
+  }
+  if (!getNativeWidgetAccountId()) {
+    window.alert("Guest 또는 Google 로그인 동기화 연결 후 시도해 주세요.");
+    return;
+  }
+  // Explicit pairing is user initiated; no automatic package probe is ever run.
+  const nonce = globalThis.crypto?.randomUUID?.() ||
+    `cat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(NATIVE_WIDGET_PAIR_NONCE_KEY, nonce);
+  sendCurrentStateBackToNativeWidget({
+    userInitiated: true, allowUnpaired: true,
+  });
+  updateCloudSyncStatus("위젯 연결 확인 중…");
 });
 
 salaryYearButton.addEventListener("click", () => {
@@ -10263,7 +10264,6 @@ async function initializeGuestCloudBridge() {
     }
 
     subscribeToGuestCloudChanges();
-    autoPairNativeWidgetOnAppOpen();
     return true;
   } catch (error) {
     // Guest 자체 저장은 로컬로 계속 정상 동작합니다. Firebase 익명 인증이
@@ -10297,6 +10297,8 @@ function subscribeToGuestCloudChanges() {
       }
 
       const data = snapshot.data();
+      if (acknowledgeNativeWidgetPairing(data)) return;
+      if (data?.sourceDeviceId?.startsWith("android-widget-pair:")) return;
       const sourceDeviceId =
         typeof data.sourceDeviceId === "string"
           ? data.sourceDeviceId
@@ -10321,7 +10323,6 @@ function subscribeToGuestCloudChanges() {
       };
 
       if (isWidgetChange) {
-        markNativeWidgetPaired();
         applyWidgetCloudStorageSnapshot(incomingSnapshot);
         saveSnapshotToLocalKey(
           GUEST_SNAPSHOT_KEY,
@@ -10554,7 +10555,6 @@ async function enterGoogleMode(user) {
   }
 
   subscribeToCloudChanges();
-  autoPairNativeWidgetOnAppOpen();
 
   if (widgetDataApplied) {
     scheduleCloudSync();
@@ -10585,6 +10585,8 @@ function subscribeToCloudChanges() {
       }
 
       const data = snapshot.data();
+      if (acknowledgeNativeWidgetPairing(data)) return;
+      if (data?.sourceDeviceId?.startsWith("android-widget-pair:")) return;
 
       const sourceDeviceId =
         typeof data.sourceDeviceId === "string"
@@ -10610,7 +10612,6 @@ function subscribeToCloudChanges() {
       };
 
       if (isWidgetChange) {
-        markNativeWidgetPaired();
         applyWidgetCloudStorageSnapshot(incomingSnapshot);
         saveSnapshotToLocalKey(
           getGoogleCacheKey(activeGoogleUser.uid),
