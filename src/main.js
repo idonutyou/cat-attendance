@@ -250,6 +250,16 @@ function sendCurrentStateBackToNativeWidget({
       return;
     }
 
+    // A Guest login can temporarily show cached data before Firebase
+    // authentication is restored. Never send a credential-less guest payload:
+    // the native bridge treats it as a disconnect and loses live sync.
+    if (
+      authMode === "guest" &&
+      (!activeGuestUser?.uid || !activeGuestUser?.refreshToken)
+    ) {
+      return;
+    }
+
     // Android 네이티브 위젯 브리지는 Android에서만 시도합니다.
     // iOS/Safari와 NAVER 인앱 브라우저에서는 웹/PWA 기능만 유지합니다.
     if (!CAT_BROWSER_ENV.isAndroid || CAT_BROWSER_ENV.isNaverInApp) {

@@ -455,12 +455,10 @@ public class WorkTypeActivity extends Activity {
     }
 
     private void syncWidgetChangeToApp() {
+        // Never start the CAT PWA when choosing a date in the Android widget.
+        // If the cloud bridge is not paired yet, WidgetDataStore keeps the
+        // pending edit until a subsequent explicit CAT widget connection.
         WidgetCloudSync.pushCurrentStateAsync(this);
-        // 새 설치에서 아직 Firebase bridge 정보가 저장되지 않은 경우에도
-        // 위젯에서 바꾼 근태를 CAT 앱에 조용히 전달합니다.
-        if (WidgetDataStore.getCloudBridgeCredentials(this) == null) {
-            WidgetAppBridge.deliverPendingToRunningAppSilently(this);
-        }
     }
 
     private void updateWindowBounds() {

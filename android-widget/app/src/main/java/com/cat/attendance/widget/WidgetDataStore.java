@@ -154,11 +154,43 @@ public final class WidgetDataStore {
     }
 
     public static void replaceFromWeb(Context context, JSONObject records, String weekStart) {
-        SharedPreferences.Editor editor = prefs(context).edit()
-                .putString(KEY_RECORDS, records == null ? "{}" : records.toString())
-                .putBoolean(KEY_WEEK_START_MONDAY, "monday".equals(weekStart))
-                .putString(KEY_PENDING, "{}")
-                .remove(KEY_WEEK_START_PENDING);
+        SharedPreferences preferences = prefs(context);
+        JSONObject incoming = records == null
+                ? new JSONObject()
+                : readObject(records.toString());
+        JSONObject pending = readObject(preferences.getString(KEY_PENDING, "{}"));
+
+        // Local widget edits not yet acknowledged by Firebase must never be
+        // discarded by an app -> widget snapshot (which may be older).
+        Iterator<String> keys = pending.keys();
+        while (keys.hasNext()) {
+            String dateKey = keys.next();
+            JSONObject change = pending.optJSONObject(dateKey);
+            if (change == null) {
+                continue;
+            }
+
+            String type = change.optString("type", "");
+            try {
+                if (type.isEmpty()) {
+                    incoming.remove(dateKey);
+                } else if (WorkTypes.CUSTOM_ID.equals(type) &&
+                        change.optJSONObject("record") != null) {
+                    incoming.put(dateKey, change.optJSONObject("record"));
+                } else {
+                    incoming.put(dateKey, type);
+                }
+            } catch (JSONException ignored) {
+                // Preserve other records even when a single pending item fails.
+            }
+        }
+
+        SharedPreferences.Editor editor = preferences.edit()
+                .putString(KEY_RECORDS, incoming.toString());
+        // Pending week-start settings also take priority over older app data.
+        if (!preferences.contains(KEY_WEEK_START_PENDING)) {
+            editor.putBoolean(KEY_WEEK_START_MONDAY, "monday".equals(weekStart));
+        }
         editor.apply();
     }
 
@@ -262,11 +294,43 @@ public final class WidgetDataStore {
                 .apply();
     }
 
-    public static void clearPendingAfterCloudSync(Context context) {
-        prefs(context).edit()
-                .putString(KEY_PENDING, "{}")
-                .remove(KEY_WEEK_START_PENDING)
-                .apply();
+    public static void clearPendingAfterCloudSync(
+            Context context,
+            JSONObject confirmedBatch
+    ) {
+        if (confirmedBatch == null) {
+            return;
+        }
+
+        SharedPreferences preferences = prefs(context);
+        JSONObject current = readObject(preferences.getString(KEY_PENDING, "{}"));
+        JSONObject sent = confirmedBatch.optJSONObject("changes");
+        if (sent != null) {
+            Iterator<String> keys = sent.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                JSONObject oldValue = sent.optJSONObject(key);
+                JSONObject currentValue = current.optJSONObject(key);
+                // A newer edit may have arrived while the network write was
+                // in flight. Never remove it as part of an older write.
+                if (oldValue != null && currentValue != null &&
+                        oldValue.toString().equals(currentValue.toString())) {
+                    current.remove(key);
+                }
+            }
+        }
+
+        SharedPreferences.Editor editor = preferences.edit()
+                .putString(KEY_PENDING, current.toString());
+        JSONObject sentWeek = confirmedBatch.optJSONObject("weekStart");
+        JSONObject currentWeek = readObject(
+                preferences.getString(KEY_WEEK_START_PENDING, "{}")
+        );
+        if (sentWeek != null &&
+                sentWeek.toString().equals(currentWeek.toString())) {
+            editor.remove(KEY_WEEK_START_PENDING);
+        }
+        editor.apply();
     }
 
     public static final class CloudBridgeCredentials {

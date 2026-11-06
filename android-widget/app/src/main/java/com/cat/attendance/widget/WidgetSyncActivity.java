@@ -34,6 +34,9 @@ public class WidgetSyncActivity extends Activity {
                     WidgetDataStore.saveCloudBridgeCredentials(this, firebaseBridge);
                     HolidayStore.replaceFromWeb(this, holidays);
                     CatCalendarWidgetProvider.refreshAll(this);
+                    // Pairing can arrive after edits were made while offline.
+                    // Upload queued widget changes without opening the CAT PWA.
+                    WidgetCloudSync.pushCurrentStateAsync(this);
                 } catch (Exception ignored) {
                     // 잘못된 콜백은 무시하고 앱으로 즉시 돌아갑니다.
                 }
