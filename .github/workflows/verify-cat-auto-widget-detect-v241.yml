@@ -1,0 +1,110 @@
+name: Validate CAT automatic native widget detection v241
+on:
+  push:
+    branches:
+      - backup/cat-auto-widget-detect-20261107-p60
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Android API 36
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+      - name: Build CAT web app and widget
+        run: |
+          npm ci
+          node --check src/main.js
+          npm run build
+          gradle -p android-widget :app:assembleDebug -PCAT_APP_URL="https://idonutyou.github.io/cat-attendance/"
+          test -s android-widget/app/build/outputs/apk/debug/app-debug.apk
+      - name: Regression - uninstalled devices never launch native widget
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import assert from "node:assert/strict";
+          import vm from "node:vm";
+          const read = p => fs.readFileSync(p,"utf8");
+          const js=read("src/main.js");
+          const sw=read("public/sw.js");
+          const manifest=JSON.parse(read("public/manifest.webmanifest"));
+          const androidManifest=read("android-widget/app/src/main/AndroidManifest.xml");
+          const strings=read("android-widget/app/src/main/res/values/strings.xml");
+          assert.ok(!js.includes("widgetConnectButton"));
+          assert.ok(js.includes("detectInstalledNativeWidgetAndAutoConnect"));
+          assert.ok(js.includes("navigator.getInstalledRelatedApps()"));
+          assert.ok(js.includes("nativeWidgetInstalledThisSession"));
+          assert.ok(!js.includes("autoPairNativeWidgetOnAppOpen"));
+          assert.ok(sw.includes('cat-attendance-v241'));
+          assert.ok(manifest.related_applications.some(app=>app.platform==="play"&&app.id==="com.cat.attendance.widget"));
+          assert.ok(androidManifest.includes('android:name="asset_statements"'));
+          assert.ok(strings.includes("https://idonutyou.github.io"));
+          const install=js.slice(js.indexOf('widgetInstallButton?.addEventListener("click"'),
+            js.indexOf('salaryYearButton.addEventListener("click"'));
+          assert.ok(install.includes("downloadLink.click()"));
+          assert.ok(!install.includes("sendCurrentStateBackToNativeWidget("));
+          const start=js.indexOf("function getNativeWidgetAccountId()");
+          const end=js.indexOf("function readNativeWidgetLaunchPayload(",start);
+          assert.ok(start>=0&&end>start);
+          const store=new Map();
+          const localStorage={
+            setItem:(k,v)=>store.set(k,String(v)),
+            getItem:(k)=>store.has(k)?store.get(k):null,
+            removeItem:(k)=>store.delete(k)
+          };
+          let installed=false, calls=0, checked=0;
+          const context={
+            authMode:"guest",activeGuestUser:{uid:"guest-A"},activeGoogleUser:null,
+            deviceId:"test-device",Date,console,
+            localStorage,
+            navigator:{getInstalledRelatedApps:async()=>{
+              checked++;
+              return installed?[{platform:"play",id:"com.cat.attendance.widget"}]:[];
+            }},
+            CAT_BROWSER_ENV:{isAndroid:true,isNaverInApp:false},
+            NATIVE_WIDGET_VERIFIED_KEY:"cat-attendance-native-widget-verified-v2",
+            NATIVE_WIDGET_PAIR_NONCE_KEY:"cat-attendance-native-widget-pair-nonce-v2",
+            NATIVE_WIDGET_PACKAGE_ID:"com.cat.attendance.widget",
+            crypto:{randomUUID:()=>"nonce-A"},
+            sendCurrentStateBackToNativeWidget:()=>{calls++;},
+            updateCloudSyncStatus:()=>{}
+          };
+          context.globalThis=context;
+          vm.createContext(context);
+          vm.runInContext(js.slice(start,end),context);
+          localStorage.setItem("cat-attendance-native-widget-paired-v1","1");
+          assert.equal(await vm.runInContext("detectInstalledNativeWidgetAndAutoConnect({force:true})",context),false);
+          assert.equal(calls,0);
+          assert.equal(vm.runInContext("hasNativeWidgetPairing()",context),false);
+          installed=true;
+          assert.equal(await vm.runInContext("detectInstalledNativeWidgetAndAutoConnect({force:true})",context),true);
+          assert.equal(calls,1);
+          assert.equal(await vm.runInContext("detectInstalledNativeWidgetAndAutoConnect({force:true})",context),true);
+          assert.equal(calls,1);
+          assert.equal(vm.runInContext('acknowledgeNativeWidgetPairing({sourceDeviceId:"android-widget-pair:wrong",widgetPairingNonce:"nonce-A"})',context),false);
+          assert.equal(vm.runInContext('acknowledgeNativeWidgetPairing({sourceDeviceId:"android-widget-pair:test-device",widgetPairingNonce:"nonce-A"})',context),true);
+          assert.equal(vm.runInContext("hasNativeWidgetPairing()",context),true);
+          installed=false;
+          assert.equal(await vm.runInContext("detectInstalledNativeWidgetAndAutoConnect({force:true})",context),false);
+          assert.equal(vm.runInContext("hasNativeWidgetPairing()",context),false);
+          assert.equal(calls,1);
+          context.navigator.getInstalledRelatedApps=undefined;
+          assert.equal(await vm.runInContext("detectInstalledNativeWidgetAndAutoConnect({force:true})",context),false);
+          assert.equal(calls,1);
+          console.log("PASS: installed detection, no popup on missing APK, nonce ACK, uninstall, API fallback; checks:",checked);
+          NODE
