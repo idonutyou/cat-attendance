@@ -1,0 +1,62 @@
+name: Validate CAT widget no-restart sync hotfix
+on:
+  push:
+    branches:
+      - backup/cat-mobile-restart-rootfix-20261107-p60
+permissions:
+  contents: read
+jobs:
+  validate-web-widget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Install Android build tools
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+      - name: Build existing web app
+        run: |
+          npm ci
+          npm run build
+      - name: Compile updated widget APK (debug, no signing/release)
+        run: |
+          gradle -p android-widget :app:assembleDebug -PCAT_APP_URL="https://idonutyou.github.io/cat-attendance/"
+          test -s android-widget/app/build/outputs/apk/debug/app-debug.apk
+      - name: Verify required invariants
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const read = (p) => fs.readFileSync(p, 'utf8');
+          const work = read('android-widget/app/src/main/java/com/cat/attendance/widget/WorkTypeActivity.java');
+          const data = read('android-widget/app/src/main/java/com/cat/attendance/widget/WidgetDataStore.java');
+          const cloud = read('android-widget/app/src/main/java/com/cat/attendance/widget/WidgetCloudSync.java');
+          const sync = read('android-widget/app/src/main/java/com/cat/attendance/widget/WidgetSyncActivity.java');
+          const web = read('src/main.js');
+          const widgetSave = work.split('private void syncWidgetChangeToApp()')[1]?.split('private void updateWindowBounds()')[0] || '';
+          assert.ok(widgetSave.includes('WidgetCloudSync.pushCurrentStateAsync(this)'));
+          assert.ok(!widgetSave.includes('deliverPendingToRunningAppSilently'));
+          const replace = data.split('public static void replaceFromWeb(')[1]?.split('public static String buildPendingPayload(')[0] || '';
+          assert.ok(replace.includes('KEY_PENDING'));
+          assert.ok(!replace.includes('.putString(KEY_PENDING, "{}")'));
+          assert.ok(data.includes('oldValue.toString().equals(currentValue.toString())'));
+          assert.ok(cloud.includes('pendingBatch'));
+          assert.ok(cloud.includes('JSONObject mergedRecords'));
+          assert.ok(!cloud.includes('WidgetDataStore.getRecordsSnapshot(context).toString()'));
+          assert.ok(sync.includes('WidgetCloudSync.pushCurrentStateAsync(this)'));
+          assert.ok(web.includes('!activeGuestUser?.refreshToken'));
+          assert.ok(web.includes('sendCurrentStateBackToNativeWidget({ userInitiated: true })'));
+          console.log('No-launch, no-loss, widget cloud merge, Guest bridge: PASS');
+          NODE
