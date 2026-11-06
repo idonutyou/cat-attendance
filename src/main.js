@@ -43,6 +43,7 @@ const WEEK_START_KEY = "cat-attendance-week-start-v1";
 const AUTH_MODE_KEY = "cat-attendance-auth-mode-v1";
 const ACTIVE_GOOGLE_UID_KEY = "cat-attendance-active-google-uid-v1";
 const GUEST_SNAPSHOT_KEY = "cat-attendance-guest-snapshot-v1";
+const GUEST_CLOUD_DIRTY_KEY = "cat-attendance-guest-cloud-dirty-v1";
 const GOOGLE_CACHE_PREFIX = "cat-attendance-google-cache-v1";
 const DEVICE_ID_KEY = "cat-attendance-device-id-v1";
 const WIDGET_SYNC_APPLIED_KEY = "cat-attendance-widget-sync-applied-v1";
@@ -9981,6 +9982,32 @@ function getGoogleCacheKey(uid) {
   return `${GOOGLE_CACHE_PREFIX}:${uid}`;
 }
 
+// Compare JSON record maps independent of object key order. Android's
+// JSONObject and the browser may serialize the same dates differently.
+function sameSyncedRecords(left, right) {
+  if (left === right) return true;
+  if (!left || !right || typeof left !== "object" || typeof right !== "object") {
+    return false;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return leftKeys.length === rightKeys.length && leftKeys.every((key) =>
+    Object.prototype.hasOwnProperty.call(right, key) &&
+    sameSyncedRecords(left[key], right[key])
+  );
+}
+
+function equivalentSyncedStorageValue(key, local, incoming) {
+  if (local === incoming) return true;
+  if (key !== STORAGE_KEY || local === null || incoming === null) return false;
+  try {
+    return sameSyncedRecords(JSON.parse(local), JSON.parse(incoming));
+  } catch {
+    return false;
+  }
+}
+
 function applyAppStorageSnapshot(snapshot) {
   if (!snapshot?.storage || typeof snapshot.storage !== "object") {
     return false;
@@ -9991,7 +10018,9 @@ function applyAppStorageSnapshot(snapshot) {
   const updates = SYNCED_STORAGE_KEYS.map((key) => {
     const value = snapshot.storage[key];
     return [key, typeof value === "string" ? value : null];
-  }).filter(([key, value]) => localStorage.getItem(key) !== value);
+  }).filter(([key, value]) =>
+    !equivalentSyncedStorageValue(key, localStorage.getItem(key), value)
+  );
 
   if (updates.length === 0) {
     return false;
@@ -10043,6 +10072,23 @@ function refreshVisibleAppValuesAfterWidgetSync() {
 // The Android widget uploads a full record map, which may have been built
 // before the user changed a different date in this PWA. Merge only the dates
 // that actually changed on the widget side since our last cloud baseline.
+function isGuestCloudDirty() {
+  try {
+    return localStorage.getItem(GUEST_CLOUD_DIRTY_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setGuestCloudDirty(dirty) {
+  try {
+    if (dirty) localStorage.setItem(GUEST_CLOUD_DIRTY_KEY, "1");
+    else localStorage.removeItem(GUEST_CLOUD_DIRTY_KEY);
+  } catch {
+    // Keep local records operational even when persistent storage is blocked.
+  }
+}
+
 function parseGuestRecordMap(value) {
   if (typeof value !== "string") return {};
   try {
@@ -10080,7 +10126,7 @@ function applyGuestWidgetCloudSnapshot(snapshot) {
   const localRecords = loadRecords();
   const mergedRecords = { ...localRecords };
   const incomingRecords = parseGuestRecordMap(incomingRecordsValue);
-  const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+  const same = sameSyncedRecords;
   let recordsChanged = false;
 
   if (typeof incomingRecordsValue === "string") {
@@ -10316,6 +10362,7 @@ async function initializeGuestCloudBridge() {
     }
 
     const editedDuringRestore =
+      isGuestCloudDirty() ||
       guestLocalRevision !== startingRevision ||
       guestCloudWritePending ||
       Boolean(guestCloudSyncTimer);
@@ -10353,6 +10400,9 @@ async function initializeGuestCloudBridge() {
         scheduleGuestCloudSync();
       } else {
         saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, localSnapshot);
+        if (!guestCloudSyncTimer && !guestCloudWriteInFlight) {
+          setGuestCloudDirty(false);
+        }
       }
     }
 
@@ -10419,8 +10469,14 @@ function subscribeToGuestCloudChanges() {
       if (
         guestCloudWritePending ||
         guestCloudSyncTimer ||
-        guestCloudWriteInFlight
+        guestCloudWriteInFlight ||
+        isGuestCloudDirty()
       ) {
+        // A failed/disconnected Guest upload must not be undone by a
+        // delayed snapshot in the next browser session.
+        if (isGuestCloudDirty() && !guestCloudWritePending) {
+          scheduleGuestCloudSync();
+        }
         return;
       }
       if (applyAppStorageSnapshot(incomingSnapshot)) {
@@ -10499,6 +10555,7 @@ async function flushGuestCloudSync() {
       guestLocalRevision === sentRevision
     ) {
       saveSnapshotToLocalKey(GUEST_SNAPSHOT_KEY, snapshot);
+      if (!guestCloudSyncTimer) setGuestCloudDirty(false);
     }
   } catch (error) {
     console.warn("Guest 위젯 동기화 저장 실패:", error);
@@ -10766,6 +10823,7 @@ function persistGuestSnapshotIfNeeded() {
   }
 
   guestLocalRevision += 1;
+  setGuestCloudDirty(true);
   saveSnapshotToLocalKey(
     GUEST_SNAPSHOT_KEY,
     captureAppStorageSnapshot(),
