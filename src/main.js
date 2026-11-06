@@ -30,8 +30,6 @@ import "./v195-overrides.css";
 import "./v231-night-week.css";
 import { firebaseConfig } from "./firebase-config.js";
 
-window.CAT_DIAG?.("app-module-loaded", "v236");
-
 const STORAGE_KEY = "cat-attendance-records-v1";
 const SETTINGS_KEY = "cat-attendance-settings-by-month-v2";
 const FISCAL_SETTINGS_KEY = "cat-attendance-fiscal-settings-v1";
@@ -123,8 +121,42 @@ function hasNativeWidgetPairing() {
   return false;
 }
 
-// Widget pairing must only be initiated from the explicit WIDGET action.
-// Never launch Android native intents automatically on app/login startup.
+let nativeWidgetAutoPairAttempted = false;
+
+function autoPairNativeWidgetOnAppOpen() {
+  if (
+    nativeWidgetAutoPairAttempted ||
+    !CAT_BROWSER_ENV.isAndroid ||
+    CAT_BROWSER_ENV.isNaverInApp
+  ) {
+    return;
+  }
+
+  const hasFirebaseBridge =
+    (authMode === "google" &&
+      activeGoogleUser?.uid &&
+      activeGoogleUser?.refreshToken) ||
+    (authMode === "guest" &&
+      activeGuestUser?.uid &&
+      activeGuestUser?.refreshToken);
+
+  if (!hasFirebaseBridge) {
+    return;
+  }
+
+  nativeWidgetAutoPairAttempted = true;
+
+  // CAT 앱을 여는 것만으로 새 폰의 위젯에도 현재 로그인 계정과
+  // 근태 데이터를 한 번 전달합니다. 위젯이 없는 폰은 숨은
+  // fallback frame에서 끝나므로 웹앱 화면은 그대로 유지됩니다.
+  window.setTimeout(() => {
+    markNativeWidgetPaired();
+    sendCurrentStateBackToNativeWidget({
+      allowUnpaired: true,
+      allowBackground: true,
+    });
+  }, 180);
+}
 
 function readNativeWidgetLaunchPayload(
   sourceUrl = window.location.href,
@@ -191,6 +223,7 @@ function encodeNativeWidgetPayload(payload) {
 function sendCurrentStateBackToNativeWidget({
   userInitiated = false,
   allowUnpaired = false,
+  allowBackground = false,
 } = {}) {
   try {
     const url = new URL(window.location.href);
@@ -207,8 +240,13 @@ function sendCurrentStateBackToNativeWidget({
       );
     }
 
-    // Native widget calls must come from a real tap; never use login/startup.
-    if (!userInitiated || navigator.userActivation?.isActive === false) {
+    // 앱 -> 위젯 동기화는 사용자가 실제로 근태/설정을 변경한
+    // 클릭/키 입력 동작 안에서만 실행합니다. 자동 페이지 로드에서는
+    // 네이티브 앱 호출을 하지 않아 확인창이 뜨지 않습니다.
+    if (
+      !allowBackground &&
+      (!userInitiated || !navigator.userActivation?.isActive)
+    ) {
       return;
     }
 
@@ -307,7 +345,6 @@ function sendCurrentStateBackToNativeWidget({
     intentLink.rel = "noopener";
     intentLink.style.display = "none";
     document.body.appendChild(intentLink);
-    window.CAT_DIAG?.("native-widget-intent", "dispatch");
     intentLink.click();
     intentLink.remove();
   } catch (error) {
@@ -824,7 +861,6 @@ if (
   typeof window.launchQueue.setConsumer === "function"
 ) {
   window.launchQueue.setConsumer((launchParams) => {
-    window.CAT_DIAG?.("pwa-launchqueue-event");
     const targetUrl =
       typeof launchParams?.targetURL === "string"
         ? launchParams.targetURL
@@ -2315,8 +2351,10 @@ widgetInstallButton?.addEventListener("click", () => {
     return;
   }
 
-  // Explicit installation/sync request: do not mark a widget as paired
-  // before a native widget payload actually returns to the CAT app.
+  // WIDGET 버튼은 설치/업데이트뿐 아니라 새 기기의 최초 연결도 겸합니다.
+  // 사용자가 명시적으로 버튼을 누른 경우에만 미연결 위젯으로 현재
+  // 근태 데이터와 Firebase 브리지 정보를 한 번 전달합니다.
+  markNativeWidgetPaired();
   sendCurrentStateBackToNativeWidget({
     userInitiated: true,
     allowUnpaired: true,
@@ -6066,7 +6104,6 @@ function installBackExitTestHook() {
 }
 
 function handleAppCloseRequest() {
-  window.CAT_DIAG?.("closewatcher-close");
   appCloseWatcher = null;
 
   if (navigationDrawer.classList.contains("open")) {
@@ -6235,7 +6272,6 @@ function resetBackExitState() {
 }
 
 function handleAppBackNavigation() {
-  window.CAT_DIAG?.("history-popstate");
   if (allowAppExitNavigation) {
     return;
   }
@@ -6300,7 +6336,6 @@ function handleAppBackNavigation() {
 }
 
 function completeAppExit(fromCloseWatcher) {
-  window.CAT_DIAG?.("app-exit-request", String(fromCloseWatcher));
   exitBackReady = false;
   allowAppExitNavigation = true;
   window.clearTimeout(exitToastTimer);
@@ -8256,7 +8291,6 @@ function openModal(dateKey, year, month, dayNumber) {
     .forEach((button) => {
       button.addEventListener("click", () => {
         const workTypeId = button.dataset.workType;
-        window.CAT_DIAG?.("work-type-selected", workTypeId);
 
         if (workTypeId === "annualLeave") {
           showAnnualLeaveChoice();
@@ -8268,7 +8302,6 @@ function openModal(dateKey, year, month, dayNumber) {
         saveRecords();
         closeModal();
         render();
-        window.CAT_DIAG?.("work-ui-rendered", workTypeId);
       });
     });
 
@@ -9412,18 +9445,15 @@ function loadRecords() {
 }
 
 function saveRecords() {
-  window.CAT_DIAG?.("save-record-start");
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify(records),
   );
+  // 로컬/Guest 영구 저장을 네이티브 위젯 호출보다 먼저 끝냅니다.
+  // 외부 Activity 전환이 발생해도 방금 선택한 근무형태가 사라지지 않습니다.
   persistGuestSnapshotIfNeeded();
   scheduleCloudSync();
-  window.CAT_DIAG?.("save-record-local-done");
-  // Restore the v234 immediate widget path removed in v235. Keep
-  // its attempt visible in local diagnostics for PWA restart triage.
   sendCurrentStateBackToNativeWidget({ userInitiated: true });
-  window.CAT_DIAG?.("save-record-done");
 }
 
 function loadWeeklyDateRange() {
@@ -9909,7 +9939,6 @@ function showAuthGate() {
 }
 
 function showAppShell() {
-  window.CAT_DIAG?.("app-shell-show");
   authGate.hidden = true;
   authGate.setAttribute("aria-hidden", "true");
   appShell.hidden = false;
@@ -10224,6 +10253,7 @@ async function initializeGuestCloudBridge() {
     }
 
     subscribeToGuestCloudChanges();
+    autoPairNativeWidgetOnAppOpen();
     return true;
   } catch (error) {
     // Guest 자체 저장은 로컬로 계속 정상 동작합니다. Firebase 익명 인증이
@@ -10514,6 +10544,7 @@ async function enterGoogleMode(user) {
   }
 
   subscribeToCloudChanges();
+  autoPairNativeWidgetOnAppOpen();
 
   if (widgetDataApplied) {
     scheduleCloudSync();
@@ -10828,7 +10859,6 @@ async function restoreSavedLoginMode() {
 }
 
 function initializeSplashScreen() {
-  window.CAT_DIAG?.("app-splash-init");
   const splash = document.querySelector("#appSplash");
 
   if (!splash) {
