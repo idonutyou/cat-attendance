@@ -35,6 +35,57 @@ public final class WidgetCloudSync {
         EXECUTOR.execute(() -> pushCurrentState(appContext));
     }
 
+    // A pairing acknowledgement is written only by the installed Android
+    // widget application. Updating metadata fields cannot overwrite records.
+    public static void confirmPairingAsync(Context context, String deviceId, String nonce) {
+        if (context == null || deviceId == null || nonce == null ||
+                deviceId.isEmpty() || nonce.isEmpty() ||
+                deviceId.length() > 128 || nonce.length() > 128) {
+            return;
+        }
+        Context appContext = context.getApplicationContext();
+        EXECUTOR.execute(() -> confirmPairing(appContext, deviceId, nonce));
+    }
+
+    private static void confirmPairing(Context context, String deviceId, String nonce) {
+        WidgetDataStore.CloudBridgeCredentials credentials =
+                WidgetDataStore.getCloudBridgeCredentials(context);
+        if (credentials == null) return;
+        try {
+            TokenResult tokenResult = refreshIdToken(credentials);
+            if (tokenResult == null || tokenResult.idToken.isEmpty()) return;
+            if (!tokenResult.refreshToken.isEmpty() &&
+                    !tokenResult.refreshToken.equals(credentials.refreshToken)) {
+                WidgetDataStore.updateCloudRefreshToken(context, tokenResult.refreshToken);
+            }
+
+            JSONObject fields = new JSONObject()
+                    .put("sourceDeviceId", new JSONObject().put(
+                            "stringValue", "android-widget-pair:" + deviceId))
+                    .put("widgetPairingNonce", new JSONObject().put(
+                            "stringValue", nonce))
+                    .put("updatedAt", new JSONObject().put(
+                            "timestampValue", getUtcTimestamp()));
+            JSONObject update = new JSONObject().put("update",
+                    new JSONObject()
+                            .put("name", buildDocumentName(credentials.projectId, credentials.uid))
+                            .put("fields", fields))
+                    .put("updateMask", new JSONObject().put("fieldPaths",
+                            new org.json.JSONArray()
+                                    .put("sourceDeviceId")
+                                    .put("widgetPairingNonce")
+                                    .put("updatedAt")));
+            JSONObject body = new JSONObject()
+                    .put("writes", new org.json.JSONArray().put(update));
+
+            requestJson("POST", buildCommitUrl(credentials.projectId),
+                    tokenResult.idToken, "application/json; charset=UTF-8",
+                    body.toString());
+        } catch (Exception ignored) {
+            // The app remains unpaired when the native acknowledgement fails.
+        }
+    }
+
     private static void pushCurrentState(Context context) {
         WidgetDataStore.CloudBridgeCredentials credentials =
                 WidgetDataStore.getCloudBridgeCredentials(context);
