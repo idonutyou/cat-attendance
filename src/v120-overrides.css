@@ -5,15 +5,19 @@
   background: var(--annual-leave, #10b981) !important;
 }
 
-.type-earlyLeave .work-badge,
+/* Native widget: calendar badge is green; picker dots stay amber. */
+.type-earlyLeave .work-badge {
+  background: var(--annual-leave, #10b981) !important;
+}
+
 .type-earlyLeave .work-type-color,
 .summary-dot.type-earlyLeave {
   background: #f59e0b !important;
 }
 
 .date-picker-work-name.type-earlyLeave {
-  color: #b45309 !important;
-  background: #fef3c7 !important;
+  color: #047857 !important;
+  background: #d1fae5 !important;
 }
 
 .date-picker-work-name.type-halfAnnualLeave {
@@ -27,34 +31,39 @@
 
 .annual-leave-choice {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
   margin: 4px 0 2px;
 }
 
 .annual-leave-choice button {
-  min-height: 76px;
-  border: 1px solid #dbe3ec;
-  border-radius: 18px;
+  min-height: 66px;
+  border: 1px solid #d8e0ea;
+  border-radius: 16px;
   color: #334155;
-  background: #fff;
+  background: #f8fafc;
   font: inherit;
   font-size: 17px;
   font-weight: 900;
   cursor: pointer;
 }
 
+.annual-leave-choice button.is-selected {
+  color: #ffffff;
+  border-color: #10b981;
+  background: #10b981;
+}
+
 .annual-leave-choice button:active {
   transform: scale(0.98);
-  background: #f0fdf4;
 }
 
 @media (max-width: 640px) {
   .annual-leave-choice {
-    gap: 10px;
+    gap: 6px;
   }
 
   .annual-leave-choice button {
-    min-height: 72px;
+    min-height: 62px;
   }
 }
