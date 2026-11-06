@@ -240,11 +240,16 @@ function sendCurrentStateBackToNativeWidget({
       return;
     }
 
-    // Never launch an Android widget intent on ordinary Galaxy phones that
-    // have never been connected to the CAT widget. This prevents Chrome/PWA
-    // from relaunching or showing an app/store error when no widget exists.
-    // Paired widget phones continue through the exact existing sync path.
-    if (!allowUnpaired && !hasNativeWidgetPairing()) {
+    // The v1 "paired" marker was set automatically on login, even when
+    // no widget was installed. v2 accepts only an actual native ACK.
+    let pairingNonce = "";
+    if (allowUnpaired && userInitiated) {
+      try {
+        pairingNonce =
+          localStorage.getItem(NATIVE_WIDGET_PAIR_NONCE_KEY) || "";
+      } catch {}
+    }
+    if (!hasNativeWidgetPairing() && !pairingNonce) {
       return;
     }
 
@@ -288,6 +293,10 @@ function sendCurrentStateBackToNativeWidget({
         : "sunday",
       firebaseBridge,
       syncedAt: Date.now(),
+      ...(pairingNonce ? {
+        pairingDeviceId: deviceId,
+        pairingNonce,
+      } : {}),
     });
 
     if (!encodedPayload) {
@@ -1016,6 +1025,7 @@ app.innerHTML = `
         </section>
 
         <div class="navigation-utility-row">
+          <div class="widget-actions" style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 104px;">
           <button
             id="widgetInstallButton"
             class="widget-install-button"
@@ -1033,6 +1043,10 @@ app.innerHTML = `
               </span>
             </span>
           </button>
+          <button id="widgetConnectButton" type="button"
+            style="width:104px;min-height:25px;border-radius:9px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;"
+            title="이미 CAT 위젯 APK를 설치했다면 눌러 연결 확인">위젯 연결</button>
+          </div>
 
           <div
             id="weekStartToggle"
@@ -1996,6 +2010,7 @@ const accountEmail = document.querySelector("#accountEmail");
 const cloudSyncStatus = document.querySelector("#cloudSyncStatus");
 const accountSwitchButton = document.querySelector("#accountSwitchButton");
 const widgetInstallButton = document.querySelector("#widgetInstallButton");
+const widgetConnectButton = document.querySelector("#widgetConnectButton");
 const monthTitle = document.querySelector("#monthTitle");
 const calendarGrid = document.querySelector("#calendarGrid");
 const mainCalendarWeekdays = document.querySelector(
@@ -2335,15 +2350,8 @@ widgetInstallButton?.addEventListener("click", () => {
     return;
   }
 
-  // WIDGET 버튼은 설치/업데이트뿐 아니라 새 기기의 최초 연결도 겸합니다.
-  // 사용자가 명시적으로 버튼을 누른 경우에만 미연결 위젯으로 현재
-  // 근태 데이터와 Firebase 브리지 정보를 한 번 전달합니다.
-  markNativeWidgetPaired();
-  sendCurrentStateBackToNativeWidget({
-    userInitiated: true,
-    allowUnpaired: true,
-  });
-
+  // WIDGET downloads an APK only. Neither a download click nor guest
+  // login proves the native widget is installed.
   const downloadLink = document.createElement("a");
   downloadLink.href = widgetInstallUrl;
   downloadLink.download = "CAT-widget.apk";
@@ -2351,6 +2359,25 @@ widgetInstallButton?.addEventListener("click", () => {
   document.body.append(downloadLink);
   downloadLink.click();
   downloadLink.remove();
+});
+
+widgetConnectButton.addEventListener("click", () => {
+  if (!CAT_BROWSER_ENV.isAndroid || CAT_BROWSER_ENV.isNaverInApp) {
+    window.alert("안드로이드에서 CAT 위젯 APK를 설치한 뒤 연결할 수 있습니다.");
+    return;
+  }
+  if (!getNativeWidgetAccountId()) {
+    window.alert("Guest 또는 Google 로그인 동기화 연결 후 시도해 주세요.");
+    return;
+  }
+  // Explicit pairing is user initiated; no automatic package probe is ever run.
+  const nonce = globalThis.crypto?.randomUUID?.() ||
+    `cat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(NATIVE_WIDGET_PAIR_NONCE_KEY, nonce);
+  sendCurrentStateBackToNativeWidget({
+    userInitiated: true, allowUnpaired: true,
+  });
+  updateCloudSyncStatus("위젯 연결 확인 중…");
 });
 
 salaryYearButton.addEventListener("click", () => {
