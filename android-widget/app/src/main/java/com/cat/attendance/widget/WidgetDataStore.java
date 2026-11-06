@@ -294,11 +294,43 @@ public final class WidgetDataStore {
                 .apply();
     }
 
-    public static void clearPendingAfterCloudSync(Context context) {
-        prefs(context).edit()
-                .putString(KEY_PENDING, "{}")
-                .remove(KEY_WEEK_START_PENDING)
-                .apply();
+    public static void clearPendingAfterCloudSync(
+            Context context,
+            JSONObject confirmedBatch
+    ) {
+        if (confirmedBatch == null) {
+            return;
+        }
+
+        SharedPreferences preferences = prefs(context);
+        JSONObject current = readObject(preferences.getString(KEY_PENDING, "{}"));
+        JSONObject sent = confirmedBatch.optJSONObject("changes");
+        if (sent != null) {
+            Iterator<String> keys = sent.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                JSONObject oldValue = sent.optJSONObject(key);
+                JSONObject currentValue = current.optJSONObject(key);
+                // A newer edit may have arrived while the network write was
+                // in flight. Never remove it as part of an older write.
+                if (oldValue != null && currentValue != null &&
+                        oldValue.toString().equals(currentValue.toString())) {
+                    current.remove(key);
+                }
+            }
+        }
+
+        SharedPreferences.Editor editor = preferences.edit()
+                .putString(KEY_PENDING, current.toString());
+        JSONObject sentWeek = confirmedBatch.optJSONObject("weekStart");
+        JSONObject currentWeek = readObject(
+                preferences.getString(KEY_WEEK_START_PENDING, "{}")
+        );
+        if (sentWeek != null &&
+                sentWeek.toString().equals(currentWeek.toString())) {
+            editor.remove(KEY_WEEK_START_PENDING);
+        }
+        editor.apply();
     }
 
     public static final class CloudBridgeCredentials {
