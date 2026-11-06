@@ -44,6 +44,18 @@ public final class WidgetCloudSync {
         }
 
         try {
+            // Capture only pending widget changes. Never overwrite the whole
+            // Firestore record set with a stale Android widget snapshot.
+            JSONObject pendingBatch = new JSONObject(
+                    WidgetDataStore.buildPendingPayload(context, Integer.MAX_VALUE)
+            );
+            JSONObject pendingChanges = pendingBatch.optJSONObject("changes");
+            JSONObject pendingWeekStart = pendingBatch.optJSONObject("weekStart");
+            if ((pendingChanges == null || pendingChanges.length() == 0)
+                    && pendingWeekStart == null) {
+                return;
+            }
+
             TokenResult tokenResult = refreshIdToken(credentials);
             if (tokenResult == null || tokenResult.idToken.isEmpty()) {
                 return;
@@ -75,20 +87,53 @@ public final class WidgetCloudSync {
                     ? new JSONObject()
                     : new JSONObject(remoteStorageFields.toString());
 
+            JSONObject remoteRecordsField =
+                    nextStorageFields.optJSONObject(RECORDS_STORAGE_KEY);
+            JSONObject mergedRecords;
+            try {
+                mergedRecords = new JSONObject(remoteRecordsField == null
+                        ? "{}"
+                        : remoteRecordsField.optString("stringValue", "{}"));
+            } catch (Exception invalidRemoteRecords) {
+                // Unknown remote format: retain it rather than lose records.
+                return;
+            }
+
+            if (pendingChanges != null) {
+                java.util.Iterator<String> keys = pendingChanges.keys();
+                while (keys.hasNext()) {
+                    String dateKey = keys.next();
+                    JSONObject change = pendingChanges.optJSONObject(dateKey);
+                    if (change == null) {
+                        continue;
+                    }
+                    String type = change.optString("type", "");
+                    if (type.isEmpty()) {
+                        mergedRecords.remove(dateKey);
+                    } else if ("custom".equals(type) &&
+                            change.optJSONObject("record") != null) {
+                        mergedRecords.put(dateKey, change.optJSONObject("record"));
+                    } else {
+                        mergedRecords.put(dateKey, type);
+                    }
+                }
+            }
+
             nextStorageFields.put(
                     RECORDS_STORAGE_KEY,
-                    new JSONObject().put(
-                            "stringValue",
-                            WidgetDataStore.getRecordsSnapshot(context).toString()
-                    )
+                    new JSONObject().put("stringValue", mergedRecords.toString())
             );
-            nextStorageFields.put(
-                    WEEK_START_STORAGE_KEY,
-                    new JSONObject().put(
-                            "stringValue",
-                            WidgetDataStore.getWeekStartValue(context)
-                    )
-            );
+            // Only change the remote week start when the user changed it
+            // inside the widget. Other app settings must remain untouched.
+            if (pendingWeekStart != null) {
+                nextStorageFields.put(
+                        WEEK_START_STORAGE_KEY,
+                        new JSONObject().put(
+                                "stringValue",
+                                pendingWeekStart.optString("value", "sunday")
+                        )
+                );
+            }
 
             JSONObject patchFields = new JSONObject();
             patchFields.put(
@@ -147,7 +192,7 @@ public final class WidgetCloudSync {
             );
 
             if (committed != null) {
-                WidgetDataStore.clearPendingAfterCloudSync(context);
+                WidgetDataStore.clearPendingAfterCloudSync(context, pendingBatch);
             }
         } catch (Exception ignored) {
             // 위젯 화면/앱 실행 상태에는 영향을 주지 않고 다음 변경 때 재시도합니다.
