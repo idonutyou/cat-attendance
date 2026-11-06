@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">CAT</string>
     <string name="widget_description">CAT 근태 달력 위젯</string>
+    <string name="asset_statements">[{\"relation\":[\"delegate_permission/common.handle_all_urls\"],\"target\":{\"namespace\":\"web\",\"site\":\"https://idonutyou.github.io\"}}]</string>
 </resources>
