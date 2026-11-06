@@ -1917,6 +1917,12 @@ app.innerHTML = `
         >
           조퇴
         </button>
+        <button
+          type="button"
+          data-annual-leave-choice="vacation"
+        >
+          휴가
+        </button>
       </div>
 
       <div
@@ -4113,11 +4119,17 @@ annualLeaveChoice.addEventListener("click", (event) => {
 
   const workTypeId = button.dataset.annualLeaveChoice;
 
-  if (!["halfAnnualLeave", "annualLeave", "earlyLeave"].includes(workTypeId)) {
+  if (workTypeId === "vacation") {
+    // Reuse the widget's existing record representation for vacation.
+    records[selectedDateKey] = {
+      type: CUSTOM_WORK_TYPE.id,
+      label: "휴가",
+    };
+  } else if (["halfAnnualLeave", "annualLeave", "earlyLeave"].includes(workTypeId)) {
+    records[selectedDateKey] = workTypeId;
+  } else {
     return;
   }
-
-  records[selectedDateKey] = workTypeId;
 
   saveRecords();
   closeModal();
@@ -8364,7 +8376,11 @@ function openModal(dateKey, year, month, dayNumber) {
   const selectedWorkRecord = records[dateKey];
   const selectedWorkType = getWorkType(selectedWorkRecord);
   const selectedWorkTypeId = selectedWorkType?.id || "";
+  const isVacation =
+    isCustomWorkRecord(selectedWorkRecord) &&
+    normalizeCustomLabel(selectedWorkRecord.label) === "휴가";
   const leaveChoiceSelected =
+    isVacation ||
     ["halfAnnualLeave", "annualLeave", "earlyLeave"].includes(selectedWorkTypeId);
 
   annualLeaveChoice.hidden = true;
@@ -8378,7 +8394,7 @@ function openModal(dateKey, year, month, dayNumber) {
         ? leaveChoiceSelected
         : selectedWorkTypeId === workType.id;
       const pickerLabel = workType.id === "annualLeave"
-        ? "연차 / 조퇴"
+        ? "연차 / 조퇴 / 휴가"
         : workType.label;
 
       return `
@@ -8397,7 +8413,7 @@ function openModal(dateKey, year, month, dayNumber) {
     <button
       type="button"
       class="work-type-button type-custom
-        ${selectedWorkTypeId === CUSTOM_WORK_TYPE.id ? "selected" : ""}"
+        ${selectedWorkTypeId === CUSTOM_WORK_TYPE.id && !isVacation ? "selected" : ""}"
       data-custom-work-type
     >
       <span class="work-type-color"></span>
@@ -8430,14 +8446,14 @@ function openModal(dateKey, year, month, dayNumber) {
 
   customWorkTypeButton.addEventListener("click", () => {
     const initialValue =
-      selectedWorkTypeId === CUSTOM_WORK_TYPE.id
+      selectedWorkTypeId === CUSTOM_WORK_TYPE.id && !isVacation
         ? selectedWorkType.label
         : "";
 
     showCustomWorkTypeEditor(initialValue);
   });
 
-  if (selectedWorkTypeId === CUSTOM_WORK_TYPE.id) {
+  if (selectedWorkTypeId === CUSTOM_WORK_TYPE.id && !isVacation) {
     showCustomWorkTypeEditor(selectedWorkType.label);
   } else {
     hideCustomWorkTypeEditor();
@@ -8450,6 +8466,20 @@ function openModal(dateKey, year, month, dayNumber) {
 }
 
 function showAnnualLeaveChoice() {
+  const selectedRecord = records[selectedDateKey];
+  const selectedType = getWorkType(selectedRecord)?.id || "";
+  const selectedChoice =
+    isCustomWorkRecord(selectedRecord) &&
+    normalizeCustomLabel(selectedRecord.label) === "휴가"
+      ? "vacation"
+      : selectedType;
+
+  annualLeaveChoice.querySelectorAll("[data-annual-leave-choice]").forEach((button) => {
+    const selected = button.dataset.annualLeaveChoice === selectedChoice;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+
   workTypeList.hidden = true;
   hideCustomWorkTypeEditor();
   annualLeaveChoice.hidden = false;
