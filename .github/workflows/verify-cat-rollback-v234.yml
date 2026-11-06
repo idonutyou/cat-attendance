@@ -1,0 +1,51 @@
+name: Verify CAT rollback to v234
+on:
+  push:
+    branches:
+      - backup/cat-rollback-v236-20261106-p30
+permissions:
+  contents: read
+jobs:
+  verify-rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+      - name: Check exact v234 files and sync behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD:src/main.js)" = "bc6d54d028a152323243c03aa6988c7c17fe1a20"
+          test "$(git rev-parse HEAD:index.html)" = "7f89aadb897766406135453e85c7067b464724a8"
+          test -s dist/index.html
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const s = fs.readFileSync('src/main.js', 'utf8');
+          const index = fs.readFileSync('index.html', 'utf8');
+          assert.ok(s.includes('function autoPairNativeWidgetOnAppOpen()'));
+          assert.ok(s.includes('autoPairNativeWidgetOnAppOpen();'));
+          assert.ok(s.includes('sendCurrentStateBackToNativeWidget({ userInitiated: true })'));
+          assert.ok(s.includes('function persistGuestSnapshotIfNeeded()'));
+          assert.ok(s.includes('function subscribeToGuestCloudChanges()'));
+          assert.ok(!index.includes('cat-diagnostics.js'));
+          NODE
+      - name: Make two-file recovery ZIP
+        run: |
+          mkdir -p release/src
+          cp src/main.js release/src/main.js
+          cp index.html release/index.html
+          (cd release && zip -q -r ../CAT_v234_restore_files.zip src index.html)
+          unzip -t CAT_v234_restore_files.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CAT_v234_restore_files
+          path: CAT_v234_restore_files.zip
+          if-no-files-found: error
