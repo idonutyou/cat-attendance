@@ -1,0 +1,52 @@
+name: Verify and package CAT Fold7 diagnostic v236
+on:
+  push:
+    branches:
+      - backup/cat-fold7-diagnose-sync-20261106-p50
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build CAT web app
+        run: |
+          npm ci
+          npm run build
+      - name: Validate diagnostic bundle and record/widget path
+        run: |
+          node --check src/main.js
+          node --check public/cat-diagnostics.js
+          test -s dist/cat-diagnostics.js
+          node --input-type=module -e '
+          import fs from "node:fs";
+          import assert from "node:assert/strict";
+          const js=fs.readFileSync("src/main.js","utf8");
+          const html=fs.readFileSync("index.html","utf8");
+          const save=js.split("function saveRecords() {")[1]?.split("function loadWeeklyDateRange()")[0];
+          assert.ok(save?.includes("sendCurrentStateBackToNativeWidget({ userInitiated: true })"));
+          assert.ok(save?.includes("persistGuestSnapshotIfNeeded()"));
+          assert.ok(save?.includes("scheduleCloudSync()"));
+          assert.ok(js.includes("work-ui-rendered"));
+          assert.ok(!js.includes("autoPairNativeWidgetOnAppOpen"));
+          assert.ok(html.includes("cat-diagnostics.js"));
+          assert.ok(fs.readFileSync("dist/index.html","utf8").includes("cat-diagnostics.js"));
+          '
+      - name: Package only changed files
+        run: |
+          mkdir -p hotfix/src hotfix/public
+          cp src/main.js hotfix/src/main.js
+          cp index.html hotfix/index.html
+          cp public/cat-diagnostics.js hotfix/public/cat-diagnostics.js
+          (cd hotfix && zip -q -r ../CAT_Fold7_v236_restore_sync_diagnostics.zip index.html src/main.js public/cat-diagnostics.js)
+          unzip -t CAT_Fold7_v236_restore_sync_diagnostics.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CAT_Fold7_v236_restore_sync_diagnostics
+          path: CAT_Fold7_v236_restore_sync_diagnostics.zip
+          if-no-files-found: error
