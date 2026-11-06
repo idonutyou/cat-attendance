@@ -19,6 +19,9 @@
         android:label="CAT"
         android:supportsRtl="true"
         android:theme="@style/Theme.CATWidget">
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/asset_statements" />
         <receiver
             android:name=".CatCalendarWidgetProvider"
             android:exported="true"
