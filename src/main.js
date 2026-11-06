@@ -121,42 +121,8 @@ function hasNativeWidgetPairing() {
   return false;
 }
 
-let nativeWidgetAutoPairAttempted = false;
-
-function autoPairNativeWidgetOnAppOpen() {
-  if (
-    nativeWidgetAutoPairAttempted ||
-    !CAT_BROWSER_ENV.isAndroid ||
-    CAT_BROWSER_ENV.isNaverInApp
-  ) {
-    return;
-  }
-
-  const hasFirebaseBridge =
-    (authMode === "google" &&
-      activeGoogleUser?.uid &&
-      activeGoogleUser?.refreshToken) ||
-    (authMode === "guest" &&
-      activeGuestUser?.uid &&
-      activeGuestUser?.refreshToken);
-
-  if (!hasFirebaseBridge) {
-    return;
-  }
-
-  nativeWidgetAutoPairAttempted = true;
-
-  // CAT 앱을 여는 것만으로 새 폰의 위젯에도 현재 로그인 계정과
-  // 근태 데이터를 한 번 전달합니다. 위젯이 없는 폰은 숨은
-  // fallback frame에서 끝나므로 웹앱 화면은 그대로 유지됩니다.
-  window.setTimeout(() => {
-    markNativeWidgetPaired();
-    sendCurrentStateBackToNativeWidget({
-      allowUnpaired: true,
-      allowBackground: true,
-    });
-  }, 180);
-}
+// Widget pairing must only be initiated from the explicit WIDGET action.
+// Never launch Android native intents automatically on app/login startup.
 
 function readNativeWidgetLaunchPayload(
   sourceUrl = window.location.href,
@@ -223,8 +189,18 @@ function encodeNativeWidgetPayload(payload) {
 function sendCurrentStateBackToNativeWidget({
   userInitiated = false,
   allowUnpaired = false,
-  allowBackground = false,
 } = {}) {
+  // Android browsers may promote an iframe intent into a foreground PWA
+  // restart. Never send this intent from routine calendar edits or login.
+  // Only the explicit WIDGET action can initiate a native bridge handoff.
+  if (
+    !userInitiated ||
+    !allowUnpaired ||
+    navigator.userActivation?.isActive === false
+  ) {
+    return;
+  }
+
   try {
     const url = new URL(window.location.href);
 
@@ -238,16 +214,6 @@ function sendCurrentStateBackToNativeWidget({
         "",
         `${url.pathname}${url.search}${url.hash}`,
       );
-    }
-
-    // 앱 -> 위젯 동기화는 사용자가 실제로 근태/설정을 변경한
-    // 클릭/키 입력 동작 안에서만 실행합니다. 자동 페이지 로드에서는
-    // 네이티브 앱 호출을 하지 않아 확인창이 뜨지 않습니다.
-    if (
-      !allowBackground &&
-      (!userInitiated || !navigator.userActivation?.isActive)
-    ) {
-      return;
     }
 
     // Android 네이티브 위젯 브리지는 Android에서만 시도합니다.
@@ -2351,10 +2317,8 @@ widgetInstallButton?.addEventListener("click", () => {
     return;
   }
 
-  // WIDGET 버튼은 설치/업데이트뿐 아니라 새 기기의 최초 연결도 겸합니다.
-  // 사용자가 명시적으로 버튼을 누른 경우에만 미연결 위젯으로 현재
-  // 근태 데이터와 Firebase 브리지 정보를 한 번 전달합니다.
-  markNativeWidgetPaired();
+  // Explicit installation/sync request: do not mark a widget as paired
+  // before a native widget payload actually returns to the CAT app.
   sendCurrentStateBackToNativeWidget({
     userInitiated: true,
     allowUnpaired: true,
@@ -4485,7 +4449,6 @@ function saveWeekStartPreference() {
     );
     persistGuestSnapshotIfNeeded();
     scheduleCloudSync();
-    sendCurrentStateBackToNativeWidget({ userInitiated: true });
   } catch (error) {
     console.error(
       "달력 시작 요일 설정을 저장하지 못했습니다.",
@@ -9449,11 +9412,11 @@ function saveRecords() {
     STORAGE_KEY,
     JSON.stringify(records),
   );
-  // 로컬/Guest 영구 저장을 네이티브 위젯 호출보다 먼저 끝냅니다.
-  // 외부 Activity 전환이 발생해도 방금 선택한 근무형태가 사라지지 않습니다.
+  // Keep routine attendance edits inside the PWA; Android intent
+  // launches here can restart the app instead of staying in a hidden frame.
+  // Cloud syncing remains intact for Guest and Google accounts.
   persistGuestSnapshotIfNeeded();
   scheduleCloudSync();
-  sendCurrentStateBackToNativeWidget({ userInitiated: true });
 }
 
 function loadWeeklyDateRange() {
@@ -10253,7 +10216,6 @@ async function initializeGuestCloudBridge() {
     }
 
     subscribeToGuestCloudChanges();
-    autoPairNativeWidgetOnAppOpen();
     return true;
   } catch (error) {
     // Guest 자체 저장은 로컬로 계속 정상 동작합니다. Firebase 익명 인증이
@@ -10544,7 +10506,6 @@ async function enterGoogleMode(user) {
   }
 
   subscribeToCloudChanges();
-  autoPairNativeWidgetOnAppOpen();
 
   if (widgetDataApplied) {
     scheduleCloudSync();
