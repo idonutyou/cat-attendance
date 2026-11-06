@@ -1,0 +1,101 @@
+name: Validate CAT widget verified-pair v240
+on:
+  push:
+    branches:
+      - backup/cat-widget-verified-pair-20261107-p60
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Install Android SDK
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+      - name: Build actual CAT web app
+        run: |
+          npm ci
+          node --check src/main.js
+          npm run build
+      - name: Build actual Android widget debug APK
+        run: |
+          gradle -p android-widget :app:assembleDebug -PCAT_APP_URL="https://idonutyou.github.io/cat-attendance/"
+          test -s android-widget/app/build/outputs/apk/debug/app-debug.apk
+      - name: Pairing and uninstalled-phone regression
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          import vm from 'node:vm';
+          const js = fs.readFileSync('src/main.js', 'utf8');
+          const cloud = fs.readFileSync('android-widget/app/src/main/java/com/cat/attendance/widget/WidgetCloudSync.java','utf8');
+          const native = fs.readFileSync('android-widget/app/src/main/java/com/cat/attendance/widget/WidgetSyncActivity.java','utf8');
+          assert.ok(!js.includes('autoPairNativeWidgetOnAppOpen'));
+          assert.ok(!js.includes('NATIVE_WIDGET_PAIRED_KEY'));
+          assert.ok(js.includes('cat-attendance-native-widget-verified-v2'));
+          assert.ok(js.includes('cat-attendance-native-widget-pair-nonce-v2'));
+          assert.ok(js.includes('id="widgetConnectButton"'));
+          assert.ok(js.includes('widgetConnectButton.addEventListener("click"'));
+          assert.ok(js.includes('!hasNativeWidgetPairing() && !pairingNonce'));
+          assert.ok(js.includes('pairingDeviceId: deviceId'));
+          assert.ok(js.includes('pairingNonce,'));
+          const install=js.slice(js.indexOf('widgetInstallButton.addEventListener('),js.indexOf('widgetConnectButton.addEventListener('));
+          assert.ok(install.includes('downloadLink.click()'));
+          assert.ok(!install.includes('sendCurrentStateBackToNativeWidget('));
+          assert.ok(!install.includes('markNativeWidgetPaired('));
+          const save=js.split('function saveRecords() {')[1].split('function loadWeeklyDateRange()')[0];
+          assert.ok(save.includes('persistGuestSnapshotIfNeeded()'));
+          assert.ok(save.includes('scheduleCloudSync()'));
+          const week=js.split('function saveWeekStartPreference() {')[1].split('function getWidgetInstallUrl()')[0];
+          assert.ok(week.includes('persistGuestSnapshotIfNeeded()'));
+          assert.ok(week.includes('scheduleCloudSync()'));
+          assert.ok(cloud.includes('confirmPairingAsync(Context context, String deviceId, String nonce)'));
+          const ack=cloud.split('private static void confirmPairing(')[1].split('private static void pushCurrentState(')[0];
+          assert.ok(ack.includes('"widgetPairingNonce"'));
+          assert.ok(ack.includes('"sourceDeviceId"'));
+          assert.ok(!ack.includes('WidgetDataStore.replaceFromWeb'));
+          assert.ok(!ack.includes('.put("storage"'));
+          assert.ok(native.includes('WidgetCloudSync.confirmPairingAsync('));
+          const head=js.slice(js.indexOf('function getNativeWidgetAccountId()'),js.indexOf('function readNativeWidgetLaunchPayload('));
+          const storage=new Map();
+          const localStorage={
+            setItem:(k,v)=>storage.set(k,String(v)),
+            getItem:k=>storage.has(k)?storage.get(k):null,
+            removeItem:k=>storage.delete(k)
+          };
+          const context={authMode:'guest',activeGuestUser:{uid:'guest-1'},activeGoogleUser:null,
+            deviceId:'device-1',localStorage,updateCloudSyncStatus:()=>{},
+            NATIVE_WIDGET_VERIFIED_KEY:'cat-attendance-native-widget-verified-v2',
+            NATIVE_WIDGET_PAIR_NONCE_KEY:'cat-attendance-native-widget-pair-nonce-v2'};
+          context.globalThis=context;
+          vm.createContext(context);
+          vm.runInContext(head,context);
+          localStorage.setItem('cat-attendance-native-widget-paired-v1','1');
+          assert.equal(vm.runInContext('hasNativeWidgetPairing()',context),false);
+          localStorage.setItem(context.NATIVE_WIDGET_PAIR_NONCE_KEY,'challenge-123');
+          assert.equal(vm.runInContext('acknowledgeNativeWidgetPairing({widgetPairingNonce:"wrong",sourceDeviceId:"android-widget-pair:device-1"})',context),false);
+          assert.equal(vm.runInContext('hasNativeWidgetPairing()',context),false);
+          assert.equal(vm.runInContext('acknowledgeNativeWidgetPairing({widgetPairingNonce:"challenge-123",sourceDeviceId:"android-widget-pair:device-other"})',context),false);
+          assert.equal(vm.runInContext('acknowledgeNativeWidgetPairing({widgetPairingNonce:"challenge-123",sourceDeviceId:"android-widget-pair:device-1"})',context),true);
+          assert.equal(vm.runInContext('hasNativeWidgetPairing()',context),true);
+          context.activeGuestUser={uid:'guest-2'};
+          assert.equal(vm.runInContext('hasNativeWidgetPairing()',context),false);
+          context.activeGuestUser={uid:'guest-1'};
+          context.deviceId='device-2';
+          assert.equal(vm.runInContext('hasNativeWidgetPairing()',context),false);
+          console.log('Uninstalled, stale marker, invalid ack, valid ack, account/device isolation: PASS');
+          NODE
