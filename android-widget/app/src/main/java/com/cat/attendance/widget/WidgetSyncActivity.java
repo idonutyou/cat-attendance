@@ -37,6 +37,12 @@ public class WidgetSyncActivity extends Activity {
                     // Pairing can arrive after edits were made while offline.
                     // Upload queued widget changes without opening the CAT PWA.
                     WidgetCloudSync.pushCurrentStateAsync(this);
+                    String pairingDeviceId = payload.optString("pairingDeviceId", "");
+                    String pairingNonce = payload.optString("pairingNonce", "");
+                    if (!pairingDeviceId.isEmpty() && !pairingNonce.isEmpty()) {
+                        WidgetCloudSync.confirmPairingAsync(
+                                this, pairingDeviceId, pairingNonce);
+                    }
                 } catch (Exception ignored) {
                     // 잘못된 콜백은 무시하고 앱으로 즉시 돌아갑니다.
                 }
