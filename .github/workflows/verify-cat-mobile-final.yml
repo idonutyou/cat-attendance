@@ -1,0 +1,70 @@
+name: CAT native widget final regression pre-release
+on:
+  push:
+    branches:
+      - backup/cat-mobile-restart-rootfix-20261107-p90
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Install Android API 36
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+      - name: Build web (Guest login and app -> widget sync intact)
+        run: |
+          npm ci
+          npm run build
+      - name: Build native widget
+        run: |
+          gradle -p android-widget :app:assembleDebug -PCAT_APP_URL="https://idonutyou.github.io/cat-attendance/"
+          test -s android-widget/app/build/outputs/apk/debug/app-debug.apk
+      - name: Root-cause and data-loss regression
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const read = p => fs.readFileSync(p, 'utf8');
+          const bridge=read('android-widget/app/src/main/java/com/cat/attendance/widget/WidgetAppBridge.java');
+          const work=read('android-widget/app/src/main/java/com/cat/attendance/widget/WorkTypeActivity.java');
+          const store=read('android-widget/app/src/main/java/com/cat/attendance/widget/WidgetDataStore.java');
+          const cloud=read('android-widget/app/src/main/java/com/cat/attendance/widget/WidgetCloudSync.java');
+          const receiver=read('android-widget/app/src/main/java/com/cat/attendance/widget/WidgetSyncActivity.java');
+          const web=read('src/main.js');
+          const workSync=work.split('private void syncWidgetChangeToApp()')[1]?.split('private void updateWindowBounds()')[0] ?? '';
+          assert.ok(workSync.includes('WidgetCloudSync.pushCurrentStateAsync(this)'));
+          assert.ok(!workSync.includes('WidgetAppBridge.'));
+          assert.ok(!bridge.includes('deliverPendingToRunningAppSilently'));
+          assert.ok(!bridge.includes('CATEGORY_HOME'));
+          const merge=store.split('public static void replaceFromWeb(')[1]?.split('public static String buildPendingPayload(')[0] ?? '';
+          assert.ok(merge.includes('KEY_PENDING'));
+          assert.ok(merge.includes('incoming.put(dateKey, type)'));
+          assert.ok(merge.includes('incoming.remove(dateKey)'));
+          assert.ok(merge.includes('KEY_WEEK_START_PENDING'));
+          assert.ok(!merge.includes('.putString(KEY_PENDING, "{}")'));
+          assert.ok(cloud.includes('WidgetDataStore.buildPendingPayload(context, Integer.MAX_VALUE)'));
+          assert.ok(cloud.includes('remoteRecordsField'));
+          assert.ok(cloud.includes('JSONObject mergedRecords'));
+          assert.ok(!cloud.includes('WidgetDataStore.getRecordsSnapshot(context).toString()'));
+          assert.ok(store.includes('oldValue.toString().equals(currentValue.toString())'));
+          assert.ok(receiver.includes('WidgetCloudSync.pushCurrentStateAsync(this)'));
+          assert.ok(web.includes('!activeGuestUser?.refreshToken'));
+          assert.ok(web.includes('sendCurrentStateBackToNativeWidget({ userInitiated: true })'));
+          assert.ok(web.includes('function subscribeToGuestCloudChanges()'));
+          console.log('All CAT root-cause and Guest/widget data retention invariants passed.');
+          NODE
