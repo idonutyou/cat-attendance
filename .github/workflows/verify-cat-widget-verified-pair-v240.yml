@@ -53,7 +53,7 @@ jobs:
           assert.ok(js.includes('!hasNativeWidgetPairing() && !pairingNonce'));
           assert.ok(js.includes('pairingDeviceId: deviceId'));
           assert.ok(js.includes('pairingNonce,'));
-          const install=js.slice(js.indexOf('widgetInstallButton.addEventListener('),js.indexOf('widgetConnectButton.addEventListener('));
+          const install=js.slice(js.indexOf('widgetInstallButton?.addEventListener('),js.indexOf('widgetConnectButton.addEventListener('));
           assert.ok(install.includes('downloadLink.click()'));
           assert.ok(!install.includes('sendCurrentStateBackToNativeWidget('));
           assert.ok(!install.includes('markNativeWidgetPaired('));
