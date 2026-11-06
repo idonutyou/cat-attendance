@@ -10,8 +10,6 @@ import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.Process;
 import android.os.UserHandle;
 import android.util.Base64;
@@ -20,44 +18,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public final class WidgetAppBridge {
-    private static final long SILENT_HOME_DELAY_MS = 90L;
     private static final String LAUNCH_CACHE_PREFS = "cat_widget_launch_cache";
     private static final String LAUNCH_CACHE_PACKAGE = "package";
     private static final String LAUNCH_CACHE_CLASS = "class";
 
     private WidgetAppBridge() {}
-
-    public static boolean deliverPendingToRunningAppSilently(Activity activity) {
-        if (activity == null) {
-            return false;
-        }
-
-        Intent catIntent = buildCatIntent(activity);
-
-        if (catIntent == null) {
-            return false;
-        }
-
-        if (!startCatIntentWithFallback(activity, catIntent)) {
-            return false;
-        }
-
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            try {
-                Intent homeIntent = new Intent(Intent.ACTION_MAIN)
-                        .addCategory(Intent.CATEGORY_HOME)
-                        .addFlags(
-                                Intent.FLAG_ACTIVITY_NEW_TASK |
-                                Intent.FLAG_ACTIVITY_NO_ANIMATION
-                        );
-
-                activity.getApplicationContext().startActivity(homeIntent);
-            } catch (Exception ignored) {
-            }
-        }, SILENT_HOME_DELAY_MS);
-
-        return true;
-    }
 
     public static boolean openOrResumeCat(Activity activity) {
         if (activity == null) {
